@@ -1,0 +1,11 @@
+0;1; Cosmos Glond;
+1;1; Arrow Root;
+2;1; Dried Ephedrat;
+3;2; Cactus Juice;
+4; ; ;
+5; ; ;
+6; ; ;
+7;1; Drakus Flower;
+8;1; Scillia Beans;
+9;1; Spineflower Berries;
+10;1; Voidroot (+1 Elemental Water);

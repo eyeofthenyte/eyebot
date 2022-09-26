@@ -1,0 +1,11 @@
+*.db
+__pychache__
+
+# configuration files with personal keys
+client_secrets
+credentials
+servers
+service_account
+storage
+eyebot.cfg
+logs/

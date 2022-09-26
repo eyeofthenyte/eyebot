@@ -1,0 +1,11 @@
+0;2; Primordial Balm;
+1;1; Silver Hibiscus;
+2;1; Devil's Bloodleaf;
+3;1; Chromus Slime;
+4;2; Mortflesh Powder;
+5;1; Fennel Silk;
+6;1; Fiend's Ivy;
+7;1; Genko Brush;
+8;2; Luminous Cap Dust;
+9;1; Radiant Synthseed;
+10;1; Wisp Stalks;

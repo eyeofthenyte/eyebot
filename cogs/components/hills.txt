@@ -1,0 +1,11 @@
+0;1; Devil's Bloodleaf;
+1;1; Nightshade Berries;
+2;2; Tail Leaf;
+3;1; Lavender Sprig;
+4; ; ;
+5; ; ;
+6; ; ;
+7;1; Ironwood Heart;
+8;1; Genko Brush;
+9;2; Rock Vine;
+10;1; Harrada Leaf;
