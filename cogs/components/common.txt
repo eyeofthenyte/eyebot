@@ -1,0 +1,11 @@
+0;1; Mandrake Root;
+1;1; Quicksilver Lichen;
+2;1; Quicksilver Lichen;
+3;1; Wild Sageroot;
+4;1; Wild Sageroot;
+5;1; Bloodgrass;
+6;1; Wyrmtongue Petals;
+7;1; Wyrmtongue Petals;
+8;1; Milkweed Seeds;
+9;1; Milkweed Seeds;
+10;1; Mandrake Root;

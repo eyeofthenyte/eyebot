@@ -1,0 +1,12 @@
+**Bloodstone**;*(opaque dark gray with red flecks)*
+**Carnelian**;*(opaque orange to red-brown)*
+**Chalcedony**;*(opaque white)*
+**Chrysoprase**;*(translucent green)*
+**Citrine**;*(transparent pale yellow-brown)*
+**Jasper**;*(opaque blue, black, or brown)*
+**Moonstone**;*(translucent white with pale blue glow)*
+**Onyx**;*(opaque bands of black and white, or pure black or white)*
+**Quartz**;*(transparent white, smoky gray, or yellow)*
+**Sardonyx**;*(opaque bands of red and white)*
+**Star rose quartz**;*(translucent rosy stone with white star-shaped center)*
+**Zircon**;*(transparent pale blue-green)*
