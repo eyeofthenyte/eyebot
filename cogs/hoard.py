@@ -32,7 +32,6 @@ class Hoard(commands.Cog):
     #----------------------------
     @commands.command()
     async def hoard(self, ctx, select):
-        await ctx.message.delete()
         #----------------------------
         # Variables
         #----------------------------
@@ -94,13 +93,11 @@ class Hoard(commands.Cog):
                         mlist[0] = mlist[0]
                     m2_Response[i] = mlist[0]
     
-            print(f'{t()}: {ctx.message.author}({ctx.message.author.guild}) rolled for hoard loot from table {select} * magic table(s) {list[4]}')
             embed = discord.Embed(color=0xffe449)
             embed.set_author(name='Treasure Hoard', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/money-bag_1f4b0.png')
             embed.add_field(name='**__Challange 0 - 4__**', value = str(m_Response).replace("and","\n") + '\n' + m_Magic[0] + str(m2_Response).replace("'","").replace("[","").replace("]","").replace(",","\n"), inline=False)
-            await ctx.send(embed=embed)
-            return
-    
+
+
         #----------------------------
         # Hoard Loot Table 2
         #----------------------------
@@ -145,13 +142,11 @@ class Hoard(commands.Cog):
                         mlist[0] = mlist[0]
                     m2_Response[i] = mlist[0]
     
-            print(f'{t()}: {ctx.message.author}({ctx.message.author.guild}) rolled for hoard loot from table {select} & magic table(s) {list[4]}')
             embed = discord.Embed(color=0xffe449)
             embed.set_author(name='Treasure Hoard', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/money-bag_1f4b0.png')
             embed.add_field(name='**__Challange 5 - 10__**', value = str(m_Response).replace("and","\n") + '\n' + m_Magic[0] + str(m2_Response).replace("'","").replace("[","").replace("]","").replace(",","\n"), inline=False)
-            await ctx.send(embed=embed)
-            return
-    
+
+
         #----------------------------
         # Hoard Loot Table 3
         #----------------------------
@@ -221,12 +216,10 @@ class Hoard(commands.Cog):
                     else:
                         mlist2[0] = mlist2[0]
                     m3_Response[i] = mlist2[0]
-            print(f'{t()}: {ctx.message.author}({ctx.message.author.guild}) rolled for hoard loot from table {select} & magic table(s) {list[4]} {list[8]}')
             embed = discord.Embed(color=0xffe449)
             embed.set_author(name='Treasure Hoard', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/money-bag_1f4b0.png')
             embed.add_field(name='**__Challange 11 - 16__**', value = str(m_Response).replace("and","\n") + '\n' + m_Magic[0] + str(m2_Response).replace("'","").replace("[","").replace("]","").replace(",","\n") + m_Magic[1] + str(m3_Response).replace("'","").replace("[","").replace("]","").replace(",","\n"), inline=False)
-            await ctx.send(embed=embed)
-            return
+
     
         #----------------------------
         # Hoard Loot Table 4
@@ -275,12 +268,10 @@ class Hoard(commands.Cog):
                         mlist[0] = mlist[0]
                     m2_Response[i] = mlist[0]
     
-                print(f'{t()}: {ctx.message.author}({ctx.message.author.guild}) rolled for hoard loot from table {select} & magic table(s) {list[4]}')
                 embed = discord.Embed(color=0xffe449)
                 embed.set_author(name='Treasure Hoard', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/money-bag_1f4b0.png')
                 embed.add_field(name='**__Challange 17+__**', value = str(m_Response).replace("and","\n") + '\n' + m_Magic[0] + str(m2_Response).replace("'","").replace("[","").replace("]","").replace(",","\n"), inline=False)
-                await ctx.send(embed=embed)
-            return
+
 
         #----------------------------
         # Help Operator
@@ -290,19 +281,39 @@ class Hoard(commands.Cog):
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Hoard)', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/warning_26a0.png')
             embed.add_field(name=':moneybag:  **__Hoard__**', value='**Usage: `.hoard #` where `# = 1-4`**\n Number corresponds to the 4 Treasure Hoard tables in DMG - Chapter 7.\nThis will generate all coins and magical items randomly based on table selected.', inline=False)
-            await ctx.send(embed=embed)
-            return
-    
+
+
         else:
             print(f'{t()}: invalid hoard opterator entered.')
             m_Response = "That's not a valid input. Please try again or `.hoard ?` for more information."
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Treasure Hoard', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/prohibited_1f6ab.png')
             embed.add_field(name='**__Error__**', value=f'{m_Response}', inline=False)
+
+
+        if discord.ChannelType == "private":
+            if select == '1':
+                print(f'{t()}: {ctx.message.author} rolled for hoard loot from table {select} * magic table(s) {list[4]}')
+            elif select == '2':
+                print(f'{t()}: {ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]}')
+            elif select == '3':
+                print(f'{t()}: {ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]} {list[8]}')
+            elif select == '4':
+                print(f'{t()}: {ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]}')
+            await message.author.send(embed=embed)
+            return
+        else:
+            if select == '1':
+                print(f'{t()}: {ctx.message.author} rolled for hoard loot from table {select} * magic table(s) {list[4]}')
+            elif select == '2':
+                print(f'{t()}: {ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]}')
+            elif select == '3':
+                print(f'{t()}: {ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]} {list[8]}')
+            elif select == '4':
+                print(f'{t()}: {ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]}')
             await ctx.send(embed=embed)
             return
-        m2_Response=[]
-        m3_response=[]
+
     
 def setup(bot):
     bot.add_cog(Hoard(bot))

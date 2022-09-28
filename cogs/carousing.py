@@ -36,8 +36,12 @@ class Carousing(commands.Cog):
         print(f'Carousing encountered error {error}')
         if isinstance(error, commands.MissingRequiredArgument):
             print(f'{t()}: {ctx.message.author}({ctx.message.author.guild}) is missing or invalid argument for .carousing')
-            await ctx.send(f'Please only type `.carousing` to get a random result.\n Type `.help` for more info.')
-            return
+            if discord.ChannelType == "private":
+                await message.author.send(f'Please only type `.carousing` to get a random result.\n Type `.help` for more info.')
+                return
+            else:
+                await ctx.send(f'Please only type `.carousing` to get a random result.\n Type `.help` for more info.')
+                return
 
     #----------------------------
     # Carousing Command
@@ -50,7 +54,10 @@ class Carousing(commands.Cog):
             embed.set_thumbnail(url = 'https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/google/313/clinking-beer-mugs_1f37b.png')
             embed.set_author(name = 'D100 CAROUSING TABLE')
             embed.add_field(name = 'You wake up... ', value = random.choice(c_list), inline=False)
-            await ctx.send(embed=embed)
+            if discord.ChannelType == "private":
+                await message.author.send(embed=embed)
+            else:
+                await ctx.send(embed=embed)
 
         else: 
             print(f'{t()}: there was an error.')
@@ -58,7 +65,10 @@ class Carousing(commands.Cog):
             embed.set_author(name='Carousing', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/prohibited_1f6ab.png')
             embed.add_field(name='__Error__', value=f"That was not a valid choice. Simply type `carousing`, `carouse`, `drinking`, `getdrinks`, or `pubcrawl` to get a selection from the table.", inline=False)     
             print(f'{t()}: Invalid input for carousing command.')
-            await ctx.send(embed=embed)
+            if discord.ChannelType == "private":
+                await message.author.send(embed=embed)
+            else:
+                await ctx.send(embed=embed)
         
 
 def setup(bot):
