@@ -41,7 +41,6 @@ class Trinket(commands.Cog):
     #----------------------------
     @commands.command()
     async def trinket(self, ctx, *, select):
-        await ctx.message.delete()
         if select.lower() in str(sheet_list).lower():
             for i in range(len(sheet_list)):
                 if select.lower() == sheet_list[i].lower():
@@ -53,14 +52,14 @@ class Trinket(commands.Cog):
                     embed.set_thumbnail(url = str(icon[i]))
                     embed.set_author(name = select.upper() + ' TRINKET')
                     embed.add_field(name = 'You found the following:', value=random.choice(v_list), inline=False)
-                    await ctx.send(embed=embed)
+
 
         elif select == '?':
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Trinket)', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/warning_26a0.png')
             embed.add_field(name='**__Trinket__**', value="**Usage: `.trinket c ` \nwhere `c = character class`**\nCharacter class referrs to Dungeons and Dragons character classes.\nThis data is taken from [Ted's (Nerd Immersion)](https://www.youtube.com/c/NerdImmersion1 'Nerd Immersion') random trinket's tables.", inline=False)
             print(f'{t()}: {ctx.message.author}({ctx.message.author.guild}) asked for help.')
-            await ctx.send(embed=embed)
+
 
         else:
             print(f'{t()}: there was an error.')
@@ -68,6 +67,10 @@ class Trinket(commands.Cog):
             embed.set_author(name='Trinket', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/prohibited_1f6ab.png')
             embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select an available Character Class. Type `.trinket ?` for more info.", inline=False)     
             print(f'{t()}: Invalid input for wildmagic command.')
+
+        if discord.ChannelType == "private":
+            await message.author.send(embed=embed)
+        else:
             await ctx.send(embed=embed)
         
 

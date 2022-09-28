@@ -36,7 +36,6 @@ class Extensions(commands.Cog):
     @commands.command()
     @commands.is_owner()
     async def load(self, ctx, extension):
-        await ctx.message.delete()
         try:
             self.bot.load_extension(f'cogs.{extension}')
             print(f'{t()}: Loaded extension - "{extension}"')
@@ -48,7 +47,10 @@ class Extensions(commands.Cog):
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name = 'LOADING ' + extension.upper() + ' FAILED', icon_url = 'https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/warning_26a0.png')
             embed.add_field(name = '**__Extension Load__**', value = e, inline=False)
-        await ctx.send(embed=embed)
+        if discord.ChannelType == "private":
+            await message.author.send(embed=embed)
+        else:
+            await ctx.send(embed=embed)
 
     @commands.command()
     @commands.is_owner()
@@ -65,7 +67,10 @@ class Extensions(commands.Cog):
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name = 'UNLOADING ' + extension.upper() + ' FAILED', icon_url = 'https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/warning_26a0.png')
             embed.add_field(name = '**__Extension Unload__**', value =  e, inline=False)
-        await ctx.send(embed=embed)
+        if discord.ChannelType == "private":
+            await message.author.send(embed=embed)
+        else:
+            await ctx.send(embed=embed)
 
     @commands.command()
     @commands.is_owner()
@@ -95,7 +100,10 @@ class Extensions(commands.Cog):
                 
         except Exception as e:
             print(f'{t()}: {e}')
-        await ctx.send(embed=embed)
+        if discord.ChannelType == "private":
+            await message.author.send(embed=embed)
+        else:
+            await ctx.send(embed=embed)
 
 def setup(bot):
     bot.add_cog(Extensions(bot))

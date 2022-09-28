@@ -34,8 +34,6 @@ class Loot(commands.Cog):
     @commands.command()
     async def loot(self, ctx, *, select):
 
-        await ctx.message.delete()
-
         # Variables
         m_Response = ''
         d100_roll = random.randrange(1,101)
@@ -56,7 +54,6 @@ class Loot(commands.Cog):
             else:
                 list[0] = 'There was an error.'
             m_Response = "At the end of your job you find... \n" + list[0] + "."
-            print(f'{t()}: {ctx.message.author}({ctx.message.author.guild}) rolled for loot from table 1.')
             embed = discord.Embed(color=0xffe449)
             embed.set_author(name='Indivdual Treasure', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/coin_1fa99.png')
             embed.add_field(name='**__Challange 0 - 4__**', value=f'{m_Response}', inline=False)
@@ -81,7 +78,6 @@ class Loot(commands.Cog):
                 list[0] = 'There was an error.'
 
             m_Response = "At the end of your job you find...\n" + list[0] + '\n' + list[1]
-            print(f'{t()}: {ctx.message.author}({ctx.message.author.guild}) rolled for loot from table 2.')
             embed = discord.Embed(color=0xffe449)
             embed.set_author(name='Indivdual Treasure', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/coin_1fa99.png')
             embed.add_field(name='**__Challange 5 - 10__**', value=f'{m_Response}', inline=False)
@@ -103,7 +99,6 @@ class Loot(commands.Cog):
             else:
                 list[0] = 'There was an error.'
             m_Response = "At the end of your job you find...\n" + list[0] + '\n' + list[1]
-            print(f'{t()}: {ctx.message.author}({ctx.message.author.guild}) rolled for loot from table 3.')
             embed = discord.Embed(color=0xffe449)
             embed.set_author(name='Indivdual Treasure', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/coin_1fa99.png')
             embed.add_field(name='**__Challange 11 - 16__**', value=f'{m_Response}', inline=False)
@@ -122,26 +117,30 @@ class Loot(commands.Cog):
             else:
                 list[0] = 'There was an error.'
             m_Response = "At the end of your job you find...\n" + list[0] + '\n' + list[1]
-            print(f'{t()}: {ctx.message.author}({ctx.message.author.guild}) rolled for loot from table 4.')
             embed = discord.Embed(color=0xffe449)
             embed.set_author(name='Indivdual Treasure', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/coin_1fa99.png')
             embed.add_field(name='**__Challange 17+__**', value=f'{m_Response}', inline=False)
 
         # Help Operator
         elif select == '?':
-            print(f'{t()}: {ctx.message.author}({ctx.message.author.guild}) asked for help with Loot.')
+            print(f'{t()}: {ctx.message.author} asked for help with Loot.')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Loot)', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/warning_26a0.png')
             embed.add_field(name='**__Loot__**', value='**Usage: `.loot #` where `# = 1-4`**\n Number corresponds to the 4 Individual Treasure tables in DMG - Chapter 7.\nThis will generate all coins randomly based on table selected.', inline=False)
 
         else:
-            print(f'{t()}: {ctx.message.author}({ctx.message.author.guild}) entered invalid hoard opterator')
+            print(f'{t()}: {ctx.message.author} entered invalid hoard opterator')
             m_Response = "That's not a valid input. Please try again or `.loot ?` for more information."
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Indivdual Treasure', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/prohibited_1f6ab.png')
             embed.add_field(name='**__Error__**', value=f'{m_Response}', inline=False)                
 
-        await ctx.send(embed=embed)
+        if discord.ChannelType == "private":
+            print(f'{t()}: {ctx.message.author} rolled for loot from table {select}.')
+            await message.author.send(embed=embed)
+        else:
+            print(f'{t()}: {ctx.message.author} rolled for loot from table {select}.')
+            await ctx.send(embed=embed)
 
 def setup(bot):
     bot.add_cog(Loot(bot))

@@ -30,8 +30,6 @@ class WildMagic(commands.Cog):
     @commands.command(aliases=['wildmagic', 'wm', 'surge', 'magicsurge'])
     async def _wildmagic(self, ctx, *, select):
 
-        await ctx.message.delete()
-
         if select == '1':
             try:
                lines = open(os.path.join(os.path.dirname(__file__), './wildmagic/randommagicaleffects2.0.txt')).read().splitlines()
@@ -65,7 +63,10 @@ class WildMagic(commands.Cog):
             embed.add_field(name='__Error__', value=f'That is not a valid input. Please try again or use `.wildmagic ?` for more information.', inline=False)     
             print(f'{t()}: Invalid input for wildmagic command.')
 
-        await ctx.send(embed=embed)
+        if discord.ChannelType == "private":
+            await message.author.send(embed=embed)
+        else:
+            await ctx.send(embed=embed)
 
 def setup(bot):
     bot.add_cog(WildMagic(bot))

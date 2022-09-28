@@ -172,8 +172,12 @@ class Roll(commands.Cog):
 
         minmax_msg = self.get_d20_minmax_msg(rolls)
 
-        await ctx.send(f'{name} rolled a {dice.raw}!\nThe result was:\n{raw_rolls} {minmax_msg}')
-        print(f'{t()}: {name} rolled a {dice.raw}!\nThe result was:\n{raw_rolls} {minmax_msg}')
+        if discord.ChannelType == "private":
+            await message.author.send(f'{name} rolled a {dice.raw}!\nThe result was:\n{raw_rolls} {minmax_msg}')
+            print(f'{t()}: {name} rolled a {dice.raw}!\nThe result was:\n{raw_rolls} {minmax_msg}')
+        else:
+            await ctx.send(f'{name} rolled a {dice.raw}!\nThe result was:\n{raw_rolls} {minmax_msg}')
+            print(f'{t()}: {name} rolled a {dice.raw}!\nThe result was:\n{raw_rolls} {minmax_msg}')
 
     @commands.command(aliases=['r','roll'])
     async def _roll(self, ctx, *, args=None):
@@ -186,12 +190,12 @@ class Roll(commands.Cog):
         results = []
         all_dice_input = []
 
-        print(args)
+        #print(args)
 
         for dice_input in re.split('[,\n]', args):
             if len(dice_input) > 0:
                 all_dice_input.append(dice_input)
-                print(f'{dice_input}')
+
 
         for dice_input in all_dice_input:
             single_mod = ''
@@ -202,18 +206,27 @@ class Roll(commands.Cog):
             try:
                 dice_parts, = re.findall(self.DICE_PATTERN, dice_input)
                 num, sides, mod = dice_parts
-                print(f'The roll consists of:\n{dice_parts}')
             except ValueError:
-                await ctx.send(f'{name} made an invalid roll: [{dice_input}]')
-                print(f'{t()}: {name} made an invalid roll: [{dice_input}]')
-                return
+                if discord.ChannelType == "private":
+                    await ctx.messege.author.send(f'{name} made an invalid roll: [{dice_input}]')
+                    print(f'{t()}: {name} made an invalid roll: [{dice_input}]')
+                    return
+                else:
+                    await ctx.send(f'{name} made an invalid roll: [{dice_input}]')
+                    print(f'{t()}: {name} made an invalid roll: [{dice_input}]')
+                    return
 
             try:
                 dice = Dice(num, sides, mod, single_mod)
             except ValueError as e:
-                await ctx.send(f'{name} made an invalid roll: {e}')
-                print(f'{t()}: {name} made an invalid roll: {e}')
-                return
+                if discord.ChannelType == "private":
+                    await ctx.messege.autho.send(f'{name} made an invalid roll: {e}')
+                    print(f'{t()}: {name} made an invalid roll: {e}')
+                    return
+                else:
+                    await ctx.send(f'{name} made an invalid roll: {e}')
+                    print(f'{t()}: {name} made an invalid roll: {e}')
+                    return
 
             rolls = dice.roll()
 
@@ -222,17 +235,21 @@ class Roll(commands.Cog):
 
             if dice.single_mod != 0:
                 result = (f'{name} rolled a {dice.raw} with a {dice.raw_single_mod} modifier!\nThe result was: {raw_rolls}\nTotal: {sum_rolls + dice.single_mod} ({sum_rolls}{dice.raw_single_mod})')
-                print(f'{t()}: a roll with modifier was made.')
+                print(f'{t()}: a roll with modifier was made: {args}')
             else:
                 result = (f'{name} rolled a {dice.raw}!\nThe result was: {raw_rolls}\nTotal: {sum_rolls}')
-                print(f'{t()}: a straight roll was made.')
+                print(f'{t()}: a straight roll was made: {args}')
 
             result += self.get_d20_minmax_msg(rolls)
 
             results.append(result)
 
-        await ctx.send('\n\n'.join(results))
-        print(f'{t()}: Results sent to discord.')
+        if discord.ChannelType == "private":
+            await message.author.send('\n\n'.join(results))
+            print(f'{t()}: Results sent to DM.')
+        else:
+            await ctx.send('\n\n'.join(results))
+            print(f'{t()}: Results sent to discord.')
 
 
 
