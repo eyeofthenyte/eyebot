@@ -11,6 +11,16 @@ def t():
     now = datetime.datetime.now()
     t = now.strftime(format)
     return t
+
+#Pass Bot Prefix
+def get_prefix():
+    data = open(os.path.join(os.path.dirname(__file__), "../eyebot.cfg")).read().splitlines()
+    prefix = data[1]
+    return prefix
+    data.close()
+
+prefix = get_prefix()
+
 # ---------------------------------------------------------
 # Admin Commands
 # ---------------------------------------------------------

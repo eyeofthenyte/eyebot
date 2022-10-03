@@ -4,6 +4,7 @@ __pycache__/
 .tmp.driveupload/
 .vs/
 .vscode/
+.env
 
 # configuration files with personal keys
 client_secrets.json
@@ -13,3 +14,4 @@ service_account.json
 storage.json
 eyebot.cfg
 logs/
+experimental/

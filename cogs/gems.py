@@ -4,7 +4,22 @@ import random
 from discord.ext import commands, tasks
 from discord import Activity, ActivityType
 from discord.utils import find
-from eyebot import t
+
+#Time Stamp Generation For Console Logging
+def t():
+    format = "%Y/%m/%d %H:%M:%S"
+    now = datetime.datetime.now()
+    t = now.strftime(format)
+    return t
+
+#Pass Bot Prefix
+def get_prefix():
+    data = open(os.path.join(os.path.dirname(__file__), "../eyebot.cfg")).read().splitlines()
+    prefix = data[1]
+    return prefix
+    data.close()
+
+prefix = get_prefix()
 
 # ---------------------------------------------------------
 # Found Gems Generator
@@ -23,12 +38,12 @@ class Gems(commands.Cog):
    
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
-            print(f'{t()}: missing or invalid argument for .gems')
+            print(f'{t()}: missing or invalid argument for gems')
             if discord.ChannelType == "private":
                 await message.author.send(embed=embed)
                 return
-            else:
-                await ctx.send(f'Make sure you put in the value in gp and the quantiy of gems you wish to generate. i.e. `.gems 100 5`')
+            elif discord.ChannelType != "private":
+                await ctx.send(f'Make sure you put in the value in gp and the quantiy of gems you wish to generate. i.e. `{prefix}gems 100 5`')
                 return
 
 
@@ -50,7 +65,6 @@ class Gems(commands.Cog):
         #----------------------------
         # Gem Table Selection
         #----------------------------
-        #await ctx.send("__**The gems that you found are:**__")
         if ckstr == True:
             gemstring = gemstring.split()
             select = gemstring[0]
@@ -69,8 +83,8 @@ class Gems(commands.Cog):
             embed.add_field(name = 'You discovered the following {select} gems:', value = '\n'.join(gems), inline=False)
 
             if discord.ChannelType == "private":
-                await message.author.send(embed=embed)
-            else:
+                await ctx.message.author.send(embed=embed)
+            elif discord.ChannelType != "private":
                 await ctx.send(embed=embed)
 
         else:
@@ -78,20 +92,20 @@ class Gems(commands.Cog):
                 print(f"{t()}: {ctx.message.author}({ctx.message.author.guild}) asked for help with .gems command")
                 embed = discord.Embed(color=0x019cd0)
                 embed.set_author(name='Help (Gems)')
-                embed.add_field(name=':gem:  **__Gems__**', value='**Usage: `.gems g n` \nwhere `g = value of gems desired`**\n*10, 50, 100, 500, 1000, 5000*\n**`     n = number of gems to be generated`**\n The value of gems corresponds to the Gem Tables DMG - Chapter 7.\nThis will generate a number of gems of a single gold value type based the table selected.', inline=False)
+                embed.add_field(name=':gem:  **__Gems__**', value='**Usage: `{prefix}gems g n` \nwhere `g = value of gems desired`**\n*10, 50, 100, 500, 1000, 5000*\n**`     n = number of gems to be generated`**\n The value of gems corresponds to the Gem Tables DMG - Chapter 7.\nThis will generate a number of gems of a single gold value type based the table selected.', inline=False)
                 if discord.ChannelType == "private":
-                    await message.author.send(embed=embed)
-                else:
+                    await ctx.message.author.send(embed=embed)
+                elif discord.ChannelType != "private":
                     await ctx.send(embed=embed)
 
             else:
                 print(t() + " : ({ctx.message.author.guild}) entered invalid argument")
                 embed = discord.Embed(color=0x019cd0)
                 embed.set_author(name='Help (Gems)')
-                embed.add_field(name=':gem:  **__Gems__**', value='**Usage: `.gems g n` \nwhere `g = value of gems desired`**\n*10, 50, 100, 500, 1000, 5000*\n**`     n = number of gems to be generated`**\n The value of gems corresponds to the Gem Tables DMG - Chapter 7.\nThis will generate a number of gems of a single gold value type based the table selected.', inline=False)
+                embed.add_field(name=':gem:  **__Gems__**', value='**Usage: `{prefix}gems g n` \nwhere `g = value of gems desired`**\n*10, 50, 100, 500, 1000, 5000*\n**`     n = number of gems to be generated`**\n The value of gems corresponds to the Gem Tables DMG - Chapter 7.\nThis will generate a number of gems of a single gold value type based the table selected.', inline=False)
                 if discord.ChannelType == "private":
-                    await message.author.send(embed=embed)
-                else:
+                    await ctx.message.author.send(embed=embed)
+                elif discord.ChannelType != "private":
                     await ctx.send(embed=embed)
 
 def setup(bot):

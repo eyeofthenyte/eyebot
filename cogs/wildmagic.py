@@ -4,9 +4,22 @@ import random, contextlib
 from discord.ext import commands, tasks
 from discord import Activity, ActivityType
 from discord.utils import find
-from eyebot import t
 
+#Time Stamp Generation For Console Logging
+def t():
+    format = "%Y/%m/%d %H:%M:%S"
+    now = datetime.datetime.now()
+    t = now.strftime(format)
+    return t
 
+#Pass Bot Prefix
+def get_prefix():
+    data = open(os.path.join(os.path.dirname(__file__), "../eyebot.cfg")).read().splitlines()
+    prefix = data[1]
+    return prefix
+    data.close()
+
+prefix = get_prefix()
 
 # ---------------------------------------------------------
 # Loot Hoard Generator
@@ -55,17 +68,17 @@ class WildMagic(commands.Cog):
         elif select == '?':
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Wild Magic)', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/warning_26a0.png')
-            embed.add_field(name='__WildMagic__', value=f'**Usage: `.wildmagic #`\n other aliases `.wm, .surge, .magicsurge` will also work\nwhere `# = 1` for Net Libram of Magical Efects v1.2 (edited) \nwhere `# = 2` for Net Libram of Magical Efects v2.0**\n Takes random selection of one of the magic effects selections. Good luck!', inline=False)
+            embed.add_field(name='__WildMagic__', value=f'**Usage: `{prefix}wildmagic #`\n other aliases `{prefix}wm, {prefix}surge, {prefix}magicsurge` will also work\nwhere `# = 1` for Net Libram of Magical Efects v1.2 (edited) \nwhere `# = 2` for Net Libram of Magical Efects v2.0**\n Takes random selection of one of the magic effects selections. Good luck!', inline=False)
 
         else:
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Wild Magic', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/prohibited_1f6ab.png')
             embed.add_field(name='__Error__', value=f'That is not a valid input. Please try again or use `.wildmagic ?` for more information.', inline=False)     
-            print(f'{t()}: Invalid input for wildmagic command.')
+            print(f'{t()}: Invalid input for {prefix}wildmagic command.')
 
         if discord.ChannelType == "private":
-            await message.author.send(embed=embed)
-        else:
+            await ctx.message.author.send(embed=embed)
+        elif discord.ChannelType != "private":
             await ctx.send(embed=embed)
 
 def setup(bot):

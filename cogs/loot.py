@@ -4,8 +4,22 @@ import random, contextlib
 from discord.ext import commands, tasks
 from discord import Activity, ActivityType
 from discord.utils import find
-from eyebot import t
 
+#Time Stamp Generation For Console Logging
+def t():
+    format = "%Y/%m/%d %H:%M:%S"
+    now = datetime.datetime.now()
+    t = now.strftime(format)
+    return t
+
+#Pass Bot Prefix
+def get_prefix():
+    data = open(os.path.join(os.path.dirname(__file__), "../eyebot.cfg")).read().splitlines()
+    prefix = data[1]
+    return prefix
+    data.close()
+
+prefix = get_prefix()
 
 # ---------------------------------------------------------
 # Random Loot Generator
@@ -25,7 +39,7 @@ class Loot(commands.Cog):
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
             print(f'{t()}: missing or invalid argument for .loot')
-            await ctx.send('Please choose which single loot table you wish to pick loot from by typing:\n`!loot (1/2/3/4)`.\nPlease try `.loot ?` for more information.')
+            await ctx.send('Please choose which single loot table you wish to pick loot from by typing:\n`{prefix}loot (1/2/3/4)`.\nPlease try `{prefix}loot ?` for more information.')
 
 
     #----------------------------
@@ -126,19 +140,19 @@ class Loot(commands.Cog):
             print(f'{t()}: {ctx.message.author} asked for help with Loot.')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Loot)', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/warning_26a0.png')
-            embed.add_field(name='**__Loot__**', value='**Usage: `.loot #` where `# = 1-4`**\n Number corresponds to the 4 Individual Treasure tables in DMG - Chapter 7.\nThis will generate all coins randomly based on table selected.', inline=False)
+            embed.add_field(name='**__Loot__**', value='**Usage: `{prefix}loot #` where `# = 1-4`**\n Number corresponds to the 4 Individual Treasure tables in DMG - Chapter 7.\nThis will generate all coins randomly based on table selected.', inline=False)
 
         else:
             print(f'{t()}: {ctx.message.author} entered invalid hoard opterator')
-            m_Response = "That's not a valid input. Please try again or `.loot ?` for more information."
+            m_Response = "That's not a valid input. Please try again or `{prefix}loot ?` for more information."
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Indivdual Treasure', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/prohibited_1f6ab.png')
             embed.add_field(name='**__Error__**', value=f'{m_Response}', inline=False)                
 
         if discord.ChannelType == "private":
             print(f'{t()}: {ctx.message.author} rolled for loot from table {select}.')
-            await message.author.send(embed=embed)
-        else:
+            await ctx.message.author.send(embed=embed)
+        elif discord.ChannelType != "private":
             print(f'{t()}: {ctx.message.author} rolled for loot from table {select}.')
             await ctx.send(embed=embed)
 
