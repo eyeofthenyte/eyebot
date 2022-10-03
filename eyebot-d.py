@@ -46,7 +46,7 @@ async def on_ready():
     print(F'{t()}: {bot.user.name} is connected to the following Discord Servers:')
     for guild in bot.guilds:
         print(f'     (id: {guild.id})    -    {guild.name}')
-    print(f'\n     -End of Server Listing-')
+    print(f'\n     -End of Server Listing-\n')
     return
 
 #New Server Connection
@@ -103,6 +103,7 @@ async def servers(ctx):
         print(f'     (id: {guild.id})    -    {guild.name}')
         await ctx.author.send(f'     (id: {guild.id})    -    {guild.name}')
     print(f'\n     -End of Server Listing-')
+
 
 bot.run(TOKEN)
 

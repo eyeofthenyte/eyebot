@@ -4,7 +4,22 @@ import random, contextlib
 from discord.ext import commands, tasks
 from discord import Activity, ActivityType
 from discord.utils import find
-from eyebot import t
+
+#Time Stamp Generation For Console Logging
+def t():
+    format = "%Y/%m/%d %H:%M:%S"
+    now = datetime.datetime.now()
+    t = now.strftime(format)
+    return t
+
+#Pass Bot Prefix
+def get_prefix():
+    data = open(os.path.join(os.path.dirname(__file__), "../eyebot.cfg")).read().splitlines()
+    prefix = data[1]
+    return prefix
+    data.close()
+
+prefix = get_prefix()
 
 # ---------------------------------------------------------
 # Extension Related Commands
@@ -48,14 +63,13 @@ class Extensions(commands.Cog):
             embed.set_author(name = 'LOADING ' + extension.upper() + ' FAILED', icon_url = 'https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/warning_26a0.png')
             embed.add_field(name = '**__Extension Load__**', value = e, inline=False)
         if discord.ChannelType == "private":
-            await message.author.send(embed=embed)
-        else:
+            await ctx.message.author.send(embed=embed)
+        elif discord.ChannelType != "private":
             await ctx.send(embed=embed)
 
     @commands.command()
     @commands.is_owner()
     async def unload(self, ctx, extension):
-        await ctx.message.delete()
         try:
             self.bot.unload_extension(f'cogs.{extension}')
             print(f'{t()}: Unloaded extension - "{extension}"')
@@ -68,14 +82,13 @@ class Extensions(commands.Cog):
             embed.set_author(name = 'UNLOADING ' + extension.upper() + ' FAILED', icon_url = 'https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/warning_26a0.png')
             embed.add_field(name = '**__Extension Unload__**', value =  e, inline=False)
         if discord.ChannelType == "private":
-            await message.author.send(embed=embed)
-        else:
+            await ctx.message.author.send(embed=embed)
+        elif discord.ChannelType != "private":
             await ctx.send(embed=embed)
 
     @commands.command()
     @commands.is_owner()
     async def reload(self, ctx, extension):
-        await ctx.message.delete()
         print(f'{t()}: Attempting to reload {extension}')
         try:
             try:
@@ -101,8 +114,8 @@ class Extensions(commands.Cog):
         except Exception as e:
             print(f'{t()}: {e}')
         if discord.ChannelType == "private":
-            await message.author.send(embed=embed)
-        else:
+            await ctx.message.author.send(embed=embed)
+        elif discord.ChannelType != "private":
             await ctx.send(embed=embed)
 
 def setup(bot):

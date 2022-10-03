@@ -4,11 +4,25 @@ import random, contextlib
 from discord.ext import commands, tasks
 from discord import Activity, ActivityType
 from discord.utils import find
-from eyebot import t
 
+#Time Stamp Generation For Console Logging
+def t():
+    format = "%Y/%m/%d %H:%M:%S"
+    now = datetime.datetime.now()
+    t = now.strftime(format)
+    return t
+
+#Pass Bot Prefix
+def get_prefix():
+    data = open(os.path.join(os.path.dirname(__file__), "../eyebot.cfg")).read().splitlines()
+    prefix = data[1]
+    return prefix
+    data.close()
+
+prefix = get_prefix()
 
 # ---------------------------------------------------------
-# Loot Hoard Generator
+# Ranodom Hoard Generator
 # ---------------------------------------------------------
 class Hoard(commands.Cog):
     def __init__(self, bot):
@@ -24,7 +38,7 @@ class Hoard(commands.Cog):
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
             print(f'{t()}: missing or invalid argument for .hoard')
-            await ctx.send('Please choose which hoard loot table you wish to pick loot from by typing:\n`!hoard (1/2/3/4)`.\nPlease try `.hoard ?` for more information.')
+            await ctx.send('Please choose which hoard loot table you wish to pick loot from by typing:\n`{prefix}hoard (1/2/3/4)`.\nPlease try `{prefix}hoard ?` for more information.')
     
     
     #----------------------------
@@ -280,12 +294,12 @@ class Hoard(commands.Cog):
             print(f'{t()}: {ctx.message.author}({ctx.message.author.guild}) asked for help with Hoard Loot.')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Hoard)', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/warning_26a0.png')
-            embed.add_field(name=':moneybag:  **__Hoard__**', value='**Usage: `.hoard #` where `# = 1-4`**\n Number corresponds to the 4 Treasure Hoard tables in DMG - Chapter 7.\nThis will generate all coins and magical items randomly based on table selected.', inline=False)
+            embed.add_field(name=':moneybag:  **__Hoard__**', value='**Usage: `{prefix}hoard #` where `# = 1-4`**\n Number corresponds to the 4 Treasure Hoard tables in DMG - Chapter 7.\nThis will generate all coins and magical items randomly based on table selected.', inline=False)
 
 
         else:
             print(f'{t()}: invalid hoard opterator entered.')
-            m_Response = "That's not a valid input. Please try again or `.hoard ?` for more information."
+            m_Response = "That's not a valid input. Please try again or `{prefix}hoard ?` for more information."
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Treasure Hoard', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/prohibited_1f6ab.png')
             embed.add_field(name='**__Error__**', value=f'{m_Response}', inline=False)
@@ -300,9 +314,9 @@ class Hoard(commands.Cog):
                 print(f'{t()}: {ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]} {list[8]}')
             elif select == '4':
                 print(f'{t()}: {ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]}')
-            await message.author.send(embed=embed)
+            await ctx.message.author.send(embed=embed)
             return
-        else:
+        elif discord.ChannelType != "private":
             if select == '1':
                 print(f'{t()}: {ctx.message.author} rolled for hoard loot from table {select} * magic table(s) {list[4]}')
             elif select == '2':

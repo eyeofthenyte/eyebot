@@ -20,6 +20,18 @@ def t():
     t = now.strftime(format)
     return t
 
+#Pass Bot Prefix
+def get_prefix():
+    data = open(os.path.join(os.path.dirname(__file__), "../eyebot.cfg")).read().splitlines()
+    prefix = data[1]
+    return prefix
+    data.close()
+
+prefix = get_prefix()
+
+# ---------------------------------------------------------
+# Random Carousing Outcome
+# ---------------------------------------------------------
 class Carousing(commands.Cog):
     
     def __init__(self, bot):
@@ -37,10 +49,10 @@ class Carousing(commands.Cog):
         if isinstance(error, commands.MissingRequiredArgument):
             print(f'{t()}: {ctx.message.author}({ctx.message.author.guild}) is missing or invalid argument for .carousing')
             if discord.ChannelType == "private":
-                await message.author.send(f'Please only type `.carousing` to get a random result.\n Type `.help` for more info.')
+                await ctx.message.author.send(f'Please only type `carousing` to get a random result.\n Type `help` for more info.')
                 return
             else:
-                await ctx.send(f'Please only type `.carousing` to get a random result.\n Type `.help` for more info.')
+                await ctx.send(f'Please only type `carousing` to get a random result.\n Type `help` for more info.')
                 return
 
     #----------------------------
@@ -55,7 +67,7 @@ class Carousing(commands.Cog):
             embed.set_author(name = 'D100 CAROUSING TABLE')
             embed.add_field(name = 'You wake up... ', value = random.choice(c_list), inline=False)
             if discord.ChannelType == "private":
-                await message.author.send(embed=embed)
+                await ctx.message.author.send(embed=embed)
             else:
                 await ctx.send(embed=embed)
 
@@ -63,10 +75,10 @@ class Carousing(commands.Cog):
             print(f'{t()}: there was an error.')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Carousing', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/prohibited_1f6ab.png')
-            embed.add_field(name='__Error__', value=f"That was not a valid choice. Simply type `carousing`, `carouse`, `drinking`, `getdrinks`, or `pubcrawl` to get a selection from the table.", inline=False)     
+            embed.add_field(name='__Error__', value=f"That was not a valid choice. Simply type `{prefix}carousing`, `{prefix}carouse`, `{prefix}drinking`, `{prefix}getdrinks`, or `{prefix}pubcrawl` to get a selection from the table.", inline=False)     
             print(f'{t()}: Invalid input for carousing command.')
             if discord.ChannelType == "private":
-                await message.author.send(embed=embed)
+                await ctx.message.author.send(embed=embed)
             else:
                 await ctx.send(embed=embed)
         

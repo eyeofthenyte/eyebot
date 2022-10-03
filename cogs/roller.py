@@ -15,6 +15,19 @@ def t():
     t = now.strftime(format)
     return t
 
+#Pass Bot Prefix
+def get_prefix():
+    data = open(os.path.join(os.path.dirname(__file__), "../eyebot.cfg")).read().splitlines()
+    prefix = data[1]
+    return prefix
+    data.close()
+
+prefix = get_prefix()
+
+
+# ---------------------------------------------------------
+# Processes a Die Roll String
+# ---------------------------------------------------------
 @dataclass()
 class Dice:
     """Represents a dice."""
@@ -112,7 +125,9 @@ class DiceRoll:
             mod = ''
         return f'{str(self.base)}{mod}'
 
-
+# ---------------------------------------------------------
+# Die Roller Commands
+# ---------------------------------------------------------
 class Roll(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -126,7 +141,9 @@ class Roll(commands.Cog):
 
     DICE_PATTERN = re.compile(r"^(\d*)d(\d+)([-+]\d+)?$")
 
-    
+    #----------------------------
+    # Check if D20 Rolls are Crit Success or Crit Fail
+    #----------------------------    
     @staticmethod
     def get_d20_minmax_msg(rolls):
         #Crit Fail or Crit Success Message
@@ -154,6 +171,10 @@ class Roll(commands.Cog):
 
         return msg
 
+
+    #----------------------------
+    # D20 Roller
+    #----------------------------
     @commands.command()
     async def d20(self, ctx, num_dice='1'):
         #Roll one or more d20 dice.
@@ -173,12 +194,17 @@ class Roll(commands.Cog):
         minmax_msg = self.get_d20_minmax_msg(rolls)
 
         if discord.ChannelType == "private":
-            await message.author.send(f'{name} rolled a {dice.raw}!\nThe result was:\n{raw_rolls} {minmax_msg}')
+            await ctx.message.author.send(f'{name} rolled a {dice.raw}!\nThe result was:\n{raw_rolls} {minmax_msg}')
             print(f'{t()}: {name} rolled a {dice.raw}!\nThe result was:\n{raw_rolls} {minmax_msg}')
-        else:
+        elif discord.ChannelType != "private":
             await ctx.send(f'{name} rolled a {dice.raw}!\nThe result was:\n{raw_rolls} {minmax_msg}')
             print(f'{t()}: {name} rolled a {dice.raw}!\nThe result was:\n{raw_rolls} {minmax_msg}')
 
+
+
+    #----------------------------
+    # All Die Roller
+    #----------------------------
     @commands.command(aliases=['r','roll'])
     async def _roll(self, ctx, *, args=None):
         name = ctx.message.author.display_name
@@ -245,9 +271,9 @@ class Roll(commands.Cog):
             results.append(result)
 
         if discord.ChannelType == "private":
-            await message.author.send('\n\n'.join(results))
+            await ctx.message.author.send('\n\n'.join(results))
             print(f'{t()}: Results sent to DM.')
-        else:
+        elif discord.ChannelType != "private":
             await ctx.send('\n\n'.join(results))
             print(f'{t()}: Results sent to discord.')
 
