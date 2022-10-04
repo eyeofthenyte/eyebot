@@ -39,7 +39,16 @@ class Loot(commands.Cog):
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
             print(f'{t()}: missing or invalid argument for .loot')
-            await ctx.send('Please choose which single loot table you wish to pick loot from by typing:\n`{prefix}loot (1/2/3/4)`.\nPlease try `{prefix}loot ?` for more information.')
+            m_Response = "That's not a valid input. Please try again or `{prefix}loot ?` for more information."
+            file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
+            embed = discord.Embed(color=0xcc0000)
+            embed.set_author(name='Indivdual Treasure', icon_url='attachment://prohibited.png')
+            embed.add_field(name='**__Error__**', value=f'{m_Response}', inline=False)                
+
+        if discord.ChannelType == "private":
+            await ctx.message.author.send(file=file, embed=embed)
+        elif discord.ChannelType != "private":
+            await ctx.send(file=file, embed=embed)
 
 
     #----------------------------
@@ -68,8 +77,9 @@ class Loot(commands.Cog):
             else:
                 list[0] = 'There was an error.'
             m_Response = "At the end of your job you find... \n" + list[0] + "."
+            file = discord.File('./eyebot/images/commands/coin.png', filename='coin.png')
             embed = discord.Embed(color=0xffe449)
-            embed.set_author(name='Indivdual Treasure', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/coin_1fa99.png')
+            embed.set_author(name='Indivdual Treasure', icon_url='attachment://coin.png')
             embed.add_field(name='**__Challange 0 - 4__**', value=f'{m_Response}', inline=False)
         
         # Loot Table 2
@@ -92,8 +102,9 @@ class Loot(commands.Cog):
                 list[0] = 'There was an error.'
 
             m_Response = "At the end of your job you find...\n" + list[0] + '\n' + list[1]
+            file = discord.File('./eyebot/images/commands/coin.png', filename='coin.png')
             embed = discord.Embed(color=0xffe449)
-            embed.set_author(name='Indivdual Treasure', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/coin_1fa99.png')
+            embed.set_author(name='Indivdual Treasure', icon_url='attachment://coin.png')
             embed.add_field(name='**__Challange 5 - 10__**', value=f'{m_Response}', inline=False)
 
         # Loot Table 3
@@ -113,8 +124,9 @@ class Loot(commands.Cog):
             else:
                 list[0] = 'There was an error.'
             m_Response = "At the end of your job you find...\n" + list[0] + '\n' + list[1]
+            file = discord.File('./eyebot/images/commands/coin.png', filename='coin.png')
             embed = discord.Embed(color=0xffe449)
-            embed.set_author(name='Indivdual Treasure', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/coin_1fa99.png')
+            embed.set_author(name='Indivdual Treasure', icon_url='attachment://coin.png')
             embed.add_field(name='**__Challange 11 - 16__**', value=f'{m_Response}', inline=False)
 
         # Loot Table 4
@@ -131,30 +143,33 @@ class Loot(commands.Cog):
             else:
                 list[0] = 'There was an error.'
             m_Response = "At the end of your job you find...\n" + list[0] + '\n' + list[1]
+            file = discord.File('./eyebot/images/commands/coin.png', filename='coin.png')
             embed = discord.Embed(color=0xffe449)
-            embed.set_author(name='Indivdual Treasure', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/coin_1fa99.png')
+            embed.set_author(name='Indivdual Treasure', icon_url='attachment://coin.png')
             embed.add_field(name='**__Challange 17+__**', value=f'{m_Response}', inline=False)
 
         # Help Operator
         elif select == '?':
+            file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
             print(f'{t()}: {ctx.message.author} asked for help with Loot.')
             embed = discord.Embed(color=0x019cd0)
-            embed.set_author(name='Help (Loot)', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/warning_26a0.png')
+            embed.set_author(name='Help (Loot)', icon_url='attachment://warning.png')
             embed.add_field(name='**__Loot__**', value='**Usage: `{prefix}loot #` where `# = 1-4`**\n Number corresponds to the 4 Individual Treasure tables in DMG - Chapter 7.\nThis will generate all coins randomly based on table selected.', inline=False)
 
         else:
             print(f'{t()}: {ctx.message.author} entered invalid hoard opterator')
             m_Response = "That's not a valid input. Please try again or `{prefix}loot ?` for more information."
+            file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
-            embed.set_author(name='Indivdual Treasure', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/prohibited_1f6ab.png')
+            embed.set_author(name='Indivdual Treasure', icon_url='attachment://prohibited.png')
             embed.add_field(name='**__Error__**', value=f'{m_Response}', inline=False)                
 
         if discord.ChannelType == "private":
             print(f'{t()}: {ctx.message.author} rolled for loot from table {select}.')
-            await ctx.message.author.send(embed=embed)
+            await ctx.message.author.send(file=file, embed=embed)
         elif discord.ChannelType != "private":
             print(f'{t()}: {ctx.message.author} rolled for loot from table {select}.')
-            await ctx.send(embed=embed)
+            await ctx.send(file=file, embed=embed)
 
 def setup(bot):
     bot.add_cog(Loot(bot))
