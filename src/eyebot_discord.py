@@ -1,25 +1,30 @@
-import sys, discord
-import os, json, datetime, codecs, re, asyncio
-import random, contextlib
-from discord.ext import commands, tasks
-from discord import Activity, ActivityType
-from discord.utils import find
-import inspect
+import os, datetime
+import discord
+import yaml
 
+from discord.ext import commands
+from yaml.loader import SafeLoader
 
 #----------------------------
 #Bot Core Setup
 #----------------------------
 def read_cfg():
-    lines = open(os.path.join(os.path.dirname(__file__), "eyebot.cfg")).read().splitlines()
-    return lines
-    lines.close()
+    with open('config.yaml') as f:
+        data = yaml.load(f, Loader=SafeLoader)
+        return data
 
-lines = read_cfg()
-TOKEN = lines[0]
-BOT_PREFIX = lines[1]
-bot = commands.Bot(command_prefix = BOT_PREFIX)
-bot.remove_command('help')  
+config = read_cfg()
+TOKEN = config["discord"]["bot_token"]
+
+BOT_PREFIX = "!"
+if config["prefix"]:
+    BOT_PREFIX = config["prefix"]
+
+bot = commands.Bot(
+    command_prefix = BOT_PREFIX,
+    intents = discord.Intents()
+)
+bot.remove_command('help')
 
 #Time Stamp Generation For Console Logging
 def t():
@@ -28,8 +33,10 @@ def t():
     t = now.strftime(format)
     return t
 
+currDir = os.path.dirname(os.path.realpath(__file__))
+
 #Listing Extensions
-for filename in os.listdir('eyebot/cogs'):
+for filename in os.listdir(currDir + '/../cogs'):
     if filename.endswith('.py'):
         bot.load_extension(f'cogs.{filename[:-3]}')
         print(f'{t()}: Extension found - {filename[:-3]}')
@@ -63,14 +70,14 @@ async def on_guild_join(guild):
 #Bot Left Server
 #@bot.event
 #async def on_guild_remove(guild):
-    
+
 # Global Error Handling
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
         print(f'{t()}: Invalid command used: ' + f' {ctx.message.content}' )
         await ctx.send('That command does not exist.')
-    elif isinstance(error, commands.MissingPermissions):           
+    elif isinstance(error, commands.MissingPermissions):
         print(f'{t()}: {ctx.message.author({ctx.message.author.guild})} attempted to use command without required permissions.')
         await ctx.send("Sorry, you don't have the permissions to use that command.")
     if isinstance(error, commands.NotOwner):
@@ -94,7 +101,7 @@ async def leave(ctx, *, guild_name):
     else:
         await guild.leave()
         print(f'{t()}: connection_broken: {bot.user.name} has left: {guild.name}(id: {guild.id})')
- 
+
 #Check connected servers BOT OWNER ONLY
 @bot.command()
 @commands.is_owner()

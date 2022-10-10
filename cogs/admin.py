@@ -1,9 +1,5 @@
-import sys, discord, logging
-import os, json, datetime, codecs, re
-import random, contextlib
-from discord.ext import commands, tasks
-from discord import Activity, ActivityType
-from discord.utils import find
+import os, datetime
+from discord.ext import commands
 
 #Time Stamp Generation For Console Logging
 def t():

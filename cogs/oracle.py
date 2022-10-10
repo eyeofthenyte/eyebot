@@ -1,9 +1,7 @@
-import sys, discord
-import os, json, datetime, codecs, re
-import random, contextlib
-from discord.ext import commands, tasks
-from discord import Activity, ActivityType
-from discord.utils import find
+import eyebot_discord
+import os, datetime
+import random
+from discord.ext import commands
 
 #Time Stamp Generation For Console Logging
 def t():
@@ -25,7 +23,7 @@ prefix = get_prefix()
 # Oracle
 # ---------------------------------------------------------
 class Oracle (commands.Cog):
-    
+
     def __init__(self, bot):
         self.bot = bot
 
@@ -35,7 +33,7 @@ class Oracle (commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         print(f'{t()}: Is seeing into the beyond.')
-            
+
 
 
     async def cog_command_error(self, ctx, error):
@@ -45,14 +43,14 @@ class Oracle (commands.Cog):
             file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Oracle', icon_url='attachment://prohibited.png')
-            embed.add_field(name='**__Error__**', value=f"{m_Response}", inline=False) 
+            embed.add_field(name='**__Error__**', value=f"{m_Response}", inline=False)
             if discord.ChannelType == "private":
                 print(f"{t()}: {ctx.message.author} has asked the oracle something it doesn't understand")
                 await ctx.message.author.send(file=file, embed=embed)
             elif discord.ChannelType != "private":
                 print(f"{t()}: {ctx.message.author} has asked the oracle something it doesn't understand")
                 await ctx.send(file=file, embed=embed)
-        
+
 
     @commands.command()
     async def oracle(self, ctx, *, question):
@@ -66,38 +64,38 @@ class Oracle (commands.Cog):
             embed.set_author(name='Oracle', icon_url='attachment://crystal-ball.png')
             embed.add_field(name='__Response__', value=random.choice(replies), inline=False)
 
-            if discord.ChannelType == "private":
+            if eyebot_discord.ChannelType == "private":
                 print(f'{t()}: {ctx.message.author} has sought guidance.')
                 await ctx.message.author.send(file=file, embed=embed)
             elif discord.ChannelType != "private":
                 print(f'{t()}: {ctx.message.author} has sought guidance.')
                 await ctx.send(file=file, embed=embed)
-        
+
         elif question == '?':
             file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Oracle)', icon_url='attachment://warning.png')
             embed.add_field(name=f"**__Oracle__**", value=f"**Usage: `{prefix}oracle q`\n Where `question = the question you want to ask`**\nSimple general responses to questions. Careful the oracle can be a bit sassy!", inline=False)
-            if discord.ChannelType == "private":
+            if eyebot_discord.ChannelType == "private":
                 print(f'{t()}: {ctx.message.author} asked for help with oracle')
                 await ctx.message.author.send(file=file, embed=embed)
             elif discord.ChannelType != "private":
                 print(f'{t()}: {ctx.message.author} asked for help with oracle')
                 await ctx.send(file=file, embed=embed)
-                         
+
         else:
             m_Response = f"That's not a valid input. Please try again or `{prefix}oracle ?` for more information."
             file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Oracle', icon_url='attachment://prohibited.png')
-            embed.add_field(name='**__Error__**', value=f"{m_Response}", inline=False) 
+            embed.add_field(name='**__Error__**', value=f"{m_Response}", inline=False)
             if discord.ChannelType == "private":
                 print(f"{t()}: {ctx.message.author} has asked the oracle something it doesn't understand")
                 await ctx.message.author.send(file=file, embed=embed)
             elif discord.ChannelType != "private":
                 print(f"{t()}: {ctx.message.author} has asked the oracle something it doesn't understand")
                 await ctx.send(file=file, embed=embed)
-            
+
 
 def setup(bot):
     bot.add_cog(Oracle(bot))

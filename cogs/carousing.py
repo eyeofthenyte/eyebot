@@ -1,9 +1,7 @@
-import sys, discord, logging
-import os, json, datetime, codecs, re, gspread
-import random, contextlib
-from discord.ext import commands, tasks
-from discord import Activity, ActivityType
-from discord.utils import find
+import sys, eyebot_discord, logging
+import os, datetime, gspread
+import random
+from discord.ext import commands
 
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
@@ -33,7 +31,7 @@ prefix = get_prefix()
 # Random Carousing Outcome
 # ---------------------------------------------------------
 class Carousing(commands.Cog):
-    
+
     def __init__(self, bot):
         self.bot = bot
 
@@ -72,18 +70,18 @@ class Carousing(commands.Cog):
             else:
                 await ctx.send(file=file, embed=embed)
 
-        else: 
+        else:
             print(f'{t()}: there was an error.')
             file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Carousing', icon_url='attachment://prohibited.png')
-            embed.add_field(name='__Error__', value=f"That was not a valid choice. Simply type `{prefix}carousing`, `{prefix}carouse`, `{prefix}drinking`, `{prefix}getdrinks`, or `{prefix}pubcrawl` to get a selection from the table.", inline=False)     
+            embed.add_field(name='__Error__', value=f"That was not a valid choice. Simply type `{prefix}carousing`, `{prefix}carouse`, `{prefix}drinking`, `{prefix}getdrinks`, or `{prefix}pubcrawl` to get a selection from the table.", inline=False)
             print(f'{t()}: Invalid input for carousing command.')
             if discord.ChannelType == "private":
                 await ctx.message.author.send(file=file, embed=embed)
             else:
                 await ctx.send(file=file, embed=embed)
-        
+
 
 def setup(bot):
     bot.add_cog(Carousing(bot))
