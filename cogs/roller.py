@@ -1,8 +1,8 @@
-import sys, discord, logging
-import random, contextlib
-import os, json, datetime, codecs, re
+import sys, eyebot_discord, logging
+import random
+import os, datetime, re
+
 from dataclasses import dataclass
-from discord import Activity, ActivityType
 from discord.ext import commands, tasks
 from discord.utils import find
 
@@ -143,11 +143,11 @@ class Roll(commands.Cog):
 
     #----------------------------
     # Check if D20 Rolls are Crit Success or Crit Fail
-    #----------------------------    
+    #----------------------------
     @staticmethod
     def get_d20_minmax_msg(rolls):
         #Crit Fail or Crit Success Message
-        
+
         msg = ''
         crit = False
         fail = False
@@ -193,10 +193,10 @@ class Roll(commands.Cog):
 
         minmax_msg = self.get_d20_minmax_msg(rolls)
 
-        if discord.ChannelType == "private":
+        if eyebot_discord.ChannelType == "private":
             await ctx.message.author.send(f'{name} rolled a {dice.raw}!\nThe result was:\n{raw_rolls} {minmax_msg}')
             print(f'{t()}: {name} rolled a {dice.raw}!\nThe result was:\n{raw_rolls} {minmax_msg}')
-        elif discord.ChannelType != "private":
+        elif eyebot_discord.ChannelType != "private":
             await ctx.send(f'{name} rolled a {dice.raw}!\nThe result was:\n{raw_rolls} {minmax_msg}')
             print(f'{t()}: {name} rolled a {dice.raw}!\nThe result was:\n{raw_rolls} {minmax_msg}')
 
@@ -233,7 +233,7 @@ class Roll(commands.Cog):
                 dice_parts, = re.findall(self.DICE_PATTERN, dice_input)
                 num, sides, mod = dice_parts
             except ValueError:
-                if discord.ChannelType == "private":
+                if eyebot_discord.ChannelType == "private":
                     await ctx.messege.author.send(f'{name} made an invalid roll: [{dice_input}]')
                     print(f'{t()}: {name} made an invalid roll: [{dice_input}]')
                     return
@@ -245,7 +245,7 @@ class Roll(commands.Cog):
             try:
                 dice = Dice(num, sides, mod, single_mod)
             except ValueError as e:
-                if discord.ChannelType == "private":
+                if eyebot_discord.ChannelType == "private":
                     await ctx.messege.autho.send(f'{name} made an invalid roll: {e}')
                     print(f'{t()}: {name} made an invalid roll: {e}')
                     return
@@ -270,10 +270,10 @@ class Roll(commands.Cog):
 
             results.append(result)
 
-        if discord.ChannelType == "private":
+        if eyebot_discord.ChannelType == "private":
             await ctx.message.author.send('\n\n'.join(results))
             print(f'{t()}: Results sent to DM.')
-        elif discord.ChannelType != "private":
+        elif eyebot_discord.ChannelType != "private":
             await ctx.send('\n\n'.join(results))
             print(f'{t()}: Results sent to discord.')
 

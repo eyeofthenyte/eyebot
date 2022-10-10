@@ -1,9 +1,6 @@
-import sys, discord
-import os, json, datetime, codecs, re
-import random, contextlib
-from discord.ext import commands, tasks
-from discord import Activity, ActivityType
-from discord.utils import find
+import eyebot_discord
+import os, datetime
+from discord.ext import commands
 
 #Time Stamp Generation For Console Logging
 def t():
@@ -25,7 +22,7 @@ prefix = get_prefix()
 # Help Embed
 # ---------------------------------------------------------
 class Help (commands.Cog):
-    
+
     def __init__(self, bot):
         self.bot = bot
 
@@ -35,12 +32,12 @@ class Help (commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         print(f'{t()}: Feeling helpful.')
-   
+
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.CommandError):
             await ctx.send('Something went wrong. Try `.reload help`.')
 
-        
+
     @commands.command(aliases=['h', 'help'])
     async def _help(self, ctx):
         file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')

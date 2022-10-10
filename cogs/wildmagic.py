@@ -1,9 +1,7 @@
-import sys, discord
-import os, json, datetime, codecs, re
-import random, contextlib
-from discord.ext import commands, tasks
-from discord import Activity, ActivityType
-from discord.utils import find
+import eyebot_discord
+import os, datetime
+import random
+from discord.ext import commands
 
 #Time Stamp Generation For Console Logging
 def t():
@@ -25,7 +23,7 @@ prefix = get_prefix()
 # Loot Hoard Generator
 # ---------------------------------------------------------
 class WildMagic(commands.Cog):
-    
+
     def __init__(self, bot):
         self.bot = bot
 
@@ -81,7 +79,7 @@ class WildMagic(commands.Cog):
             file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Wild Magic', icon_url='attachment://prohibited.png')
-            embed.add_field(name='__Error__', value=f'That is not a valid input. Please try again or use `{prefix}wildmagic ?` for more information.', inline=False)     
+            embed.add_field(name='__Error__', value=f'That is not a valid input. Please try again or use `{prefix}wildmagic ?` for more information.', inline=False)
 
 
         if discord.ChannelType == "private":

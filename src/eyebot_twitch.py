@@ -1,8 +1,9 @@
-import sys, logging
-import os, json, datetime, codecs, re
-import random, contextlib
-from twitchio.ext import commands
+import datetime
+import random
+import yaml
 
+from twitchio.ext import commands
+from yaml.loader import SafeLoader
 
 #Time Stamp Generation For Console Logging
 def t():
@@ -12,16 +13,20 @@ def t():
     return t
 
 def read_cfg():
-    lines = open(os.path.join(os.path.dirname(__file__), "eyebot.cfg")).read().splitlines()
-    return lines
-    lines.close()
+    with open('config.yaml') as f:
+        data = yaml.load(f, Loader=SafeLoader)
+        return data
 
-lines = read_cfg()
-TMI_TOKEN = lines[2]
-BOT_PREFIX = lines[1]
-CLIENT_ID = lines[3]
-BOT_NICK = lines[5]
-CHANNEL = lines[6]
+config = read_cfg()
+
+BOT_PREFIX = "!"
+if config["prefix"]:
+    BOT_PREFIX = config["prefix"]
+
+TMI_TOKEN = config["twitch"]["tmi_token"]
+CLIENT_ID = config["twitch"]["client_id"]
+BOT_NICK = config["twitch"]["nick"]
+CHANNELS = config["twitch"]["channels"]
 
 bot = commands.Bot(
     # set up the bot
@@ -29,7 +34,7 @@ bot = commands.Bot(
     client_id = CLIENT_ID,
     nick = BOT_NICK,
     prefix = BOT_PREFIX,
-    initial_channels = [CHANNEL]
+    initial_channels = CHANNELS
 )
 
 class Bot(commands.Bot):
@@ -39,7 +44,7 @@ class Bot(commands.Bot):
             client_id = CLIENT_ID,
             nick = BOT_NICK,
             prefix = BOT_PREFIX,
-            initial_channels = [CHANNEL]
+            initial_channels = CHANNELS
         )
 
     async def event_ready(self):
@@ -60,7 +65,7 @@ class Bot(commands.Bot):
         replies = ["Yes.", "No.", "I said NO!", "Do you really want an answer to that?", "Ask again later.", "Go play in the street.", "Shut your cock holster!","How can you even ask something like that?", "If you don't know the answer already I certainly can't help you.", "Lets be honest you could use the life experience.", "Lets just say... your best option would be to put your head between your legs and kiss your ass goodbye.", "Definitely maybe.", "Ask me again someday.", "*~Unintelligable, Yet Frightening Wispers~*","*~Disembodied Laughter of Children~*"];
         if (int(question.count(" ")) >= 2):
             print(f'{t()}: {ctx.author.name} has sought guidance.')
-        await ctx.send(random.choice(replies))    
+        await ctx.send(random.choice(replies))
 
 bot = Bot()
 bot.run()

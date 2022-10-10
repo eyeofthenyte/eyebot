@@ -15,3 +15,5 @@ storage.json
 eyebot.cfg
 logs/
 experimental/
+
+config.yaml

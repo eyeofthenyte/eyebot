@@ -1,9 +1,6 @@
-import sys, discord
-import os, json, datetime, codecs, re
-import random, contextlib
-from discord.ext import commands, tasks
-from discord import Activity, ActivityType
-from discord.utils import find
+import eyebot_discord
+import os, datetime
+from discord.ext import commands
 
 #Time Stamp Generation For Console Logging
 def t():
@@ -25,24 +22,24 @@ prefix = get_prefix()
 # Extension Related Commands
 # ---------------------------------------------------------
 class Extensions(commands.Cog):
-    
+
     def __init__(self, bot):
         self.bot = bot
-    
+
     #----------------------------
     # Events
     #----------------------------
     @commands.Cog.listener()
     async def on_ready(self):
         print(f'{t()}: Has made external connections.')
-   
+
 
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
             await ctx.send(f'Missing argument')
             print(f'{t()}: missing argument')
             return
-    
+
 
     #----------------------------
     # Gems Command
@@ -116,7 +113,7 @@ class Extensions(commands.Cog):
                 embed = discord.Embed(color=0xcc0000)
                 embed.set_author(name = 'RELOADING ' + extension.upper() + ' FAILED', icon_url = 'attachment://warning.png')
                 embed.add_field(name = '**__Extension Reload__**', value='Reloading "' + extension + '" has failed. Invalid extension or extension not loaded.', inline=False)
-                
+
         except Exception as e:
             print(f'{t()}: {e}')
         if discord.ChannelType == "private":
