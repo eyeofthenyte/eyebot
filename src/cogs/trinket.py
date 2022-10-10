@@ -1,10 +1,7 @@
-import sys, discord
-import os, json, datetime, codecs, re, gsheets, gspread
-import random, contextlib
-from discord.ext import commands, tasks
-from discord import Activity, ActivityType
-from discord.utils import find
-from gsheets import Sheets
+import discord
+import os, datetime, gspread
+import random
+from discord.ext import commands
 
 gsa = gspread.service_account(filename = 'eyebot/service_account.json')
 
@@ -23,16 +20,16 @@ def t():
     return t
 
 #Pass Bot Prefix
-def get_prefix():
-    data = open(os.path.join(os.path.dirname(__file__), "../eyebot.cfg")).read().splitlines()
-    prefix = data[1]
-    return prefix
-    data.close()
+#def get_prefix():
+#    data = open(os.path.join(os.path.dirname(__file__), "../eyebot.cfg")).read().splitlines()
+#    prefix = data[1]
+#    return prefix
+#    data.close()
 
-prefix = get_prefix()
+#prefix = get_prefix()
 
 class Trinket(commands.Cog):
-    
+
     def __init__(self, bot):
         self.bot = bot
 
@@ -50,7 +47,7 @@ class Trinket(commands.Cog):
             file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Trinket', icon_url='attachment://prohibited.png')
-            embed.add_field(name='__Error__', value=f'{error_m}', inline=False)   
+            embed.add_field(name='__Error__', value=f'{error_m}', inline=False)
             if discord.ChannelType == "private":
                 await ctx.message.author.send(file=file, embed=embed)
             elif discord.ChannelType != "private":
@@ -88,14 +85,14 @@ class Trinket(commands.Cog):
             file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Trinket', icon_url='attachment://prohibited.png')
-            embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select an available Character Class. Type `trinket ?` for more info.", inline=False)     
+            embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select an available Character Class. Type `trinket ?` for more info.", inline=False)
             print(f'{t()}: Invalid input for {prefix}trinket command.')
 
         if discord.ChannelType == "private":
             await ctx.message.author.send(file=file, embed=embed)
         elif discord.ChannelType != "private":
             await ctx.send(file=file, embed=embed)
-        
 
-def setup(bot):
-    bot.add_cog(Trinket(bot))
+
+async def setup(bot):
+    await bot.add_cog(Trinket(bot))

@@ -1,14 +1,14 @@
-import sys, discord
-import os, json, datetime, codecs, re, gsheets, gspread
-import random, contextlib, itertools, functools
+import discord
+import os, datetime, gspread
+import random
+
 from discord.ext import commands, tasks
-from discord import Activity, ActivityType
 from discord.utils import find
 from gsheets import Sheets
 
 gsa = gspread.service_account(filename = 'eyebot/service_account.json')
 s = gsa.open_by_key('1wkaF--4DqTComUfX1dYbjhkRimR2raYbJm3IEa1CTq0')
-  
+
 #Time Stamp Generation For Console Logging
 def t():
     format = "%Y/%m/%d %H:%M:%S"
@@ -18,20 +18,20 @@ def t():
 
 
 #Pass Bot Prefix
-def get_prefix():
-    data = open(os.path.join(os.path.dirname(__file__), "../eyebot.cfg")).read().splitlines()
-    prefix = data[1]
-    return prefix
-    data.close()
+#def get_prefix():
+#    data = open(os.path.join(os.path.dirname(__file__), "../eyebot.cfg")).read().splitlines()
+#    prefix = data[1]
+#    return prefix
+#    data.close()
 
-prefix = get_prefix()
+#prefix = get_prefix()
 
 
 # ---------------------------------------------------------
 # Herbalism and Alchemey Commands
 # ---------------------------------------------------------
 class Components(commands.Cog):
-    
+
     def __init__(self, bot):
         self.bot = bot
 
@@ -58,10 +58,10 @@ class Components(commands.Cog):
     #----------------------------
     @commands.command(aliases=['collect', 'search', 'find'])
     async def _collect(self, ctx, *, select):
-        
+
         pick = select
         biome = ['arctic','common','desert','forest','grass','hills','mountain','swamp','underdark','water']
-        icon = ['https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/snowflake_2744.png','https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/world-map_1f5fa.png','https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/desert_1f3dc.png','https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/deciduous-tree_1f333.png','https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/seedling_1f331.png','https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/sunrise-over-mountains_1f304.png','https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/mountain_26f0.png','https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/sheaf-of-rice_1f33e.png','https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/hole_1f573.png0','https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/water-wave_1f30a.png']
+        icon = ['snowflake','world-map','desert','deciduous-tree','seedling','sunrise-over-mountains','mountain','sheaf-of-rice','hole','water-wave']
         w = ["0", "1", "2", "8", "9", "10"]
         percentage = random.randrange(1,101)
         if pick.lower() in str(biome).lower():
@@ -76,8 +76,8 @@ class Components(commands.Cog):
                         if (percentage > 75):
                             qty = str(random.randrange(1,5))
                             list[2] = " Elemental Water"
-                    else:				
-                        if list[1] == '1':														
+                    else:
+                        if list[1] == '1':
                             qty = str(random.randrange(1,5))
                         elif list[1] == '2':
                             qty = str(random.randrange(1,9)*2)
@@ -86,11 +86,12 @@ class Components(commands.Cog):
                             randline = random.choice(common)
                             list = randline.split(";")
                             qty = str(random.randrange(1,5))
-                            
+
                     m_Response = str(qty) + "x " + list[2]
+                    file = discord.File('./eyebot/images/commands/'+icon[i]+'.png', filename=icon[i]+'.png')
                     print(f'{t()}: Components from the ' + pick.upper() + ' biome were found.')
                     embed = discord.Embed(color=0x019cd0)
-                    embed.set_author(name = pick.upper() + ' BIOME COMPONENTS', icon_url=icon[i])
+                    embed.set_author(name = pick.upper() + ' BIOME COMPONENTS', icon_url='attachment://'+icon[i]+'.png')
                     embed.add_field(name = 'You found the following alchemic components:', value = m_Response, inline=False)
 
         elif pick == '?':
@@ -105,9 +106,8 @@ class Components(commands.Cog):
             file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Collect', icon_url='attachment://prohibited.png')
-            embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select an available biome. Type `{prefix}collect ?` for more info.", inline=False)     
+            embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select an available biome. Type `{prefix}collect ?` for more info.", inline=False)
             print(f'{t()}: {ctx.message.author} gave an invalid input for collect command.')
-            
 
         if discord.ChannelType == "private":
             await ctx.message.author.send(file=file, embed=embed)
@@ -117,7 +117,7 @@ class Components(commands.Cog):
 
     @commands.command(aliases=['herb', 'hinfo'])
     async def _flora(self, ctx, *, select):
-        
+
         ws = s.worksheet("Ingredients")
         c_list = ws.col_values(1)
         rarity = ['Common (Up to 15 GP)','Uncommon (16-40 GP)','Rare (41-100 GP)','Very Rare (100-150 GP)']
@@ -157,7 +157,7 @@ class Components(commands.Cog):
             file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Herb Info', icon_url='attachment://prohibited.png')
-            embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select a component that has an entry. Type `{prefix}herb ?` or `{prefix}hinfo ?` for more info.", inline=False)     
+            embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select a component that has an entry. Type `{prefix}herb ?` or `{prefix}hinfo ?` for more info.", inline=False)
             print(f'{t()}: {ctx.message.author} gave an invalid input for herb command.')
 
         if discord.ChannelType == "private":
@@ -197,7 +197,7 @@ class Components(commands.Cog):
                         else:
                             m_Response = m_Response + ' + ' + str(modifier[i])
                         text[i] = ws.cell(index+1,1).value
-    
+
                 c_Response = str(text).replace('"','').replace("[","").replace("]","").replace("'","")
                 total = 10 + int(sum(modifier))
                 print(f'{t()}: A potion DC was generated.')
@@ -205,13 +205,13 @@ class Components(commands.Cog):
                 embed = discord.Embed(color=0x019cd0)
                 embed.set_author(name = 'POTION DIFFICULTY', icon_url='attachment://alembic.png')
                 embed.add_field(name = '__Alchemy Attempt DC__', value = f"The difficulty for a potion\poison\enchantment made from:\n{c_Response}\n\n 10 {m_Response} = **`{total}`**", inline=False)
- 
+
             except Exception as e:
                 print(f'{t()}: there was an error: {e}')
                 file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
                 embed = discord.Embed(color=0xcc0000)
                 embed.set_author(name='Potion', icon_url='attachment://prohibited.png')
-                embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select components within the potion component list. Type `{prefix}potion ?`, `{prefix}herb list` for a list of components, or `{prefix}herb (name)` for details on a spicific component.", inline=False)     
+                embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select components within the potion component list. Type `{prefix}potion ?`, `{prefix}herb list` for a list of components, or `{prefix}herb (name)` for details on a spicific component.", inline=False)
 
         elif mix == '?':
             file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
@@ -225,7 +225,7 @@ class Components(commands.Cog):
             file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Potion', icon_url='attachment://prohibited.png')
-            embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select components within the potion component list. Type `{prefix}potion ?`, `{prefix}herb list` for a list of components, or `{prefix}herb (name)` for details on a spicific component.", inline=False)     
+            embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select components within the potion component list. Type `{prefix}potion ?`, `{prefix}herb list` for a list of components, or `{prefix}herb (name)` for details on a spicific component.", inline=False)
             print(f'{t()}: {ctx.message.author} gave an invalid input for potion command.')
 
         if discord.ChannelType == "private":
@@ -252,7 +252,7 @@ class Components(commands.Cog):
             # Here we loop through every item in mix, but also keep a count of iterations
             # we have made, which we will use later to add the "column G" element to the
             # corresponding location in the list "modifier"
-            
+
             try:
                 for i, value in enumerate(mix):
                     # Here we check if the value exists in the c_list
@@ -265,11 +265,11 @@ class Components(commands.Cog):
                         else:
                             m_Response = m_Response + ' + ' + str(modifier[i])
                             text[i] = ws.cell(index+1,1).value
-  
-        
+
+
                     c_Response = str(text).replace('"','').replace("[","").replace("]","").replace("'","")
                     total = 10 + int(sum(modifier))
-                
+
                     print(f'{t()}: A poison DC was generated.')
                     file = discord.File('./eyebot/images/commands/test-tube.png', filename='test-tube.png')
                     embed = discord.Embed(color=0x019cd0)
@@ -281,20 +281,20 @@ class Components(commands.Cog):
                 file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
                 embed = discord.Embed(color=0xcc0000)
                 embed.set_author(name='Poison', icon_url='attachment://prohibited.png')
-                embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select components within the poison component list. Type `{prefix}poison ?` or `{prefix}herb list` for more info.", inline=False)     
+                embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select components within the poison component list. Type `{prefix}poison ?` or `{prefix}herb list` for more info.", inline=False)
 
         elif mix == '?':
             file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Poison)', icon_url='attachment://warning.png')
             embed.add_field(name='**__Poison__**', value="**Usage: `{prefix}poison c `\nwhere `c = component` multiple components separated by a `,`**\nValid component selections can be found by using `{prefix}herb list` for a list of components or `{prefix}herb (name)` for details on a spicific component you wish to combine for effects.", inline=False)
-            print(f'{t()}: {ctx.message.author} asked for help with {prefix}poison') 
+            print(f'{t()}: {ctx.message.author} asked for help with {prefix}poison')
 
         else:
             file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Poison', icon_url='attachment://prohibited.png')
-            embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select components within the poison component list. Type `{prefix}poison ?`, `{prefix}herb list` for a list of components, or `{prefix}herb (name)` for details on a spicific component.", inline=False)     
+            embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select components within the poison component list. Type `{prefix}poison ?`, `{prefix}herb list` for a list of components, or `{prefix}herb (name)` for details on a spicific component.", inline=False)
             print(f'{t()}: {ctx.message.author} gave an invalid input for poison command.')
 
         if discord.ChannelType == "private":
@@ -302,5 +302,5 @@ class Components(commands.Cog):
         elif discord.ChannelType != "private":
             await ctx.send(file=file, embed=embed)
 
-def setup(bot):
-    bot.add_cog(Components(bot))
+async def setup(bot):
+    await bot.add_cog(Components(bot))
