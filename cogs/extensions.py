@@ -51,18 +51,20 @@ class Extensions(commands.Cog):
         try:
             self.bot.load_extension(f'cogs.{extension}')
             print(f'{t()}: Loaded extension - "{extension}"')
-            embed = eyebot_discord.Embed(color=0x01f31d)
-            embed.set_author(name = 'LOADED ' + extension.upper(), icon_url = 'https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/thumbs-up_1f44d.png')
+            file = discord.File('./eyebot/images/commands/thumbs-up.png', filename='thumbs-up.png')
+            embed = discord.Embed(color=0x01f31d)
+            embed.set_author(name = 'LOADED ' + extension.upper(), icon_url = 'attachment://thumbs-up.png')
             embed.add_field(name = '**__Extension Load__**', value = 'Extension: "' + extension + '" has been loaded successfully.', inline=False)
         except Exception as e:
             print(f'{t()}: {e}')
-            embed = eyebot_discord.Embed(color=0xcc0000)
-            embed.set_author(name = 'LOADING ' + extension.upper() + ' FAILED', icon_url = 'https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/warning_26a0.png')
+            file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
+            embed = discord.Embed(color=0xcc0000)
+            embed.set_author(name = 'LOADING ' + extension.upper() + ' FAILED', icon_url = 'attachment://warning.png')
             embed.add_field(name = '**__Extension Load__**', value = e, inline=False)
-        if eyebot_discord.ChannelType == "private":
-            await ctx.message.author.send(embed=embed)
-        elif eyebot_discord.ChannelType != "private":
-            await ctx.send(embed=embed)
+        if discord.ChannelType == "private":
+            await ctx.message.author.send(file=file, embed=embed)
+        elif discord.ChannelType != "private":
+            await ctx.send(file=file, embed=embed)
 
     @commands.command()
     @commands.is_owner()
@@ -70,18 +72,20 @@ class Extensions(commands.Cog):
         try:
             self.bot.unload_extension(f'cogs.{extension}')
             print(f'{t()}: Unloaded extension - "{extension}"')
-            embed = eyebot_discord.Embed(color=0x01f31d)
-            embed.set_author(name = 'UNLOADED ' + extension.upper(), icon_url = 'https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/thumbs-up_1f44d.png')
+            file = discord.File('./eyebot/images/commands/thumbs-up.png', filename='thumbs-up.png')
+            embed = discord.Embed(color=0x01f31d)
+            embed.set_author(name = 'UNLOADED ' + extension.upper(), icon_url = 'attachment://thumbs-up.png')
             embed.add_field(name = '**__Extension Unload__**', value = 'Extension: "' + extension + '" has been unloaded.', inline=False)
         except Exception as e:
             print(f'{t()}: {e}')
-            embed = eyebot_discord.Embed(color=0xcc0000)
-            embed.set_author(name = 'UNLOADING ' + extension.upper() + ' FAILED', icon_url = 'https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/warning_26a0.png')
+            file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
+            embed = discord.Embed(color=0xcc0000)
+            embed.set_author(name = 'UNLOADING ' + extension.upper() + ' FAILED', icon_url = 'attachment://warning.png')
             embed.add_field(name = '**__Extension Unload__**', value =  e, inline=False)
-        if eyebot_discord.ChannelType == "private":
-            await ctx.message.author.send(embed=embed)
-        elif eyebot_discord.ChannelType != "private":
-            await ctx.send(embed=embed)
+        if discord.ChannelType == "private":
+            await ctx.message.author.send(file=file, embed=embed)
+        elif discord.ChannelType != "private":
+            await ctx.send(file=file, embed=embed)
 
     @commands.command()
     @commands.is_owner()
@@ -96,24 +100,26 @@ class Extensions(commands.Cog):
             try:
                 self.bot.load_extension(f'cogs.{extension}')
                 print(f'    - "{extension}" has been loaded.')
-                embed = eyebot_discord.Embed(color=0x01f31d)
-                embed.set_author(name = 'RELOADED ' + extension.upper(), icon_url = 'https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/thumbs-up_1f44d.png')
+                file = discord.File('./eyebot/images/commands/thumbs-up.png', filename='thumbs-up.png')
+                embed = discord.Embed(color=0x01f31d)
+                embed.set_author(name = 'RELOADED ' + extension.upper(), icon_url = 'attachment://thumbs-up.png')
                 embed.add_field(name = '**__Extension Reload__**', value='Reloading "' + extension + '" has been completed successfully.', inline=False)
                 print(f'{t()}: Reloaded extension - "{extension}" successfully.')
 
             except Exception as e:
                 print(f'    - {e}')
                 print(f'{t()}: Reload extension - "{extension}" has failed.')
-                embed = eyebot_discord.Embed(color=0xcc0000)
-                embed.set_author(name = 'RELOADING ' + extension.upper() + ' FAILED', icon_url = 'https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/warning_26a0.png')
+                file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
+                embed = discord.Embed(color=0xcc0000)
+                embed.set_author(name = 'RELOADING ' + extension.upper() + ' FAILED', icon_url = 'attachment://warning.png')
                 embed.add_field(name = '**__Extension Reload__**', value='Reloading "' + extension + '" has failed. Invalid extension or extension not loaded.', inline=False)
 
         except Exception as e:
             print(f'{t()}: {e}')
-        if eyebot_discord.ChannelType == "private":
-            await ctx.message.author.send(embed=embed)
-        elif eyebot_discord.ChannelType != "private":
-            await ctx.send(embed=embed)
+        if discord.ChannelType == "private":
+            await ctx.message.author.send(file=file, embed=embed)
+        elif discord.ChannelType != "private":
+            await ctx.send(file=file, embed=embed)
 
 def setup(bot):
     bot.add_cog(Extensions(bot))
