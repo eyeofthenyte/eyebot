@@ -1,12 +1,12 @@
-FROM python:3.9.1
+FROM python:3.10.7
 
 RUN pip install -U discord.py
 RUN pip install twitchio
 RUN pip install gspread
 RUN pip install gsheets
-
+RUN pip install pyyaml
 
 COPY . /opt/eyebot
 WORKDIR /opt
 
-CMD ["python", "eyebot/eyebot-d.py"]
+CMD ["python", "eyebot/src/eyebot_discord.py"]

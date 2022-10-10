@@ -1,9 +1,6 @@
-import sys, discord
-import os, json, datetime, codecs, re
-import random, contextlib
-from discord.ext import commands, tasks
-from discord import Activity, ActivityType
-from discord.utils import find
+import discord
+import os, datetime
+from discord.ext import commands
 
 #Time Stamp Generation For Console Logging
 def t():
@@ -12,20 +9,20 @@ def t():
     t = now.strftime(format)
     return t
 
-#Time Stamp Generation For Console Logging
-def get_prefix():
-    data = open(os.path.join(os.path.dirname(__file__), "../eyebot.cfg")).read().splitlines()
-    prefix = data[1]
-    return prefix
-    data.close()
+#Pass Bot Prefix
+#def get_prefix():
+#    data = open(os.path.join(os.path.dirname(__file__), "../eyebot.cfg")).read().splitlines()
+#    prefix = data[1]
+#    return prefix
+#    data.close()
 
-prefix = get_prefix()
+#prefix = get_prefix()
 
 # ---------------------------------------------------------
 # Help Embed
 # ---------------------------------------------------------
 class Help (commands.Cog):
-    
+
     def __init__(self, bot):
         self.bot = bot
 
@@ -35,12 +32,12 @@ class Help (commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         print(f'{t()}: Feeling helpful.')
-   
+
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.CommandError):
             await ctx.send('Something went wrong. Try `.reload help`.')
 
-        
+
     @commands.command(aliases=['h', 'help'])
     async def _help(self, ctx):
         file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
@@ -68,5 +65,5 @@ class Help (commands.Cog):
             await ctx.send(file=file, embed=embed)
 
 
-def setup(bot):
-    bot.add_cog(Help(bot))
+async def setup(bot):
+    await bot.add_cog(Help(bot))

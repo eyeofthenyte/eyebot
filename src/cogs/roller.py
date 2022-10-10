@@ -1,8 +1,8 @@
 import sys, discord, logging
-import random, contextlib
-import os, json, datetime, codecs, re
+import random
+import os, datetime, re
+
 from dataclasses import dataclass
-from discord import Activity, ActivityType
 from discord.ext import commands, tasks
 from discord.utils import find
 
@@ -16,13 +16,13 @@ def t():
     return t
 
 #Pass Bot Prefix
-def get_prefix():
-    data = open(os.path.join(os.path.dirname(__file__), "../eyebot.cfg")).read().splitlines()
-    prefix = data[1]
-    return prefix
-    data.close()
+#def get_prefix():
+#    data = open(os.path.join(os.path.dirname(__file__), "../eyebot.cfg")).read().splitlines()
+#    prefix = data[1]
+#    return prefix
+#    data.close()
 
-prefix = get_prefix()
+#prefix = get_prefix()
 
 
 # ---------------------------------------------------------
@@ -143,11 +143,11 @@ class Roll(commands.Cog):
 
     #----------------------------
     # Check if D20 Rolls are Crit Success or Crit Fail
-    #----------------------------    
+    #----------------------------
     @staticmethod
     def get_d20_minmax_msg(rolls):
         #Crit Fail or Crit Success Message
-        
+
         msg = ''
         crit = False
         fail = False
@@ -279,5 +279,5 @@ class Roll(commands.Cog):
 
 
 
-def setup(bot):
-    bot.add_cog(Roll(bot))
+async def setup(bot):
+    await bot.add_cog(Roll(bot))
