@@ -1,9 +1,6 @@
-import sys, discord
-import os, json, datetime, codecs, re
-import random, contextlib
-from discord.ext import commands, tasks
-from discord import Activity, ActivityType
-from discord.utils import find
+import eyebot_discord
+import os, datetime
+from discord.ext import commands
 
 #Time Stamp Generation For Console Logging
 def t():
@@ -25,7 +22,7 @@ prefix = get_prefix()
 # Help Embed
 # ---------------------------------------------------------
 class Help (commands.Cog):
-    
+
     def __init__(self, bot):
         self.bot = bot
 
@@ -35,16 +32,16 @@ class Help (commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         print(f'{t()}: Feeling helpful.')
-   
+
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.CommandError):
             await ctx.send('Something went wrong. Try `.reload help`.')
 
-        
+
     @commands.command(aliases=['h', 'help'])
     async def _help(self, ctx):
 
-        embed = discord.Embed(color=0x019cd0)
+        embed = eyebot_discord.Embed(color=0x019cd0)
         embed.set_author(name=f'Help (All Commands)')
         embed.add_field(name=f':dollar:  **__Loot__**', value=f"**Usage: `{prefix}loot #` where `# = 1-4`**\n Number corresponds to the 4 Individual Treasure tables in Dungeon Master's Guide - Chapter 7.\nThis will generate all coins randomly based on table selected.\n", inline=False)
         embed.add_field(name=f':moneybag:  **__Hoard__**', value=f"**Usage: `{prefix}hoard #` where `# = 1-4`**\n Number corresponds to the 4 Treasure Hoard tables in Dungeon Master's Guide - Chapter 7.\nThis will generate all coins and magical items randomly based on table selected.\n", inline=False)
@@ -62,9 +59,9 @@ class Help (commands.Cog):
         #embed.add_field(name=f':wave:  **__Leave__**', value=f'**Usage: `{prefix}leave server`\nWhere `server = name of server`**\nWill make the bot leave the server.\n**Must be server owner to use this command.**\n', inline=False)
 
 
-        if discord.ChannelType == "private":
+        if eyebot_discord.ChannelType == "private":
             await ctx.message.author.send(embed=embed)
-        elif discord.ChannelType != "private":
+        elif eyebot_discord.ChannelType != "private":
             await ctx.send(embed=embed)
 
 

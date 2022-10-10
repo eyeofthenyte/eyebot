@@ -1,9 +1,7 @@
-import sys, discord
-import os, json, datetime, codecs, re
-import random, contextlib
-from discord.ext import commands, tasks
-from discord import Activity, ActivityType
-from discord.utils import find
+import eyebot_discord
+import os, datetime
+import random
+from discord.ext import commands
 
 #Time Stamp Generation For Console Logging
 def t():
@@ -27,20 +25,20 @@ prefix = get_prefix()
 class Hoard(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-    
+
     #----------------------------
     # Events
     #----------------------------
     @commands.Cog.listener()
     async def on_ready(self):
         print(f'{t()}: Swimming through the treasure.')
-    
+
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
             print(f'{t()}: missing or invalid argument for .hoard')
             await ctx.send('Please choose which hoard loot table you wish to pick loot from by typing:\n`{prefix}hoard (1/2/3/4)`.\nPlease try `{prefix}hoard ?` for more information.')
-    
-    
+
+
     #----------------------------
     # Hoard Loot Generator
     #----------------------------
@@ -60,11 +58,11 @@ class Hoard(commands.Cog):
         count = 0
         count2 = 0
         mlist = [''] * 2
-    
+
         #----------------------------
         # Hoard Loot Table 1
         #----------------------------
-        if select == '1': 
+        if select == '1':
             coins = str(random.randrange(6,37)*100) + ' x CP\n' + str(random.randrange(3,19)*100) + ' x SP\n' + str(random.randrange(2,13)*10) + ' x GP\n'
             lines = open(os.path.join(os.path.dirname(__file__), './hoard/hoard1.txt')).read().splitlines()
             randline = random.choice(lines)
@@ -86,7 +84,7 @@ class Hoard(commands.Cog):
             else:
                 list[2] = ''
             m_Response = f'__In the final loot hoard you find...__\n{coins} {list[0]} {list[1]} {list[2]} {list[3]} {list[4]}.'
-            
+
             # Magic item list generation
             if list[2] != '':
                 m_Magic[0] = f'\n__You find the following magical :sparkles: item(s)__:\n'
@@ -106,8 +104,8 @@ class Hoard(commands.Cog):
                     else:
                         mlist[0] = mlist[0]
                     m2_Response[i] = mlist[0]
-    
-            embed = discord.Embed(color=0xffe449)
+
+            embed = eyebot_discord.Embed(color=0xffe449)
             embed.set_author(name='Treasure Hoard', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/money-bag_1f4b0.png')
             embed.add_field(name='**__Challange 0 - 4__**', value = str(m_Response).replace("and","\n") + '\n' + m_Magic[0] + str(m2_Response).replace("'","").replace("[","").replace("]","").replace(",","\n"), inline=False)
 
@@ -135,7 +133,7 @@ class Hoard(commands.Cog):
             else:
                 list[2] = ''
             m_Response = f'__In the final loot hoard you find...__\n{coins} {list[0]} {list[1]} {list[2]} {list[3]} {list[4]}.'
-    
+
             # Magic item list generation
             if list[2] != '':
                 m_Magic[0] = f'\n__You find the following magical :sparkles: item(s)__:\n'
@@ -155,8 +153,8 @@ class Hoard(commands.Cog):
                     else:
                         mlist[0] = mlist[0]
                     m2_Response[i] = mlist[0]
-    
-            embed = discord.Embed(color=0xffe449)
+
+            embed = eyebot_discord.Embed(color=0xffe449)
             embed.set_author(name='Treasure Hoard', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/money-bag_1f4b0.png')
             embed.add_field(name='**__Challange 5 - 10__**', value = str(m_Response).replace("and","\n") + '\n' + m_Magic[0] + str(m2_Response).replace("'","").replace("[","").replace("]","").replace(",","\n"), inline=False)
 
@@ -190,7 +188,7 @@ class Hoard(commands.Cog):
             else:
                 list[6] = ''
             m_Response = f'__In the final loot hoard you find...__\n{coins} {list[0]} {list[1]} {list[2]} {list[3]} {list[4]} {list[5]} {list[6]} {list[7]} {list[8]}.'
-    
+
             # Magic item list generation
             if list[2] != '':
                 m_Magic[0] = f'\n__You find the following magical :sparkles: item(s)__:\n'
@@ -230,11 +228,11 @@ class Hoard(commands.Cog):
                     else:
                         mlist2[0] = mlist2[0]
                     m3_Response[i] = mlist2[0]
-            embed = discord.Embed(color=0xffe449)
+            embed = eyebot_discord.Embed(color=0xffe449)
             embed.set_author(name='Treasure Hoard', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/money-bag_1f4b0.png')
             embed.add_field(name='**__Challange 11 - 16__**', value = str(m_Response).replace("and","\n") + '\n' + m_Magic[0] + str(m2_Response).replace("'","").replace("[","").replace("]","").replace(",","\n") + m_Magic[1] + str(m3_Response).replace("'","").replace("[","").replace("]","").replace(",","\n"), inline=False)
 
-    
+
         #----------------------------
         # Hoard Loot Table 4
         #----------------------------
@@ -262,7 +260,7 @@ class Hoard(commands.Cog):
             else:
                 list[2] = ''
             m_Response = f'__In the final loot hoard you find...__\n{coins} {list[0]} {list[1]} {list[2]} {list[3]} {list[4]}.'
-    
+
         # Magic item list generation
             if list[2] != '':
                 m_Magic[0] = f'\n__You find the following magical :sparkles: item(s)__:\n'
@@ -281,8 +279,8 @@ class Hoard(commands.Cog):
                     else:
                         mlist[0] = mlist[0]
                     m2_Response[i] = mlist[0]
-    
-                embed = discord.Embed(color=0xffe449)
+
+                embed = eyebot_discord.Embed(color=0xffe449)
                 embed.set_author(name='Treasure Hoard', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/money-bag_1f4b0.png')
                 embed.add_field(name='**__Challange 17+__**', value = str(m_Response).replace("and","\n") + '\n' + m_Magic[0] + str(m2_Response).replace("'","").replace("[","").replace("]","").replace(",","\n"), inline=False)
 
@@ -292,7 +290,7 @@ class Hoard(commands.Cog):
         #----------------------------
         elif select == '?':
             print(f'{t()}: {ctx.message.author}({ctx.message.author.guild}) asked for help with Hoard Loot.')
-            embed = discord.Embed(color=0x019cd0)
+            embed = eyebot_discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Hoard)', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/warning_26a0.png')
             embed.add_field(name=':moneybag:  **__Hoard__**', value='**Usage: `{prefix}hoard #` where `# = 1-4`**\n Number corresponds to the 4 Treasure Hoard tables in DMG - Chapter 7.\nThis will generate all coins and magical items randomly based on table selected.', inline=False)
 
@@ -300,12 +298,12 @@ class Hoard(commands.Cog):
         else:
             print(f'{t()}: invalid hoard opterator entered.')
             m_Response = "That's not a valid input. Please try again or `{prefix}hoard ?` for more information."
-            embed = discord.Embed(color=0xcc0000)
+            embed = eyebot_discord.Embed(color=0xcc0000)
             embed.set_author(name='Treasure Hoard', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/prohibited_1f6ab.png')
             embed.add_field(name='**__Error__**', value=f'{m_Response}', inline=False)
 
 
-        if discord.ChannelType == "private":
+        if eyebot_discord.ChannelType == "private":
             if select == '1':
                 print(f'{t()}: {ctx.message.author} rolled for hoard loot from table {select} * magic table(s) {list[4]}')
             elif select == '2':
@@ -316,7 +314,7 @@ class Hoard(commands.Cog):
                 print(f'{t()}: {ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]}')
             await ctx.message.author.send(embed=embed)
             return
-        elif discord.ChannelType != "private":
+        elif eyebot_discord.ChannelType != "private":
             if select == '1':
                 print(f'{t()}: {ctx.message.author} rolled for hoard loot from table {select} * magic table(s) {list[4]}')
             elif select == '2':
@@ -328,6 +326,6 @@ class Hoard(commands.Cog):
             await ctx.send(embed=embed)
             return
 
-    
+
 def setup(bot):
     bot.add_cog(Hoard(bot))

@@ -5,7 +5,6 @@ RUN pip install twitchio
 RUN pip install gspread
 RUN pip install gsheets
 
-
 COPY . /opt/eyebot
 WORKDIR /opt
 

@@ -1,9 +1,7 @@
-import sys, discord, logging
-import os, json, datetime, codecs, re, gspread
-import random, contextlib
-from discord.ext import commands, tasks
-from discord import Activity, ActivityType
-from discord.utils import find
+import sys, eyebot_discord, logging
+import os, datetime, gspread
+import random
+from discord.ext import commands
 
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
@@ -33,7 +31,7 @@ prefix = get_prefix()
 # Random Carousing Outcome
 # ---------------------------------------------------------
 class Carousing(commands.Cog):
-    
+
     def __init__(self, bot):
         self.bot = bot
 
@@ -48,7 +46,7 @@ class Carousing(commands.Cog):
         print(f'Carousing encountered error {error}')
         if isinstance(error, commands.MissingRequiredArgument):
             print(f'{t()}: {ctx.message.author}({ctx.message.author.guild}) is missing or invalid argument for .carousing')
-            if discord.ChannelType == "private":
+            if eyebot_discord.ChannelType == "private":
                 await ctx.message.author.send(f'Please only type `carousing` to get a random result.\n Type `help` for more info.')
                 return
             else:
@@ -62,26 +60,26 @@ class Carousing(commands.Cog):
     async def _carousing(self, ctx):
         if ctx == ctx:
             print(f'{t()}: A selection from the D100 Carousing list was made.')
-            embed = discord.Embed(color=0x019cd0)
+            embed = eyebot_discord.Embed(color=0x019cd0)
             embed.set_thumbnail(url = 'https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/google/313/clinking-beer-mugs_1f37b.png')
             embed.set_author(name = 'D100 CAROUSING TABLE')
             embed.add_field(name = 'You wake up... ', value = random.choice(c_list), inline=False)
-            if discord.ChannelType == "private":
+            if eyebot_discord.ChannelType == "private":
                 await ctx.message.author.send(embed=embed)
             else:
                 await ctx.send(embed=embed)
 
-        else: 
+        else:
             print(f'{t()}: there was an error.')
-            embed = discord.Embed(color=0xcc0000)
+            embed = eyebot_discord.Embed(color=0xcc0000)
             embed.set_author(name='Carousing', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/prohibited_1f6ab.png')
-            embed.add_field(name='__Error__', value=f"That was not a valid choice. Simply type `{prefix}carousing`, `{prefix}carouse`, `{prefix}drinking`, `{prefix}getdrinks`, or `{prefix}pubcrawl` to get a selection from the table.", inline=False)     
+            embed.add_field(name='__Error__', value=f"That was not a valid choice. Simply type `{prefix}carousing`, `{prefix}carouse`, `{prefix}drinking`, `{prefix}getdrinks`, or `{prefix}pubcrawl` to get a selection from the table.", inline=False)
             print(f'{t()}: Invalid input for carousing command.')
-            if discord.ChannelType == "private":
+            if eyebot_discord.ChannelType == "private":
                 await ctx.message.author.send(embed=embed)
             else:
                 await ctx.send(embed=embed)
-        
+
 
 def setup(bot):
     bot.add_cog(Carousing(bot))
