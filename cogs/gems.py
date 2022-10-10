@@ -37,11 +37,16 @@ class Gems(commands.Cog):
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
             print(f'{t()}: missing or invalid argument for gems')
-            if eyebot_discord.ChannelType == "private":
-                await message.author.send(embed=embed)
+            file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
+            embed = discord.Embed(color=0x019cd0)
+            embed.set_author(name='Help (Gems)', icon_url='attachment://prohibited.png')
+            embed.add_field(name=':gem:  **__Gems__**', value='**Usage: `{prefix}gems g n` \nwhere `g = value of gems desired`**\n*10, 50, 100, 500, 1000, 5000*\n**`     n = number of gems to be generated`**\n The value of gems corresponds to the Gem Tables DMG - Chapter 7.\nThis will generate a number of gems of a single gold value type based the table selected.', inline=False)
+
+            if discord.ChannelType == "private":
+                await ctx.message.author.send(file=file, embed=embed)
                 return
-            elif eyebot_discord.ChannelType != "private":
-                await ctx.send(f'Make sure you put in the value in gp and the quantiy of gems you wish to generate. i.e. `{prefix}gems 100 5`')
+            elif discord.ChannelType != "private":
+                await ctx.send(file=file, embed=embed)
                 return
 
 
@@ -75,36 +80,39 @@ class Gems(commands.Cog):
                 gems.append(m_Response)
                 i -= 1
 
-            embed = eyebot_discord.Embed(color=0x019cd0)
-            embed.set_thumbnail(url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/google/346/gem-stone_1f48e.png')
+            file = discord.File('./eyebot/images/commands/gem-stone.png', filename='gem-stone.png')
+            embed = discord.Embed(color=0x019cd0)
+            embed.set_thumbnail(url='attachment://gem-stone.png')
             embed.set_author(name = 'RANDOM GEM SELECTION')
             embed.add_field(name = 'You discovered the following {select} gems:', value = '\n'.join(gems), inline=False)
 
-            if eyebot_discord.ChannelType == "private":
-                await ctx.message.author.send(embed=embed)
-            elif eyebot_discord.ChannelType != "private":
-                await ctx.send(embed=embed)
+            if discord.ChannelType == "private":
+                await ctx.message.author.send(file=file, embed=embed)
+            elif discord.ChannelType != "private":
+                await ctx.send(file=file, embed=embed)
 
         else:
             if lstr == 1 and gemstring == '?':
                 print(f"{t()}: {ctx.message.author}({ctx.message.author.guild}) asked for help with .gems command")
-                embed = eyebot_discord.Embed(color=0x019cd0)
-                embed.set_author(name='Help (Gems)')
+                file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
+                embed = discord.Embed(color=0x019cd0)
+                embed.set_author(name='Help (Gems)', icon_url='attachment://warning.png')
                 embed.add_field(name=':gem:  **__Gems__**', value='**Usage: `{prefix}gems g n` \nwhere `g = value of gems desired`**\n*10, 50, 100, 500, 1000, 5000*\n**`     n = number of gems to be generated`**\n The value of gems corresponds to the Gem Tables DMG - Chapter 7.\nThis will generate a number of gems of a single gold value type based the table selected.', inline=False)
-                if eyebot_discord.ChannelType == "private":
-                    await ctx.message.author.send(embed=embed)
-                elif eyebot_discord.ChannelType != "private":
-                    await ctx.send(embed=embed)
+                if discord.ChannelType == "private":
+                    await ctx.message.author.send(file=file, embed=embed)
+                elif discord.ChannelType != "private":
+                    await ctx.send(file=file, embed=embed)
 
             else:
                 print(t() + " : ({ctx.message.author.guild}) entered invalid argument")
-                embed = eyebot_discord.Embed(color=0x019cd0)
-                embed.set_author(name='Help (Gems)')
+                file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
+                embed = discord.Embed(color=0x019cd0)
+                embed.set_author(name='Help (Gems)', icon_url='attachment://prohibited.png')
                 embed.add_field(name=':gem:  **__Gems__**', value='**Usage: `{prefix}gems g n` \nwhere `g = value of gems desired`**\n*10, 50, 100, 500, 1000, 5000*\n**`     n = number of gems to be generated`**\n The value of gems corresponds to the Gem Tables DMG - Chapter 7.\nThis will generate a number of gems of a single gold value type based the table selected.', inline=False)
-                if eyebot_discord.ChannelType == "private":
-                    await ctx.message.author.send(embed=embed)
-                elif eyebot_discord.ChannelType != "private":
-                    await ctx.send(embed=embed)
+                if discord.ChannelType == "private":
+                    await ctx.message.author.send(file=file, embed=embed)
+                elif discord.ChannelType != "private":
+                    await ctx.send(file=file, embed=embed)
 
 def setup(bot):
     bot.add_cog(Gems(bot))
