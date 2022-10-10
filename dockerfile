@@ -9,4 +9,4 @@ RUN pip install gsheets
 COPY . /opt/eyebot
 WORKDIR /opt
 
-CMD ["python", "eyebot/eyebot-d.py"]
+CMD ["python", "eyebot/src/discord.py"]

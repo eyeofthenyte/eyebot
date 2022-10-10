@@ -1,0 +1,18 @@
+---
+# default is .
+prefix:
+
+discord:
+    # discord bot token from https://discord.com/developers
+    bot_token:
+
+twitch:
+    # generate here https://twitchapps.com/tmi/
+    tmi_token:
+    # get a twitch application clientId from https://dev.twitch.tv/
+    client_id:
+    # what is your bots nickname?
+    nick:
+    # channels to auto join, expecting list.
+    channels:
+     - 123
