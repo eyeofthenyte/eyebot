@@ -1,10 +1,7 @@
-import sys, discord
-import os, json, datetime, codecs, re, gsheets, gspread
-import random, contextlib
-from discord.ext import commands, tasks
-from discord import Activity, ActivityType
-from discord.utils import find
-from gsheets import Sheets
+import eyebot_discord
+import os, datetime, gspread
+import random
+from discord.ext import commands
 
 gsa = gspread.service_account(filename = 'eyebot/service_account.json')
 
@@ -33,7 +30,7 @@ def get_prefix():
 prefix = get_prefix()
 
 class Trinket(commands.Cog):
-    
+
     def __init__(self, bot):
         self.bot = bot
 
@@ -62,14 +59,14 @@ class Trinket(commands.Cog):
                     v_list = worksheet.col_values(2)
                     v_list = list(filter(None, v_list))
                     print(f'{t()}: {ctx.message.author} drew a random trinket from the ' + select.upper() + ' list.')
-                    embed = discord.Embed(color=0x019cd0)
+                    embed = eyebot_discord.Embed(color=0x019cd0)
                     embed.set_thumbnail(url = str(icon[i]))
                     embed.set_author(name = select.upper() + ' TRINKET')
                     embed.add_field(name = 'You found the following:', value=random.choice(v_list), inline=False)
 
 
         elif select == '?':
-            embed = discord.Embed(color=0x019cd0)
+            embed = eyebot_discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Trinket)', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/warning_26a0.png')
             embed.add_field(name='**__Trinket__**', value="**Usage: `{prefix}trinket c ` \nwhere `c = character class`**\nCharacter class referrs to Dungeons and Dragons character classes.\nThis data is taken from [Ted's (Nerd Immersion)](https://www.youtube.com/c/NerdImmersion1 'Nerd Immersion') random trinket's tables.", inline=False)
             print(f'{t()}: {ctx.message.author} asked for help with {prefix}trinket command.')
@@ -77,16 +74,16 @@ class Trinket(commands.Cog):
 
         else:
             print(f'{t()}: there was an error.')
-            embed = discord.Embed(color=0xcc0000)
+            embed = eyebot_discord.Embed(color=0xcc0000)
             embed.set_author(name='Trinket', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/prohibited_1f6ab.png')
-            embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select an available Character Class. Type `trinket ?` for more info.", inline=False)     
+            embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select an available Character Class. Type `trinket ?` for more info.", inline=False)
             print(f'{t()}: Invalid input for {prefix}trinket command.')
 
-        if discord.ChannelType == "private":
+        if eyebot_discord.ChannelType == "private":
             await ctx.message.author.send(embed=embed)
-        elif discord.ChannelType != "private":
+        elif eyebot_discord.ChannelType != "private":
             await ctx.send(embed=embed)
-        
+
 
 def setup(bot):
     bot.add_cog(Trinket(bot))

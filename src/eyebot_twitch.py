@@ -1,6 +1,5 @@
-import os, json, datetime, codecs, re
-import random, contextlib
-import sys, logging
+import datetime
+import random
 import yaml
 
 from twitchio.ext import commands
@@ -18,20 +17,16 @@ def read_cfg():
         data = yaml.load(f, Loader=SafeLoader)
         return data
 
-    # default is no config
-    return null
-
-config = read_cfg()
-if (!config):
-    return
-
 config = read_cfg()
 
-BOT_PREFIX = not config.prefix ? "!" : config.prefix
-TMI_TOKEN = config.twitch.tmi_token
-CLIENT_ID = config.twitch.client_id
-BOT_NICK = config.twitch.nick
-CHANNELS = config.twitch.channels
+BOT_PREFIX = "!"
+if config["prefix"]:
+    BOT_PREFIX = config["prefix"]
+
+TMI_TOKEN = config["twitch"]["tmi_token"]
+CLIENT_ID = config["twitch"]["client_id"]
+BOT_NICK = config["twitch"]["nick"]
+CHANNELS = config["twitch"]["channels"]
 
 bot = commands.Bot(
     # set up the bot

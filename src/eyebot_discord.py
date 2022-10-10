@@ -1,12 +1,8 @@
-import inspect
-import os, json, datetime, codecs, re, asyncio
-import random, contextlib
-import sys, discord
+import os, datetime
+import discord
 import yaml
 
-from discord import Activity, ActivityType
-from discord.ext import commands, tasks
-from discord.utils import find
+from discord.ext import commands
 from yaml.loader import SafeLoader
 
 #----------------------------
@@ -17,17 +13,17 @@ def read_cfg():
         data = yaml.load(f, Loader=SafeLoader)
         return data
 
-    # default is no config
-    return null
-
 config = read_cfg()
-if (!config):
-    return
+TOKEN = config["discord"]["bot_token"]
 
-TOKEN = config.discord.bot_token
-BOT_PREFIX = not config.prefix ? "!" : config.prefix
+BOT_PREFIX = "!"
+if config["prefix"]:
+    BOT_PREFIX = config["prefix"]
 
-bot = commands.Bot(command_prefix = BOT_PREFIX)
+bot = commands.Bot(
+    command_prefix = BOT_PREFIX,
+    intents = discord.Intents()
+)
 bot.remove_command('help')
 
 #Time Stamp Generation For Console Logging
@@ -37,8 +33,10 @@ def t():
     t = now.strftime(format)
     return t
 
+currDir = os.path.dirname(os.path.realpath(__file__))
+
 #Listing Extensions
-for filename in os.listdir('eyebot/cogs'):
+for filename in os.listdir(currDir + '/../cogs'):
     if filename.endswith('.py'):
         bot.load_extension(f'cogs.{filename[:-3]}')
         print(f'{t()}: Extension found - {filename[:-3]}')

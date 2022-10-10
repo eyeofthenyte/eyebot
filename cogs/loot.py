@@ -1,9 +1,7 @@
-import sys, discord
-import os, json, datetime, codecs, re
-import random, contextlib
-from discord.ext import commands, tasks
-from discord import Activity, ActivityType
-from discord.utils import find
+import eyebot_discord
+import os, datetime
+import random
+from discord.ext import commands
 
 #Time Stamp Generation For Console Logging
 def t():
@@ -25,7 +23,7 @@ prefix = get_prefix()
 # Random Loot Generator
 # ---------------------------------------------------------
 class Loot(commands.Cog):
-    
+
     def __init__(self, bot):
         self.bot = bot
 
@@ -35,7 +33,7 @@ class Loot(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         print(f"{t()}: Looking for loose change.")
-   
+
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
             print(f'{t()}: missing or invalid argument for .loot')
@@ -68,10 +66,10 @@ class Loot(commands.Cog):
             else:
                 list[0] = 'There was an error.'
             m_Response = "At the end of your job you find... \n" + list[0] + "."
-            embed = discord.Embed(color=0xffe449)
+            embed = eyebot_discord.Embed(color=0xffe449)
             embed.set_author(name='Indivdual Treasure', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/coin_1fa99.png')
             embed.add_field(name='**__Challange 0 - 4__**', value=f'{m_Response}', inline=False)
-        
+
         # Loot Table 2
         elif select == '2':
             if d100_roll < 31:
@@ -92,7 +90,7 @@ class Loot(commands.Cog):
                 list[0] = 'There was an error.'
 
             m_Response = "At the end of your job you find...\n" + list[0] + '\n' + list[1]
-            embed = discord.Embed(color=0xffe449)
+            embed = eyebot_discord.Embed(color=0xffe449)
             embed.set_author(name='Indivdual Treasure', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/coin_1fa99.png')
             embed.add_field(name='**__Challange 5 - 10__**', value=f'{m_Response}', inline=False)
 
@@ -113,7 +111,7 @@ class Loot(commands.Cog):
             else:
                 list[0] = 'There was an error.'
             m_Response = "At the end of your job you find...\n" + list[0] + '\n' + list[1]
-            embed = discord.Embed(color=0xffe449)
+            embed = eyebot_discord.Embed(color=0xffe449)
             embed.set_author(name='Indivdual Treasure', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/coin_1fa99.png')
             embed.add_field(name='**__Challange 11 - 16__**', value=f'{m_Response}', inline=False)
 
@@ -131,28 +129,28 @@ class Loot(commands.Cog):
             else:
                 list[0] = 'There was an error.'
             m_Response = "At the end of your job you find...\n" + list[0] + '\n' + list[1]
-            embed = discord.Embed(color=0xffe449)
+            embed = eyebot_discord.Embed(color=0xffe449)
             embed.set_author(name='Indivdual Treasure', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/coin_1fa99.png')
             embed.add_field(name='**__Challange 17+__**', value=f'{m_Response}', inline=False)
 
         # Help Operator
         elif select == '?':
             print(f'{t()}: {ctx.message.author} asked for help with Loot.')
-            embed = discord.Embed(color=0x019cd0)
+            embed = eyebot_discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Loot)', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/warning_26a0.png')
             embed.add_field(name='**__Loot__**', value='**Usage: `{prefix}loot #` where `# = 1-4`**\n Number corresponds to the 4 Individual Treasure tables in DMG - Chapter 7.\nThis will generate all coins randomly based on table selected.', inline=False)
 
         else:
             print(f'{t()}: {ctx.message.author} entered invalid hoard opterator')
             m_Response = "That's not a valid input. Please try again or `{prefix}loot ?` for more information."
-            embed = discord.Embed(color=0xcc0000)
+            embed = eyebot_discord.Embed(color=0xcc0000)
             embed.set_author(name='Indivdual Treasure', icon_url='https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/259/prohibited_1f6ab.png')
-            embed.add_field(name='**__Error__**', value=f'{m_Response}', inline=False)                
+            embed.add_field(name='**__Error__**', value=f'{m_Response}', inline=False)
 
-        if discord.ChannelType == "private":
+        if eyebot_discord.ChannelType == "private":
             print(f'{t()}: {ctx.message.author} rolled for loot from table {select}.')
             await ctx.message.author.send(embed=embed)
-        elif discord.ChannelType != "private":
+        elif eyebot_discord.ChannelType != "private":
             print(f'{t()}: {ctx.message.author} rolled for loot from table {select}.')
             await ctx.send(embed=embed)
 
