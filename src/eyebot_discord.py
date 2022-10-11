@@ -26,6 +26,7 @@ bot = commands.Bot(
 )
 bot.remove_command('help')
 
+
 #Time Stamp Generation For Console Logging
 def t():
     format = "%Y/%m/%d %H:%M:%S"
