@@ -1,10 +1,12 @@
-import discord
 import os, datetime, gspread
+import discord
+import yaml
 import random
 
 from discord.ext import commands, tasks
 from discord.utils import find
 from gsheets import Sheets
+from yaml.loader import SafeLoader
 
 gsa = gspread.service_account(filename = 'eyebot/service_account.json')
 s = gsa.open_by_key('1wkaF--4DqTComUfX1dYbjhkRimR2raYbJm3IEa1CTq0')
@@ -18,13 +20,16 @@ def t():
 
 
 #Pass Bot Prefix
-#def get_prefix():
-#    data = open(os.path.join(os.path.dirname(__file__), "../eyebot.cfg")).read().splitlines()
-#    prefix = data[1]
-#    return prefix
-#    data.close()
+def get_prefix():
+    with open('./eyebot/config.yaml') as f:
+        data = yaml.load(f, Loader=SafeLoader)
+        BOT_PREFIX = "!"
+        if data["prefix"]:
+            BOT_PREFIX = config["prefix"]
+        return BOT_PREFIX
 
-#prefix = get_prefix()
+
+prefix = get_prefix()
 
 
 # ---------------------------------------------------------

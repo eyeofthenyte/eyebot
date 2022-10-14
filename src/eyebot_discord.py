@@ -110,6 +110,84 @@ async def servers(ctx):
         await ctx.author.send(f'     (id: {guild.id})    -    {guild.name}')
     print(f'\n     -End of Server Listing-')
 
+#Load Cog
+@bot.command()
+@commands.check_any(commands.has_permissions(administrator=True),commands.is_owner())
+async def load(ctx, extension):
+    try:
+        await bot.load_extension(f'cogs.{extension}')
+        print(f'{t()}: Loaded extension - "{extension}"')
+        file = discord.File('./eyebot/images/commands/thumbs-up.png', filename='thumbs-up.png')
+        embed = discord.Embed(color=0x01f31d)
+        embed.set_author(name = 'LOADED ' + extension.upper(), icon_url = 'attachment://thumbs-up.png')
+        embed.add_field(name = '**__Extension Load__**', value = 'Extension: "' + extension + '" has been loaded successfully.', inline=False)
+    except Exception as e:
+        print(f'{t()}: {e}')
+        file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
+        embed = discord.Embed(color=0xcc0000)
+        embed.set_author(name = 'LOADING ' + extension.upper() + ' FAILED', icon_url = 'attachment://warning.png')
+        embed.add_field(name = '**__Extension Load__**', value = e, inline=False)
+    if discord.ChannelType == "private":
+        await ctx.message.author.send(file=file, embed=embed)
+    elif discord.ChannelType != "private":
+        await ctx.send(file=file, embed=embed)
+
+#Unload Cog
+@bot.command()
+@commands.check_any(commands.has_permissions(administrator=True),commands.is_owner())
+async def unload(ctx, extension):
+    try:
+        await bot.unload_extension(f'cogs.{extension}')
+        print(f'{t()}: Unloaded extension - "{extension}"')
+        file = discord.File('./eyebot/images/commands/thumbs-up.png', filename='thumbs-up.png')
+        embed = discord.Embed(color=0x01f31d)
+        embed.set_author(name = 'UNLOADED ' + extension.upper(), icon_url = 'attachment://thumbs-up.png')
+        embed.add_field(name = '**__Extension Unload__**', value = 'Extension: "' + extension + '" has been unloaded.', inline=False)
+    except Exception as e:
+        print(f'{t()}: {e}')
+        file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
+        embed = discord.Embed(color=0xcc0000)
+        embed.set_author(name = 'UNLOADING ' + extension.upper() + ' FAILED', icon_url = 'attachment://warning.png')
+        embed.add_field(name = '**__Extension Unload__**', value =  e, inline=False)
+    if discord.ChannelType == "private":
+        await ctx.message.author.send(file=file, embed=embed)
+    elif discord.ChannelType != "private":
+        await ctx.send(file=file, embed=embed)
+
+#Reload Cog
+@bot.command()
+@commands.check_any(commands.has_permissions(administrator=True),commands.is_owner())
+async def reload(ctx, extension):
+    print(f'{t()}: Attempting to reload {extension}')
+    try:
+        try:
+            await bot.unload_extension(f'cogs.{extension}')
+            print(f'    - "{extension}" has been unloaded.')
+        except Exception as e:
+            print(f'    - {e}')
+        try:
+            await bot.load_extension(f'cogs.{extension}')
+            print(f'    - "{extension}" has been loaded.')
+            file = discord.File('./eyebot/images/commands/thumbs-up.png', filename='thumbs-up.png')
+            embed = discord.Embed(color=0x01f31d)
+            embed.set_author(name = 'RELOADED ' + extension.upper(), icon_url = 'attachment://thumbs-up.png')
+            embed.add_field(name = '**__Extension Reload__**', value='Reloading "' + extension + '" has been completed successfully.', inline=False)
+            print(f'{t()}: Reloaded extension - "{extension}" successfully.')
+
+        except Exception as e:
+            print(f'    - {e}')
+            print(f'{t()}: Reload extension - "{extension}" has failed.')
+            file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
+            embed = discord.Embed(color=0xcc0000)
+            embed.set_author(name = 'RELOADING ' + extension.upper() + ' FAILED', icon_url = 'attachment://warning.png')
+            embed.add_field(name = '**__Extension Reload__**', value='Reloading "' + extension + '" has failed. Invalid extension or extension not loaded.', inline=False)
+
+    except Exception as e:
+        print(f'{t()}: {e}')
+    if discord.ChannelType == "private":
+        await ctx.message.author.send(file=file, embed=embed)
+    elif discord.ChannelType != "private":
+        await ctx.send(file=file, embed=embed)
 
 async def main():
     async with bot:

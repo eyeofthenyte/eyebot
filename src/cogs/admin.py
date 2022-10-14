@@ -1,6 +1,9 @@
 import os, datetime
 import discord
+import yaml
 from discord.ext import commands
+from yaml.loader import SafeLoader
+
 
 #Time Stamp Generation For Console Logging
 def t():
@@ -8,6 +11,18 @@ def t():
     now = datetime.datetime.now()
     t = now.strftime(format)
     return t
+
+#Pass Bot Prefix
+def get_prefix():
+    with open('./eyebot/config.yaml') as f:
+        data = yaml.load(f, Loader=SafeLoader)
+        BOT_PREFIX = "!"
+        if data["prefix"]:
+            BOT_PREFIX = config["prefix"]
+        return BOT_PREFIX
+
+
+prefix = get_prefix()
 
 # ---------------------------------------------------------
 # Admin Commands
