@@ -3,22 +3,6 @@ import os, datetime
 import random
 from discord.ext import commands
 
-#Time Stamp Generation For Console Logging
-def t():
-    format = "%Y/%m/%d %H:%M:%S"
-    now = datetime.datetime.now()
-    t = now.strftime(format)
-    return t
-
-#Pass Bot Prefix
-#def get_prefix():
-#    data = open(os.path.join(os.path.dirname(__file__), "../eyebot.cfg")).read().splitlines()
-#    prefix = data[1]
-#    return prefix
-#    data.close()
-
-#prefix = get_prefix()
-
 # ---------------------------------------------------------
 # Ranodom Hoard Generator
 # ---------------------------------------------------------
@@ -31,12 +15,12 @@ class Hoard(commands.Cog):
     #----------------------------
     @commands.Cog.listener()
     async def on_ready(self):
-        print(f'{t()}: Swimming through the treasure.')
+        self.bot.logger.log(f'Swimming through the treasure.')
 
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
-            print(f'{t()}: missing or invalid argument for .hoard')
-            m_Response = "That's not a valid input. Please try again or `{prefix}hoard ?` for more information."
+            self.bot.logger.log(f'missing or invalid argument for .hoard')
+            m_Response = "That's not a valid input. Please try again or `self.bot.config.get().prefixhoard ?` for more information."
             file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Treasure Hoard', icon_url='attachment://prohibited.png')
@@ -302,16 +286,16 @@ class Hoard(commands.Cog):
         # Help Operator
         #----------------------------
         elif select == '?':
-            print(f'{t()}: {ctx.message.author}({ctx.message.author.guild}) asked for help with Hoard Loot.')
+            self.bot.logger.log(f'{ctx.message.author}({ctx.message.author.guild}) asked for help with Hoard Loot.')
             file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Hoard)', icon_url='attachment://warning.png')
-            embed.add_field(name=':moneybag:  **__Hoard__**', value='**Usage: `{prefix}hoard #` where `# = 1-4`**\n Number corresponds to the 4 Treasure Hoard tables in DMG - Chapter 7.\nThis will generate all coins and magical items randomly based on table selected.', inline=False)
+            embed.add_field(name=':moneybag:  **__Hoard__**', value='**Usage: `self.bot.config.get().prefixhoard #` where `# = 1-4`**\n Number corresponds to the 4 Treasure Hoard tables in DMG - Chapter 7.\nThis will generate all coins and magical items randomly based on table selected.', inline=False)
 
 
         else:
-            print(f'{t()}: invalid hoard opterator entered.')
-            m_Response = "That's not a valid input. Please try again or `{prefix}hoard ?` for more information."
+            self.bot.logger.log(f'invalid hoard opterator entered.')
+            m_Response = "That's not a valid input. Please try again or `self.bot.config.get().prefixhoard ?` for more information."
             file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Treasure Hoard', icon_url='attachment://prohibited.png')
@@ -320,24 +304,24 @@ class Hoard(commands.Cog):
 
         if discord.ChannelType == "private":
             if select == '1':
-                print(f'{t()}: {ctx.message.author} rolled for hoard loot from table {select} * magic table(s) {list[4]}')
+                self.bot.logger.log(f'{ctx.message.author} rolled for hoard loot from table {select} * magic table(s) {list[4]}')
             elif select == '2':
-                print(f'{t()}: {ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]}')
+                self.bot.logger.log(f'{ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]}')
             elif select == '3':
-                print(f'{t()}: {ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]} {list[8]}')
+                self.bot.logger.log(f'{ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]} {list[8]}')
             elif select == '4':
-                print(f'{t()}: {ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]}')
+                self.bot.logger.log(f'{ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]}')
             await ctx.message.author.send(file=file, embed=embed)
             return
         elif discord.ChannelType != "private":
             if select == '1':
-                print(f'{t()}: {ctx.message.author} rolled for hoard loot from table {select} * magic table(s) {list[4]}')
+                self.bot.logger.log(f'{ctx.message.author} rolled for hoard loot from table {select} * magic table(s) {list[4]}')
             elif select == '2':
-                print(f'{t()}: {ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]}')
+                self.bot.logger.log(f'{ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]}')
             elif select == '3':
-                print(f'{t()}: {ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]} {list[8]}')
+                self.bot.logger.log(f'{ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]} {list[8]}')
             elif select == '4':
-                print(f'{t()}: {ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]}')
+                self.bot.logger.log(f'{ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]}')
             await ctx.send(file=file, embed=embed)
             return
 

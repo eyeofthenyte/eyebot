@@ -3,22 +3,6 @@ import os, datetime
 import random
 from discord.ext import commands
 
-#Time Stamp Generation For Console Logging
-def t():
-    format = "%Y/%m/%d %H:%M:%S"
-    now = datetime.datetime.now()
-    t = now.strftime(format)
-    return t
-
-#Pass Bot Prefix
-#def get_prefix():
-#    data = open(os.path.join(os.path.dirname(__file__), "../eyebot.cfg")).read().splitlines()
-#    prefix = data[1]
-#    return prefix
-#    data.close()
-
-#prefix = get_prefix()
-
 # ---------------------------------------------------------
 # Random Loot Generator
 # ---------------------------------------------------------
@@ -32,12 +16,12 @@ class Loot(commands.Cog):
     #----------------------------
     @commands.Cog.listener()
     async def on_ready(self):
-        print(f"{t()}: Looking for loose change.")
+        self.bot.logger.log(f"Looking for loose change.")
 
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
-            print(f'{t()}: missing or invalid argument for .loot')
-            m_Response = "That's not a valid input. Please try again or `{prefix}loot ?` for more information."
+            self.bot.logger.log(f'missing or invalid argument for .loot')
+            m_Response = "That's not a valid input. Please try again or `self.bot.config.get().prefixloot ?` for more information."
             file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Indivdual Treasure', icon_url='attachment://prohibited.png')
@@ -149,24 +133,24 @@ class Loot(commands.Cog):
         # Help Operator
         elif select == '?':
             file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
-            print(f'{t()}: {ctx.message.author} asked for help with Loot.')
+            self.bot.logger.log(f'{ctx.message.author} asked for help with Loot.')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Loot)', icon_url='attachment://warning.png')
-            embed.add_field(name='**__Loot__**', value='**Usage: `{prefix}loot #` where `# = 1-4`**\n Number corresponds to the 4 Individual Treasure tables in DMG - Chapter 7.\nThis will generate all coins randomly based on table selected.', inline=False)
+            embed.add_field(name='**__Loot__**', value='**Usage: `self.bot.config.get().prefixloot #` where `# = 1-4`**\n Number corresponds to the 4 Individual Treasure tables in DMG - Chapter 7.\nThis will generate all coins randomly based on table selected.', inline=False)
 
         else:
-            print(f'{t()}: {ctx.message.author} entered invalid hoard opterator')
-            m_Response = "That's not a valid input. Please try again or `{prefix}loot ?` for more information."
+            self.bot.logger.log(f'{ctx.message.author} entered invalid hoard opterator')
+            m_Response = "That's not a valid input. Please try again or `self.bot.config.get().prefixloot ?` for more information."
             file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Indivdual Treasure', icon_url='attachment://prohibited.png')
             embed.add_field(name='**__Error__**', value=f'{m_Response}', inline=False)
 
         if discord.ChannelType == "private":
-            print(f'{t()}: {ctx.message.author} rolled for loot from table {select}.')
+            self.bot.logger.log(f'{ctx.message.author} rolled for loot from table {select}.')
             await ctx.message.author.send(file=file, embed=embed)
         elif discord.ChannelType != "private":
-            print(f'{t()}: {ctx.message.author} rolled for loot from table {select}.')
+            self.bot.logger.log(f'{ctx.message.author} rolled for loot from table {select}.')
             await ctx.send(file=file, embed=embed)
 
 async def setup(bot):
