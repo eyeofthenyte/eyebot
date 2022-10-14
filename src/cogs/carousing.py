@@ -1,8 +1,10 @@
-import sys, discord, logging
+import sys, logging
+import discord
 import os, datetime, gspread
+import yaml
 import random
 from discord.ext import commands
-
+from yaml.loader import SafeLoader
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
@@ -19,13 +21,16 @@ def t():
     return t
 
 #Pass Bot Prefix
-#def get_prefix():
-#    data = open(os.path.join(os.path.dirname(__file__), "../eyebot.cfg")).read().splitlines()
-#    prefix = data[1]
-#    return prefix
-#    data.close()
+def get_prefix():
+    with open('./eyebot/config.yaml') as f:
+        data = yaml.load(f, Loader=SafeLoader)
+        BOT_PREFIX = "!"
+        if data["prefix"]:
+            BOT_PREFIX = config["prefix"]
+        return BOT_PREFIX
 
-#prefix = get_prefix()
+
+prefix = get_prefix()
 
 # ---------------------------------------------------------
 # Random Carousing Outcome

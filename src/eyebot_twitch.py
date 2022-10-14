@@ -1,5 +1,5 @@
 import datetime
-import random
+import random, asyncio, os
 import yaml
 
 from twitchio.ext import commands
@@ -37,6 +37,16 @@ bot = commands.Bot(
     initial_channels = CHANNELS
 )
 
+currDir = os.path.dirname(os.path.realpath(__file__))
+
+
+async def load_extensions():
+    #Listing Extensions
+    for filename in os.listdir(currDir + '/cogs'):
+        if filename.endswith('.py'):
+            await bot.load_module(f'cogs.{filename[:-3]}')
+            print(f'{t()}: Extension found - {filename[:-3]}')
+
 class Bot(commands.Bot):
     def __init__(self):
         super().__init__(
@@ -51,7 +61,8 @@ class Bot(commands.Bot):
         print(f'Logged in as | {self.nick}')
         print(f'User id is | {self.user_id}')
         print(f'{BOT_NICK} is alive')
-
+        await load_extensions()
+    
     @commands.command()
     async def hello(self, ctx: commands.Context):
         await ctx.send(f'Hello {ctx.author.name}!')
@@ -67,5 +78,14 @@ class Bot(commands.Bot):
             print(f'{t()}: {ctx.author.name} has sought guidance.')
         await ctx.send(random.choice(replies))
 
+
+
 bot = Bot()
 bot.run()
+
+#async def main():
+#    async with bot:
+#        await load_extensions()
+#        await bot.start(TOKEN)
+
+#asyncio.run(main())
