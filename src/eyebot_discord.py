@@ -1,20 +1,22 @@
-import os, datetime, asyncio
+import logging
+import os, asyncio
 import discord
-import yaml
+
+from services.configService import ConfigService
+from services.logService import LogService
 
 from discord.ext import commands
-from yaml.loader import SafeLoader
+
 
 #----------------------------
 #Bot Core Setup
 #----------------------------
-def read_cfg():
-    with open('./eyebot/config.yaml') as f:
-        data = yaml.load(f, Loader=SafeLoader)
-        return data
 
-config = read_cfg()
+config = ConfigService(os.path.dirname(__file__) + "/../config.yaml").get()
 TOKEN = config["discord"]["bot_token"]
+
+logger = LogService("discord", config["log_level"])
+logger.log(config["prefix"])
 
 BOT_PREFIX = "!"
 if config["prefix"]:
@@ -24,15 +26,11 @@ bot = commands.Bot(
     command_prefix = BOT_PREFIX,
     intents = discord.Intents.all()
 )
+
 bot.remove_command('help')
 
-
-#Time Stamp Generation For Console Logging
-def t():
-    format = "%Y/%m/%d %H:%M:%S"
-    now = datetime.datetime.now()
-    t = now.strftime(format)
-    return t
+bot.logger = logger
+bot.config = config
 
 currDir = os.path.dirname(os.path.realpath(__file__))
 
@@ -41,7 +39,7 @@ async def load_extensions():
     for filename in os.listdir(currDir + '/cogs'):
         if filename.endswith('.py'):
             await bot.load_extension(f'cogs.{filename[:-3]}')
-            print(f'{t()}: Extension found - {filename[:-3]}')
+            logger.info(f'Extension found: {filename[:-3]}')
 
 #----------------------------
 #Bot Events
@@ -51,11 +49,11 @@ async def load_extensions():
 @bot.event
 async def on_ready():
     await bot.change_presence(status=discord.Status.online, activity=discord.Game('with the strings of fate.'))
-    print(f"{t()}: {bot.user.name} has awoken!")
-    print(F'{t()}: {bot.user.name} is connected to the following Discord Servers:')
+    logger.info(f'{bot.user.name} has awoken!')
+    logger.info(f'{bot.user.name} is connected to the following Discord Servers:')
     for guild in bot.guilds:
-        print(f'     (id: {guild.id})    -    {guild.name}')
-    print(f'\n     -End of Server Listing-\n')
+        logger.info(f'          (id: {guild.id})     -     {guild.name}')
+    logger.info('End of Server Listing')
     return
 
 #New Server Connection
@@ -65,23 +63,23 @@ async def on_guild_join(guild):
     try:
         await bot_entry[0].user.send("You see a small strange egg.\nTo see what it's about type `.help`")
     except:
-        print(f"{t()}: connection_error - Could not send inital DM. User's DMs are closed. Bot still connected to server.")
+        logger.error('connection_error - Could not send inital DM. User\'s DMs are closed. Bot still connected to server.')
 
-    print(f'{t()}: connection_made - {bot.user.name} has been found in: {guild.name}(id: {guild.id})')
+    logger.info(f'connection_made - {bot.user.name} has been found in: {guild.name} (id: {guild.id})')
 
 
 # Global Error Handling
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
-        print(f'{t()}: Invalid command used: ' + f' {ctx.message.content}' )
+        logger.warn(f'Invalid command used: {ctx.message.content}')
         await ctx.send('That command does not exist.')
     elif isinstance(error, commands.MissingPermissions):
-        print(f'{t()}: {ctx.message.author({ctx.message.author.guild})} attempted to use command without required permissions.')
+        logger.warn(f'{ctx.message.author} ({ctx.message.author.guild}) attempted to use command without required permissions.')
         await ctx.send("Sorry, you don't have the permissions to use that command.")
     if isinstance(error, commands.NotOwner):
-        print(f'{t()}: {ctx.message.author}({ctx.message.author.guild}) attempted to use command without required permissions.')
-        await ctx.send("{ctx.message.author}, sorry you need to be the bot owner to use that command.")
+        logger.warn(f'{ctx.message.author} ({ctx.message.author.guild}) attempted to use command without required permissions.')
+        await ctx.send(f"{ctx.message.author}, sorry you need to be the bot owner to use that command.")
 
 
 #----------------------------
@@ -95,21 +93,20 @@ async def leave(ctx, *, guild_name):
     guild = discord.utils.get(bot.guilds, name=guild_name)
     if guild is None:
         await ctx.send("I don't recognize that guild. Please enter the server name. (case sensitive)")
-        print(f'{t()}: leaving_error - blank or invalid server name, please enter the guild name')
+        logger.error(f'leaving_error - blank or invalid server name, please enter the guild name')
         return
     else:
         await guild.leave()
-        print(f'{t()}: connection_broken: {bot.user.name} has left: {guild.name}(id: {guild.id})')
+        logger.error(f'connection_broken: {bot.user.name} has left: {guild.name} (id: {guild.id})')
 
 #Check connected servers BOT OWNER ONLY
 @bot.command()
 @commands.is_owner()
 async def servers(ctx):
     for guild in bot.guilds:
-        print(f'     (id: {guild.id})    -    {guild.name}')
-        await ctx.author.send(f'     (id: {guild.id})    -    {guild.name}')
-    print(f'\n     -End of Server Listing-')
-
+        logger.info(f'%-10s(id: %s)%-5s-%-5s', ' ', guild.id, ' ', ' ', guild.name)
+        await ctx.author.send(f'%-5s(id: %s)%-5s-%-5s%s', ' ', guild.id, ' ', ' ', guild.name)
+    logger.info(f'-End of Server Listing-')
 
 async def main():
     async with bot:

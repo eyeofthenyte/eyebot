@@ -1,29 +1,9 @@
-import sys, discord, logging
+import discord
 import random
-import os, datetime, re
+import datetime, re
 
 from dataclasses import dataclass
-from discord.ext import commands, tasks
-from discord.utils import find
-
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
-
-#Time Stamp Generation For Console Logging
-def t():
-    format = "%Y/%m/%d %H:%M:%S"
-    now = datetime.datetime.now()
-    t = now.strftime(format)
-    return t
-
-#Pass Bot Prefix
-#def get_prefix():
-#    data = open(os.path.join(os.path.dirname(__file__), "../eyebot.cfg")).read().splitlines()
-#    prefix = data[1]
-#    return prefix
-#    data.close()
-
-#prefix = get_prefix()
-
+from discord.ext import commands
 
 # ---------------------------------------------------------
 # Processes a Die Roll String
@@ -43,43 +23,43 @@ class Dice:
             self.quantity = int(self.raw_quantity) if self.raw_quantity else 1
         except ValueError:
             raise ValueError(f'[{self.raw_quantity}] quantity must be a number.')
-            print(f'{t()}: [{self.raw_quantity}] quantity must be a number.')
+            # self.bot.logger.log(f'[{self.raw_quantity}] quantity must be a number.')
 
         try:
             self.sides = int(self.raw_sides)
         except ValueError:
             raise ValueError(f'[{self.raw_sides}] number of sides must be a number.')
-            print(f'{t()}: [{self.raw_sides}] number of sides must be a number.')
+            # self.bot.logger.log(f'[{self.raw_sides}] number of sides must be a number.')
 
         try:
             self.modifier = int(self.raw_modifier) if self.raw_modifier else 0
         except ValueError:
             raise ValueError(f'[{self.raw_modifier}] is not a valid modifier.')
-            print(f'{t()}: [{self.raw_modifier}] is not a valid modifier.')
+            # self.bot.logger.log(f'[{self.raw_modifier}] is not a valid modifier.')
 
         try:
             self.single_mod = (int(self.raw_single_mod) if self.raw_single_mod else 0)
         except ValueError:
             raise ValueError(f'[{self.raw_single_mod}] is not a valid modifier.')
-            print(f'{t()}: [{self.raw_single_mod}] is not a valid modifier.')
+            # self.bot.logger.log(f'[{self.raw_single_mod}] is not a valid modifier.')
 
         if self.quantity < 1:
             raise ValueError(f'[{self.quantity}] is not a valid number of dice.')
-            print(f'{t()}: [{self.quantity}] is not a valid number of dice.')
+            # self.bot.logger.log(f'[{self.quantity}] is not a valid number of dice.')
 
         if self.quantity > 200:
             raise ValueError(f'[{self.quantity}] that is too many dice.')
-            print(f'{t()}: [{self.quantity}] that is too many dice.')
+            # self.bot.logger.log(f'[{self.quantity}] that is too many dice.')
 
         if self.sides not in self.VALID_SIDES:
             raise ValueError(f'[{self.raw}] Allowed dice are: {self.valid_dice}.')
-            print(f'{t()}: [{self.raw}] Allowed dice are: {self.valid_dice}.')
+            # self.bot.logger.log(f'[{self.raw}] Allowed dice are: {self.valid_dice}.')
 
     @property
     def raw(self):
         #Return raw string of the dice
                 return f'{self.raw_quantity}d{self.raw_sides}{self.raw_modifier or ""}'
-                print(f'{t()}: {self.raw_quantity}d{self.raw_sides}{self.raw_modifier or ""}')
+                # self.bot.logger.log(f'{self.raw_quantity}d{self.raw_sides}{self.raw_modifier or ""}')
 
     @property
     def valid_dice(self):
@@ -137,7 +117,7 @@ class Roll(commands.Cog):
     #----------------------------
     @commands.Cog.listener()
     async def on_ready(self):
-        print(f'{t()}: Gathers all of the clickity-clacks.')
+        self.bot.logger.log(f'Gathers all of the clickity-clacks.')
 
     DICE_PATTERN = re.compile(r"^(\d*)d(\d+)([-+]\d+)?$")
 
@@ -195,10 +175,10 @@ class Roll(commands.Cog):
 
         if discord.ChannelType == "private":
             await ctx.message.author.send(f'{name} rolled a {dice.raw}!\nThe result was:\n{raw_rolls} {minmax_msg}')
-            print(f'{t()}: {name} rolled a {dice.raw}!\nThe result was:\n{raw_rolls} {minmax_msg}')
+            self.bot.logger.log(f'{name} rolled a {dice.raw}!\nThe result was:\n{raw_rolls} {minmax_msg}')
         elif discord.ChannelType != "private":
             await ctx.send(f'{name} rolled a {dice.raw}!\nThe result was:\n{raw_rolls} {minmax_msg}')
-            print(f'{t()}: {name} rolled a {dice.raw}!\nThe result was:\n{raw_rolls} {minmax_msg}')
+            self.bot.logger.log(f'{name} rolled a {dice.raw}!\nThe result was:\n{raw_rolls} {minmax_msg}')
 
 
 
@@ -216,7 +196,7 @@ class Roll(commands.Cog):
         results = []
         all_dice_input = []
 
-        #print(args)
+        #self.bot.logger.log(args)
 
         for dice_input in re.split('[,\n]', args):
             if len(dice_input) > 0:
@@ -235,11 +215,11 @@ class Roll(commands.Cog):
             except ValueError:
                 if discord.ChannelType == "private":
                     await ctx.messege.author.send(f'{name} made an invalid roll: [{dice_input}]')
-                    print(f'{t()}: {name} made an invalid roll: [{dice_input}]')
+                    self.bot.logger.log(f'{name} made an invalid roll: [{dice_input}]')
                     return
                 else:
                     await ctx.send(f'{name} made an invalid roll: [{dice_input}]')
-                    print(f'{t()}: {name} made an invalid roll: [{dice_input}]')
+                    self.bot.logger.log(f'{name} made an invalid roll: [{dice_input}]')
                     return
 
             try:
@@ -247,11 +227,11 @@ class Roll(commands.Cog):
             except ValueError as e:
                 if discord.ChannelType == "private":
                     await ctx.messege.autho.send(f'{name} made an invalid roll: {e}')
-                    print(f'{t()}: {name} made an invalid roll: {e}')
+                    self.bot.logger.log(f'{name} made an invalid roll: {e}')
                     return
                 else:
                     await ctx.send(f'{name} made an invalid roll: {e}')
-                    print(f'{t()}: {name} made an invalid roll: {e}')
+                    self.bot.logger.log(f'{name} made an invalid roll: {e}')
                     return
 
             rolls = dice.roll()
@@ -261,10 +241,10 @@ class Roll(commands.Cog):
 
             if dice.single_mod != 0:
                 result = (f'{name} rolled a {dice.raw} with a {dice.raw_single_mod} modifier!\nThe result was: {raw_rolls}\nTotal: {sum_rolls + dice.single_mod} ({sum_rolls}{dice.raw_single_mod})')
-                print(f'{t()}: a roll with modifier was made: {args}')
+                self.bot.logger.log(f'a roll with modifier was made: {args}')
             else:
                 result = (f'{name} rolled a {dice.raw}!\nThe result was: {raw_rolls}\nTotal: {sum_rolls}')
-                print(f'{t()}: a straight roll was made: {args}')
+                self.bot.logger.log(f'a straight roll was made: {args}')
 
             result += self.get_d20_minmax_msg(rolls)
 
@@ -272,10 +252,10 @@ class Roll(commands.Cog):
 
         if discord.ChannelType == "private":
             await ctx.message.author.send('\n\n'.join(results))
-            print(f'{t()}: Results sent to DM.')
+            self.bot.logger.log(f'Results sent to DM.')
         elif discord.ChannelType != "private":
             await ctx.send('\n\n'.join(results))
-            print(f'{t()}: Results sent to discord.')
+            self.bot.logger.log(f'Results sent to discord.')
 
 
 

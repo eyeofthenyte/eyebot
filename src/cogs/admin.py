@@ -1,35 +1,27 @@
-import os, datetime
-import discord
+import logging
+from services.logService import LogService
 from discord.ext import commands
-
-#Time Stamp Generation For Console Logging
-def t():
-    format = "%Y/%m/%d %H:%M:%S"
-    now = datetime.datetime.now()
-    t = now.strftime(format)
-    return t
 
 # ---------------------------------------------------------
 # Admin Commands
 # ---------------------------------------------------------
 class Admin (commands.Cog):
-
     def __init__(self, bot):
         self.bot = bot
+        self.logger = bot.logger
 
     # ---------------------------------------------------------
     # Events
     # ---------------------------------------------------------
     @commands.Cog.listener()
     async def on_ready(self):
-        print(f'{t()}: Core functions started.')
+        self.logger.info("Core functions started.")
 
     async def cog_command_error(self, ctx, error):
-        print(f'Admin encountered error {error}')
+        self.logger.error(f'Admin encountered error: %s', error)
         if isinstance(error, commands.CommandError):
-            print(f'{t()}: there was an error with Admin commands.')
+            self.logger.error("there was an error with Admin commands.")
             await ctx.send('Something went wrong.')
-
 
     @commands.command(aliases=['shtudown','sd'])
     async def _shutdown(self,ctx: commands.bot.Context) -> None:
