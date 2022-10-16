@@ -1,5 +1,5 @@
-import logging
-from services.logService import LogService
+import os
+
 from discord.ext import commands
 
 # ---------------------------------------------------------
@@ -19,13 +19,14 @@ class Help (commands.Cog):
         self.bot.logger.log(f'Feeling helpful.')
 
     async def cog_command_error(self, ctx, error):
+        self.logger.error(f"error trying to run help: {error}")
         if isinstance(error, commands.CommandError):
             await ctx.send('Something went wrong. Try `.reload help`.')
 
 
     @commands.command(aliases=['h', 'help'])
     async def _help(self, ctx):
-        file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
+        file = discord.File(os.path.dirname(__file__) + '/../../images/system/prohibited.png', filename='prohibited.png')
         embed = discord.Embed(color=0x019cd0)
         embed.set_author(name=f'Help (All Commands)', icon_url='attachment://prohibited.png')
         embed.add_field(name=f':dollar:  **__Loot__**', value=f"**Usage: `{self.bot.config.get().prefix}loot #` where `# = 1-4`**\n Number corresponds to the 4 Individual Treasure tables in Dungeon Master's Guide - Chapter 7.\nThis will generate all coins randomly based on table selected.\n", inline=False)

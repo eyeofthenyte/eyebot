@@ -1,10 +1,8 @@
+import os
 import gspread
 import random
-import logging
-from services.logService import LogService
-from discord.ext import commands
 
-from services.logService import LogService
+from discord.ext import commands
 
 gsa = 0
 if os.path.exists(os.path.dirname(__file__) + '/../../service_account.json'):
