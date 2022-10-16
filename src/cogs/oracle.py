@@ -1,6 +1,6 @@
-import discord
-import os, datetime
 import random
+import logging
+from services.logService import LogService
 from discord.ext import commands
 
 # ---------------------------------------------------------
@@ -10,6 +10,7 @@ class Oracle (commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
+        self.logger = bot.logger
 
     # ---------------------------------------------------------
     # Events

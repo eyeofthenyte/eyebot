@@ -1,6 +1,7 @@
-import discord, logging
-import os, datetime, gspread
+import gspread
 import random
+import logging
+from services.logService import LogService
 from discord.ext import commands
 
 from services.logService import LogService
@@ -19,6 +20,7 @@ class Carousing(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
+        self.logger = bot.logger
 
     #----------------------------
     # Events

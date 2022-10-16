@@ -1,6 +1,6 @@
-import discord
-import os, datetime
 import random
+import logging
+from services.logService import LogService
 from discord.ext import commands
 
 # ---------------------------------------------------------
@@ -10,6 +10,7 @@ class WildMagic(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
+        self.logger = bot.logger
 
     #----------------------------
     # Events
@@ -52,18 +53,18 @@ class WildMagic(commands.Cog):
                 self.bot.logger.log(f'{e}')
 
         elif select == '?':
-            self.bot.logger.log(f'{ctx.message.author} asked for help with self.bot.config.get().prefixwildmagic command.')
+            self.bot.logger.log(f'{ctx.message.author} asked for help with {self.bot.config.get().prefix}wildmagic command.')
             file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Wild Magic)', icon_url='attachment://warning.png')
-            embed.add_field(name='__WildMagic__', value=f'**Usage: `self.bot.config.get().prefixwildmagic #`\n other aliases `self.bot.config.get().prefixwm, self.bot.config.get().prefixsurge, self.bot.config.get().prefixmagicsurge` will also work\nwhere `# = 1` for Net Libram of Magical Efects v1.2 (edited) \nwhere `# = 2` for Net Libram of Magical Efects v2.0**\n Takes random selection of one of the magic effects selections. Good luck!', inline=False)
+            embed.add_field(name='__WildMagic__', value=f'**Usage: `{self.bot.config.get().prefix}wildmagic #`\n other aliases `{self.bot.config.get().prefix}wm, {self.bot.config.get().prefix}surge, {self.bot.config.get().prefix}magicsurge` will also work\nwhere `# = 1` for Net Libram of Magical Efects v1.2 (edited) \nwhere `# = 2` for Net Libram of Magical Efects v2.0**\n Takes random selection of one of the magic effects selections. Good luck!', inline=False)
 
         else:
-            self.bot.logger.log(f'Invalid input for self.bot.config.get().prefixwildmagic command.')
+            self.bot.logger.log(f'Invalid input for {self.bot.config.get().prefix}wildmagic command.')
             file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Wild Magic', icon_url='attachment://prohibited.png')
-            embed.add_field(name='__Error__', value=f'That is not a valid input. Please try again or use `self.bot.config.get().prefixwildmagic ?` for more information.', inline=False)
+            embed.add_field(name='__Error__', value=f'That is not a valid input. Please try again or use `{self.bot.config.get().prefix}wildmagic ?` for more information.', inline=False)
 
 
         if discord.ChannelType == "private":
