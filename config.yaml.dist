@@ -1,6 +1,7 @@
 ---
 # default is !
-prefix:
+prefix: !
+log_level: DEBUG
 
 discord:
     # discord bot token from https://discord.com/developers

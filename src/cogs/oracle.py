@@ -11,6 +11,8 @@ class Oracle (commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.logger = bot.logger
+        self.config = bot.config
+        self.prefix = self.config["prefix"]
 
     # ---------------------------------------------------------
     # Events
@@ -24,7 +26,7 @@ class Oracle (commands.Cog):
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
             self.bot.logger.log(f'missing or invalid argument for oracle')
-            m_Response = f"That's not a valid input. Please try again or `self.bot.config.get().prefixoracle ?` for more information."
+            m_Response = f"That's not a valid input. Please try again or `self.prefixoracle ?` for more information."
             file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Oracle', icon_url='attachment://prohibited.png')
@@ -60,7 +62,7 @@ class Oracle (commands.Cog):
             file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Oracle)', icon_url='attachment://warning.png')
-            embed.add_field(name=f"**__Oracle__**", value=f"**Usage: `self.bot.config.get().prefixoracle q`\n Where `question = the question you want to ask`**\nSimple general responses to questions. Careful the oracle can be a bit sassy!", inline=False)
+            embed.add_field(name=f"**__Oracle__**", value=f"**Usage: `self.prefixoracle q`\n Where `question = the question you want to ask`**\nSimple general responses to questions. Careful the oracle can be a bit sassy!", inline=False)
             if discord.ChannelType == "private":
                 self.bot.logger.log(f'{ctx.message.author} asked for help with oracle')
                 await ctx.message.author.send(file=file, embed=embed)
@@ -69,7 +71,7 @@ class Oracle (commands.Cog):
                 await ctx.send(file=file, embed=embed)
 
         else:
-            m_Response = f"That's not a valid input. Please try again or `self.bot.config.get().prefixoracle ?` for more information."
+            m_Response = f"That's not a valid input. Please try again or `self.prefixoracle ?` for more information."
             file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Oracle', icon_url='attachment://prohibited.png')

@@ -1,10 +1,8 @@
+import os
 import gspread
 import random
-import logging
-from services.logService import LogService
-from discord.ext import commands
 
-from services.logService import LogService
+from discord.ext import commands
 
 gsa = 0
 if os.path.exists(os.path.dirname(__file__) + '/../../service_account.json'):
@@ -21,6 +19,8 @@ class Carousing(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.logger = bot.logger
+        self.config = bot.config
+        self.prefix = self.config["prefix"]
 
     #----------------------------
     # Events
@@ -34,10 +34,10 @@ class Carousing(commands.Cog):
         if isinstance(error, commands.MissingRequiredArgument):
             self.bot.logger.error(f'{ctx.message.author} is missing or invalid argument for .carousing')
             if discord.ChannelType == "private":
-                await ctx.message.author.send(f'Please only type `{self.bot.config.get().prefix}carousing` to get a random result.\n Type `help` for more info.')
+                await ctx.message.author.send(f'Please only type `{self.prefix}carousing` to get a random result.\n Type `help` for more info.')
                 return
             else:
-                await ctx.send(f'Please only type `{self.bot.config.get().prefix}carousing` to get a random result.\n Type `help` for more info.')
+                await ctx.send(f'Please only type `{self.prefix}carousing` to get a random result.\n Type `help` for more info.')
                 return
 
     #----------------------------
@@ -64,7 +64,7 @@ class Carousing(commands.Cog):
             file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Carousing', icon_url='attachment://prohibited.png')
-            embed.add_field(name='__Error__', value=f"That was not a valid choice. Simply type `{self.bot.config.get().prefix}carousing`, `{self.bot.config.get().prefix}carouse`, `self.bot.config.get().prefixdrinking`, `self.bot.config.get().prefixgetdrinks`, or `self.bot.config.get().prefixpubcrawl` to get a selection from the table.", inline=False)
+            embed.add_field(name='__Error__', value=f"That was not a valid choice. Simply type `{self.prefix}carousing`, `{self.prefix}carouse`, `self.prefixdrinking`, `self.prefixgetdrinks`, or `self.prefixpubcrawl` to get a selection from the table.", inline=False)
 
             self.bot.logger.error(f'Invalid input for carousing command.')
             if discord.ChannelType == "private":
