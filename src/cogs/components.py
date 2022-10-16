@@ -1,7 +1,7 @@
-import discord
-import os, datetime, gspread
+import gspread
 import random
-
+import logging
+from services.logService import LogService
 from discord.ext import commands, tasks
 from discord.utils import find
 from gsheets import Sheets
@@ -26,6 +26,7 @@ class Components(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
+        self.logger = bot.logger
 
     #----------------------------
     # Events

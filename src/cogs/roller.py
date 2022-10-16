@@ -1,7 +1,7 @@
-import discord
 import random
-import datetime, re
-
+import re
+import logging
+from services.logService import LogService
 from dataclasses import dataclass
 from discord.ext import commands
 
@@ -111,6 +111,7 @@ class DiceRoll:
 class Roll(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.logger = bot.logger
 
     #----------------------------
     # Events

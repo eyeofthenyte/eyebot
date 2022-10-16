@@ -1,6 +1,7 @@
-import discord
-import os, datetime, re
+import re
 import random
+import logging
+from services.logService import LogService
 from discord.ext import commands
 
 # ---------------------------------------------------------
@@ -10,6 +11,7 @@ class Gems(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
+        self.logger = bot.logger
 
     #----------------------------
     # Events
@@ -24,7 +26,7 @@ class Gems(commands.Cog):
             file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Gems)', icon_url='attachment://prohibited.png')
-            embed.add_field(name=':gem:  **__Gems__**', value='**Usage: `self.bot.config.get().prefixgems g n` \nwhere `g = value of gems desired`**\n*10, 50, 100, 500, 1000, 5000*\n**`     n = number of gems to be generated`**\n The value of gems corresponds to the Gem Tables DMG - Chapter 7.\nThis will generate a number of gems of a single gold value type based the table selected.', inline=False)
+            embed.add_field(name=':gem:  **__Gems__**', value='**Usage: `{self.bot.config.get().prefix}gems g n` \nwhere `g = value of gems desired`**\n*10, 50, 100, 500, 1000, 5000*\n**`     n = number of gems to be generated`**\n The value of gems corresponds to the Gem Tables DMG - Chapter 7.\nThis will generate a number of gems of a single gold value type based the table selected.', inline=False)
 
             if discord.ChannelType == "private":
                 await ctx.message.author.send(file=file, embed=embed)
@@ -81,7 +83,7 @@ class Gems(commands.Cog):
                 file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
                 embed = discord.Embed(color=0x019cd0)
                 embed.set_author(name='Help (Gems)', icon_url='attachment://warning.png')
-                embed.add_field(name=':gem:  **__Gems__**', value='**Usage: `self.bot.config.get().prefixgems g n` \nwhere `g = value of gems desired`**\n*10, 50, 100, 500, 1000, 5000*\n**`     n = number of gems to be generated`**\n The value of gems corresponds to the Gem Tables DMG - Chapter 7.\nThis will generate a number of gems of a single gold value type based the table selected.', inline=False)
+                embed.add_field(name=':gem:  **__Gems__**', value='**Usage: `{self.bot.config.get().prefix}gems g n` \nwhere `g = value of gems desired`**\n*10, 50, 100, 500, 1000, 5000*\n**`     n = number of gems to be generated`**\n The value of gems corresponds to the Gem Tables DMG - Chapter 7.\nThis will generate a number of gems of a single gold value type based the table selected.', inline=False)
                 if discord.ChannelType == "private":
                     await ctx.message.author.send(file=file, embed=embed)
                 elif discord.ChannelType != "private":
@@ -92,7 +94,7 @@ class Gems(commands.Cog):
                 file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
                 embed = discord.Embed(color=0x019cd0)
                 embed.set_author(name='Help (Gems)', icon_url='attachment://prohibited.png')
-                embed.add_field(name=':gem:  **__Gems__**', value='**Usage: `self.bot.config.get().prefixgems g n` \nwhere `g = value of gems desired`**\n*10, 50, 100, 500, 1000, 5000*\n**`     n = number of gems to be generated`**\n The value of gems corresponds to the Gem Tables DMG - Chapter 7.\nThis will generate a number of gems of a single gold value type based the table selected.', inline=False)
+                embed.add_field(name=':gem:  **__Gems__**', value='**Usage: `{self.bot.config.get().prefix}gems g n` \nwhere `g = value of gems desired`**\n*10, 50, 100, 500, 1000, 5000*\n**`     n = number of gems to be generated`**\n The value of gems corresponds to the Gem Tables DMG - Chapter 7.\nThis will generate a number of gems of a single gold value type based the table selected.', inline=False)
                 if discord.ChannelType == "private":
                     await ctx.message.author.send(file=file, embed=embed)
                 elif discord.ChannelType != "private":

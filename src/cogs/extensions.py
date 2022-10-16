@@ -1,5 +1,5 @@
-import discord
-import os, datetime
+import logging
+from services.logService import LogService
 from discord.ext import commands
 
 # ---------------------------------------------------------
@@ -9,6 +9,7 @@ class Extensions(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
+        self.logger = bot.logger
 
     #----------------------------
     # Events

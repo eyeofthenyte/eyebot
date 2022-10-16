@@ -1,6 +1,6 @@
-import discord
-import os, datetime
 import random
+import logging
+from services.logService import LogService
 from discord.ext import commands
 
 # ---------------------------------------------------------
@@ -10,6 +10,7 @@ class Loot(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
+        self.logger = bot.logger
 
     #----------------------------
     # Events
@@ -21,7 +22,7 @@ class Loot(commands.Cog):
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
             self.bot.logger.log(f'missing or invalid argument for .loot')
-            m_Response = "That's not a valid input. Please try again or `self.bot.config.get().prefixloot ?` for more information."
+            m_Response = "That's not a valid input. Please try again or `{self.bot.config.get().prefix}loot ?` for more information."
             file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Indivdual Treasure', icon_url='attachment://prohibited.png')
@@ -136,11 +137,11 @@ class Loot(commands.Cog):
             self.bot.logger.log(f'{ctx.message.author} asked for help with Loot.')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Loot)', icon_url='attachment://warning.png')
-            embed.add_field(name='**__Loot__**', value='**Usage: `self.bot.config.get().prefixloot #` where `# = 1-4`**\n Number corresponds to the 4 Individual Treasure tables in DMG - Chapter 7.\nThis will generate all coins randomly based on table selected.', inline=False)
+            embed.add_field(name='**__Loot__**', value='**Usage: `{self.bot.config.get().prefix}loot #` where `# = 1-4`**\n Number corresponds to the 4 Individual Treasure tables in DMG - Chapter 7.\nThis will generate all coins randomly based on table selected.', inline=False)
 
         else:
             self.bot.logger.log(f'{ctx.message.author} entered invalid hoard opterator')
-            m_Response = "That's not a valid input. Please try again or `self.bot.config.get().prefixloot ?` for more information."
+            m_Response = "That's not a valid input. Please try again or `{self.bot.config.get().prefix}loot ?` for more information."
             file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Indivdual Treasure', icon_url='attachment://prohibited.png')
