@@ -22,6 +22,8 @@ class Trinket(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.logger = bot.logger
+        self.config = bot.config
+        self.prefix = self.config["prefix"]
 
     #----------------------------
     # Events
@@ -32,8 +34,8 @@ class Trinket(commands.Cog):
 
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
-            self.bot.logger.log(f'{ctx.message.author}is missing or invalid argument for {self.bot.config.get().prefix}trinket')
-            error_m = f'Please select one of the following classes:\n' + str(sheet_list).replace("'","").replace("[","").replace("]","") + f'.\n Type `{self.bot.config.get().prefix}trinket ?` for more info.'
+            self.bot.logger.log(f'{ctx.message.author}is missing or invalid argument for {self.prefix}trinket')
+            error_m = f'Please select one of the following classes:\n' + str(sheet_list).replace("'","").replace("[","").replace("]","") + f'.\n Type `{self.prefix}trinket ?` for more info.'
             file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Trinket', icon_url='attachment://prohibited.png')
@@ -64,11 +66,11 @@ class Trinket(commands.Cog):
 
 
         elif select == '?':
-            self.bot.logger.log(f'{ctx.message.author} asked for help with {self.bot.config.get().prefix}trinket command.')
+            self.bot.logger.log(f'{ctx.message.author} asked for help with {self.prefix}trinket command.')
             file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Trinket)', icon_url='attachment://warning.png')
-            embed.add_field(name='**__Trinket__**', value="**Usage: `{self.bot.config.get().prefix}trinket c ` \nwhere `c = character class`**\nCharacter class referrs to Dungeons and Dragons character classes.\nThis data is taken from [Ted's (Nerd Immersion)](https://www.youtube.com/c/NerdImmersion1 'Nerd Immersion') random trinket's tables.", inline=False)
+            embed.add_field(name='**__Trinket__**', value="**Usage: `{self.prefix}trinket c ` \nwhere `c = character class`**\nCharacter class referrs to Dungeons and Dragons character classes.\nThis data is taken from [Ted's (Nerd Immersion)](https://www.youtube.com/c/NerdImmersion1 'Nerd Immersion') random trinket's tables.", inline=False)
 
         else:
             self.bot.logger.log(f'there was an error.')
@@ -76,7 +78,7 @@ class Trinket(commands.Cog):
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Trinket', icon_url='attachment://prohibited.png')
             embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select an available Character Class. Type `trinket ?` for more info.", inline=False)
-            self.bot.logger.log(f'Invalid input for {self.bot.config.get().prefix}trinket command.')
+            self.bot.logger.log(f'Invalid input for {self.prefix}trinket command.')
 
         if discord.ChannelType == "private":
             await ctx.message.author.send(file=file, embed=embed)

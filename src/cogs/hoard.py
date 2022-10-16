@@ -10,6 +10,8 @@ class Hoard(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.logger = bot.logger
+        self.config = bot.config
+        self.prefix = self.config["prefix"]
 
     #----------------------------
     # Events
@@ -21,7 +23,7 @@ class Hoard(commands.Cog):
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
             self.bot.logger.log(f'missing or invalid argument for .hoard')
-            m_Response = "That's not a valid input. Please try again or `{self.bot.config.get().prefix}hoard ?` for more information."
+            m_Response = "That's not a valid input. Please try again or `{self.prefix}hoard ?` for more information."
             file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Treasure Hoard', icon_url='attachment://prohibited.png')
@@ -291,12 +293,12 @@ class Hoard(commands.Cog):
             file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Hoard)', icon_url='attachment://warning.png')
-            embed.add_field(name=':moneybag:  **__Hoard__**', value='**Usage: `{self.bot.config.get().prefix}hoard #` where `# = 1-4`**\n Number corresponds to the 4 Treasure Hoard tables in DMG - Chapter 7.\nThis will generate all coins and magical items randomly based on table selected.', inline=False)
+            embed.add_field(name=':moneybag:  **__Hoard__**', value='**Usage: `{self.prefix}hoard #` where `# = 1-4`**\n Number corresponds to the 4 Treasure Hoard tables in DMG - Chapter 7.\nThis will generate all coins and magical items randomly based on table selected.', inline=False)
 
 
         else:
             self.bot.logger.log(f'invalid hoard opterator entered.')
-            m_Response = "That's not a valid input. Please try again or `{self.bot.config.get().prefix}hoard ?` for more information."
+            m_Response = "That's not a valid input. Please try again or `{self.prefix}hoard ?` for more information."
             file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Treasure Hoard', icon_url='attachment://prohibited.png')
