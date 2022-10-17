@@ -58,8 +58,8 @@ class Dice:
     @property
     def raw(self):
         #Return raw string of the dice
-                return f'{self.raw_quantity}d{self.raw_sides}{self.raw_modifier or ""}'
-                # self.bot.logger.log(f'{self.raw_quantity}d{self.raw_sides}{self.raw_modifier or ""}')
+            return f'{self.raw_quantity}d{self.raw_sides}{self.raw_modifier or ""}'
+            # self.bot.logger.log(f'{self.raw_quantity}d{self.raw_sides}{self.raw_modifier or ""}')
 
     @property
     def valid_dice(self):
