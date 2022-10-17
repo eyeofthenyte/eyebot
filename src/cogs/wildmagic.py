@@ -1,3 +1,4 @@
+import discord
 import random
 import logging
 from services.logService import LogService
@@ -25,7 +26,7 @@ class WildMagic(commands.Cog):
     #----------------------------
     # Wild Magic Surge
     #----------------------------
-    @commands.command(aliases=['wildmagic', 'wm', 'surge', 'magicsurge'])
+    @commands.command(aliases=['wildmagic', 'wm', 'surge'])
     async def _wildmagic(self, ctx, *, select):
 
         if select == '1':
@@ -59,7 +60,7 @@ class WildMagic(commands.Cog):
             file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Wild Magic)', icon_url='attachment://warning.png')
-            embed.add_field(name='__WildMagic__', value=f'**Usage: `{self.prefix}wildmagic #`\n other aliases `{self.prefix}wm, {self.prefix}surge, {self.prefix}magicsurge` will also work\nwhere `# = 1` for Net Libram of Magical Efects v1.2 (edited) \nwhere `# = 2` for Net Libram of Magical Efects v2.0**\n Takes random selection of one of the magic effects selections. Good luck!', inline=False)
+            embed.add_field(name='__WildMagic__', value=f'**Usage: `{self.prefix}wildmagic #`\n other aliases `{self.prefix}wm, {self.prefix}surge` will also work\nwhere `# = 1` for Net Libram of Magical Efects v1.2 (edited) \nwhere `# = 2` for Net Libram of Magical Efects v2.0**\n Takes random selection of one of the magic effects selections. Good luck!', inline=False)
 
         else:
             self.bot.logger.log(f'Invalid input for {self.prefix}wildmagic command.')

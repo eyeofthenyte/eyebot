@@ -1,3 +1,4 @@
+import discord
 import random
 import logging
 from services.logService import LogService

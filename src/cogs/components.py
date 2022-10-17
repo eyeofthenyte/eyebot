@@ -1,7 +1,8 @@
+import discord
 import os
 import gspread
 import random
-
+from services.logService import LogService
 from discord.ext import commands, tasks
 from discord.utils import find
 from gsheets import Sheets
@@ -50,8 +51,8 @@ class Components(commands.Cog):
     #----------------------------
     # Trinkets Command
     #----------------------------
-    @commands.command(aliases=['collect', 'search', 'find'])
-    async def _collect(self, ctx, *, select):
+    @commands.command()
+    async def collect(self, ctx, *, select):
 
         pick = select
         biome = ['arctic','common','desert','forest','grass','hills','mountain','swamp','underdark','water']
@@ -92,7 +93,7 @@ class Components(commands.Cog):
             file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Collect)', icon_url='attachment://warning.png')
-            embed.add_field(name='**__Collect__**', value=f"**Usage: `{self.prefix}collect b `\n`search` and `find` can also be used\nwhere `b = biome`**\nValid biome selections are:\n arctic, desert, forest, grass, hills, mountain, swamp, underdark, water, and common(not a biome but a list of components that can be found in any biome)", inline=False)
+            embed.add_field(name='**__Collect__**', value=f"**Usage: `{self.prefix}collect b`\nwhere `b = biome`**\nValid biome selections are:\n arctic, desert, forest, grass, hills, mountain, swamp, underdark, water, and common(not a biome but a list of components that can be found in any biome)", inline=False)
             self.bot.logger.log(f'{ctx.message.author} asked for help with {self.prefix}collect.')
 
         else:
@@ -111,8 +112,8 @@ class Components(commands.Cog):
             await ctx.send(file=file, embed=embed)
 
 
-    @commands.command(aliases=['herb', 'hinfo'])
-    async def _flora(self, ctx, *, select):
+    @commands.command()
+    async def hinfo(self, ctx, *, select):
         if not gsa:
             return
 

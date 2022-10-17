@@ -1,7 +1,8 @@
 import os
+import discord
 import gspread
 import random
-
+from services.logService import LogService
 from discord.ext import commands
 
 gsa = 0

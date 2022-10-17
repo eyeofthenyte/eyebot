@@ -1,7 +1,8 @@
+import discord
 import os
 import gspread
 import random
-
+from services.logService import LogService
 from discord.ext import commands
 
 gsa = 0
@@ -43,8 +44,8 @@ class Carousing(commands.Cog):
     #----------------------------
     # Carousing Command
     #----------------------------
-    @commands.command(aliases=['carousing','carouse','drinking','getdrinks','pubcrawl'])
-    async def _carousing(self, ctx):
+    @commands.command()
+    async def carousing(self, ctx):
         if ctx == ctx and gsa:
             self.bot.logger.info(f'A selection from the D100 Carousing list was made.')
 
