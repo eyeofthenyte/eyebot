@@ -84,6 +84,32 @@ async def on_command_error(ctx, error):
         await ctx.send(f"{ctx.message.author}, sorry you need to be the bot owner to use that command.")
 
 
+#----------------------------
+#Bot Commands
+#----------------------------
+
+#Disconnect bot from server BOT OWNER ONLY
+@bot.command()
+@commands.check_any(commands.has_permissions(administrator=True),commands.is_owner())
+async def leave(ctx, *, guild_name):
+    guild = discord.utils.get(bot.guilds, name=guild_name)
+    if guild is None:
+        await ctx.send("I don't recognize that guild. Please enter the server name. (case sensitive)")
+        logger.error(f'leaving_error - blank or invalid server name, please enter the guild name')
+        return
+    else:
+        await guild.leave()
+        logger.error(f'connection_broken: {bot.user.name} has left: {guild.name} (id: {guild.id})')
+
+#Check connected servers BOT OWNER ONLY
+@bot.command()
+@commands.is_owner()
+async def servers(ctx):
+    for guild in bot.guilds:
+        logger.info(f'%-10s(id: %s)%-5s-%-5s', ' ', guild.id, ' ', ' ', guild.name)
+        await ctx.author.send(f'%-5s(id: %s)%-5s-%-5s%s', ' ', guild.id, ' ', ' ', guild.name)
+    logger.info(f'-End of Server Listing-')
+
 async def main():
     async with bot:
         await load_extensions()
