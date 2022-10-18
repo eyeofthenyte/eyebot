@@ -1,7 +1,10 @@
 ---
 # default is !
 prefix: !
-log_level: DEBUG
+
+logging:
+    level: DEBUG
+    output: output.log # syslog, filename
 
 discord:
     # discord bot token from https://discord.com/developers
