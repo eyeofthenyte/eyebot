@@ -3,6 +3,8 @@ import discord
 from services.logService import LogService
 from discord.ext import commands
 
+
+
 # ---------------------------------------------------------
 # Assistance
 # ---------------------------------------------------------
@@ -33,7 +35,6 @@ class Help (commands.Cog):
     # ---------------------------------------------------------
     @commands.command(aliases=['cmds','commands'])
     async def _cmds(self, ctx):
-
         def get_commands():
             x = []
             for y in self.bot.commands:
@@ -41,21 +42,21 @@ class Help (commands.Cog):
             return x
 
         x = get_commands()
-        commands = [c.replace("_","") for c in x]
+        cmd_list = [c.replace("_","") for c in x]
 
-        if (commands.is_owner() or (ctx.author==ctx.guild.owner or ctx.author.has_permissions(administrator=True))):
+        if commands.is_owner() or (ctx.author==ctx.guild.owner or ctx.author.has_permissions(administrator=True)):
+
             file = discord.File(os.path.dirname(__file__) + '/../../images/system/warning.png', filename='warning.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name=f'Available Commands', icon_url='attachment://warning.png')
-            embed.add_field(name=f'**__Commands__**', value="Below is a list of the individual commands available and all aliases that can be used to activate a given command.\n\n" + "\n".join(commands), inline=False)
+            embed.add_field(name=f'**__Commands__**', value="Below is a list of the individual commands available and all aliases that can be used to activate a given command.\n\n" + "\n".join(cmd_list), inline=False)
             print("Displayed all commands available to Administrators or Server Owners.")
         else:
-            if 'admin' in all_commands:
-                commands.remove('reload','load','unload','servers','shutdown')
+            cmd_list.remove('reload','load','unload','servers','shutdown')
             file = discord.File(os.path.dirname(__file__) + '/../../images/system/warning.png', filename='warning.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name=f'Available Commands', icon_url='attachment://warning.png')
-            embed.add_field(name=f'**__Commands__**', value=f"\n".join(commands), inline=False)
+            embed.add_field(name=f'**__Commands__**', value=f"\n".join(cmd_list), inline=False)
             print("Displayed all commands available to Users.")
 
         if discord.ChannelType == "private":
@@ -69,7 +70,7 @@ class Help (commands.Cog):
     # ---------------------------------------------------------
     @commands.command()
     async def help(self, ctx):
-        if (commands.is_owner() or (ctx.author==ctx.guild.owner or ctx.author.has_permissions(administrator=True))):
+        if commands.is_owner() or (ctx.author==ctx.guild.owner or ctx.author.has_permissions(administrator=True)):
             file = discord.File(os.path.dirname(__file__) + '/../../images/system/prohibited.png', filename='prohibited.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name=f'Available Commands', icon_url='attachment://prohibited.png')
