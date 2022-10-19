@@ -1,5 +1,6 @@
 import discord
 import random
+import os
 import logging
 from services.logService import LogService
 from discord.ext import commands
@@ -26,7 +27,7 @@ class Loot(commands.Cog):
         if isinstance(error, commands.MissingRequiredArgument):
             self.bot.logger.log(f'missing or invalid argument for .loot')
             m_Response = "That's not a valid input. Please try again or `{self.prefix}loot ?` for more information."
-            file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Indivdual Treasure', icon_url='attachment://prohibited.png')
             embed.add_field(name='**__Error__**', value=f'{m_Response}', inline=False)
@@ -40,7 +41,7 @@ class Loot(commands.Cog):
     #----------------------------
     # Loot Command
     #----------------------------
-    @commands.command()
+    @commands.command(extras=["f':dollar:  **__Loot__**'", "f'**Usage: `{self.prefix}loot #` where `# = 1-4`**\n Number corresponds to the 4 Individual Treasure tables in Dungeon Master's Guide - Chapter 7.\nThis will generate all coins randomly based on table selected.\n'", "inline=False"])
     async def loot(self, ctx, *, select):
 
         # Variables
@@ -63,7 +64,7 @@ class Loot(commands.Cog):
             else:
                 list[0] = 'There was an error.'
             m_Response = "At the end of your job you find... \n" + list[0] + "."
-            file = discord.File('./eyebot/images/commands/coin.png', filename='coin.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/coin.png'), filename='coin.png')
             embed = discord.Embed(color=0xffe449)
             embed.set_author(name='Indivdual Treasure', icon_url='attachment://coin.png')
             embed.add_field(name='**__Challange 0 - 4__**', value=f'{m_Response}', inline=False)
@@ -81,14 +82,14 @@ class Loot(commands.Cog):
                 list[1] = str(random.randrange(2,12)*10) + ' GP'
             elif ((d100_roll < 96) and (d100_roll > 70)):
                 list[0] = str(random.randrange(4,24)*10) + ' GP'
+                list[1] = ""
             elif ((d100_roll <= 100) and (d100_roll > 95)):
                 list[0] = str(random.randrange(2,12)*10) + ' GP'
                 list[1] = str(random.randrange(3,18)) + ' PP'
             else:
                 list[0] = 'There was an error.'
-
             m_Response = "At the end of your job you find...\n" + list[0] + '\n' + list[1]
-            file = discord.File('./eyebot/images/commands/coin.png', filename='coin.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/coin.png'), filename='coin.png')
             embed = discord.Embed(color=0xffe449)
             embed.set_author(name='Indivdual Treasure', icon_url='attachment://coin.png')
             embed.add_field(name='**__Challange 5 - 10__**', value=f'{m_Response}', inline=False)
@@ -110,7 +111,7 @@ class Loot(commands.Cog):
             else:
                 list[0] = 'There was an error.'
             m_Response = "At the end of your job you find...\n" + list[0] + '\n' + list[1]
-            file = discord.File('./eyebot/images/commands/coin.png', filename='coin.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/coin.png'), filename='coin.png')
             embed = discord.Embed(color=0xffe449)
             embed.set_author(name='Indivdual Treasure', icon_url='attachment://coin.png')
             embed.add_field(name='**__Challange 11 - 16__**', value=f'{m_Response}', inline=False)
@@ -129,14 +130,14 @@ class Loot(commands.Cog):
             else:
                 list[0] = 'There was an error.'
             m_Response = "At the end of your job you find...\n" + list[0] + '\n' + list[1]
-            file = discord.File('./eyebot/images/commands/coin.png', filename='coin.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/coin.png'), filename='coin.png')
             embed = discord.Embed(color=0xffe449)
             embed.set_author(name='Indivdual Treasure', icon_url='attachment://coin.png')
             embed.add_field(name='**__Challange 17+__**', value=f'{m_Response}', inline=False)
 
         # Help Operator
         elif select == '?':
-            file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
             self.bot.logger.log(f'{ctx.message.author} asked for help with Loot.')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Loot)', icon_url='attachment://warning.png')
@@ -145,7 +146,7 @@ class Loot(commands.Cog):
         else:
             self.bot.logger.log(f'{ctx.message.author} entered invalid hoard opterator')
             m_Response = "That's not a valid input. Please try again or `{self.prefix}loot ?` for more information."
-            file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Indivdual Treasure', icon_url='attachment://prohibited.png')
             embed.add_field(name='**__Error__**', value=f'{m_Response}', inline=False)

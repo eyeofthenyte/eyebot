@@ -1,5 +1,6 @@
 import discord
 import re
+import os
 import random
 import logging
 from services.logService import LogService
@@ -26,7 +27,7 @@ class Gems(commands.Cog):
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
             self.bot.logger.log(f'missing or invalid argument for gems')
-            file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Gems)', icon_url='attachment://prohibited.png')
             embed.add_field(name=':gem:  **__Gems__**', value='**Usage: `{self.prefix}gems g n` \nwhere `g = value of gems desired`**\n*10, 50, 100, 500, 1000, 5000*\n**`     n = number of gems to be generated`**\n The value of gems corresponds to the Gem Tables DMG - Chapter 7.\nThis will generate a number of gems of a single gold value type based the table selected.', inline=False)
@@ -42,9 +43,8 @@ class Gems(commands.Cog):
     #----------------------------
     # Gems Command
     #----------------------------
-    @commands.command()
+    @commands.command(extras=["f':gem:  **__Gems__**'","f'**Usage: `{self.prefix}gems g n` \nwhere `g = value of gems desired`**\n*10, 50, 100, 500, 1000, 5000*\n**`n = number of gems to be generated`**\n Number corresponds to the 4 Individual Treasure tables in DMG - Chapter 7.\nThis will generate all coins randomly based on table selected.\n'", "inline=False"])
     async def gems(self, ctx, *, gemstring):
-        await ctx.message.delete()
         #----------------------------
         # Variables
         #----------------------------
@@ -61,15 +61,16 @@ class Gems(commands.Cog):
             gemstring = gemstring.split()
             select = gemstring[0]
             i = int(gemstring[1])
+            print(os.path.join(os.path.dirname(__file__) + 'gems/' + {select} + 'gp.txt'))
             while i > 0:
-                lines = open(os.path.join(os.path.dirname(__file__), f"./gems/{select}gp.txt")).read().splitlines()
+                lines = open(os.path.dirname(__file__) + 'gems/' + {select} + 'gp.txt').read().splitlines()
                 randline = random.choice(lines)
                 list = randline.split(";")
                 m_Response = f'- {list[0]}: {list[1]}'
                 gems.append(m_Response)
                 i -= 1
 
-            file = discord.File('./eyebot/images/commands/gem-stone.png', filename='gem-stone.png')
+            file = discord.File(os.path.dirname(__file__), '../../images/commands/gem-stone.png', filename='gem-stone.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_thumbnail(url='attachment://gem-stone.png')
             embed.set_author(name = 'RANDOM GEM SELECTION')
@@ -83,7 +84,7 @@ class Gems(commands.Cog):
         else:
             if lstr == 1 and gemstring == '?':
                 self.bot.logger.log(f"{ctx.message.author}({ctx.message.author.guild}) asked for help with .gems command")
-                file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
+                file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
                 embed = discord.Embed(color=0x019cd0)
                 embed.set_author(name='Help (Gems)', icon_url='attachment://warning.png')
                 embed.add_field(name=':gem:  **__Gems__**', value='**Usage: `{self.prefix}gems g n` \nwhere `g = value of gems desired`**\n*10, 50, 100, 500, 1000, 5000*\n**`     n = number of gems to be generated`**\n The value of gems corresponds to the Gem Tables DMG - Chapter 7.\nThis will generate a number of gems of a single gold value type based the table selected.', inline=False)
@@ -94,7 +95,7 @@ class Gems(commands.Cog):
 
             else:
                 self.bot.logger.log(" : ({ctx.message.author.guild}) entered invalid argument")
-                file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
+                file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
                 embed = discord.Embed(color=0x019cd0)
                 embed.set_author(name='Help (Gems)', icon_url='attachment://prohibited.png')
                 embed.add_field(name=':gem:  **__Gems__**', value='**Usage: `{self.prefix}gems g n` \nwhere `g = value of gems desired`**\n*10, 50, 100, 500, 1000, 5000*\n**`     n = number of gems to be generated`**\n The value of gems corresponds to the Gem Tables DMG - Chapter 7.\nThis will generate a number of gems of a single gold value type based the table selected.', inline=False)

@@ -1,4 +1,5 @@
 import discord
+import os
 import logging
 from services.logService import LogService
 from discord.ext import commands
@@ -31,19 +32,19 @@ class Extensions(commands.Cog):
     # Load Command
     #----------------------------
 
-    @commands.command()
+    @commands.command(extras=["f':floppy_disk:  **__Load__**'", "'**Usage: `{self.prefix}load extension`\nWhere `extension = loot, hoard, roll`**\nWill load one of the listed command extensions following the use of the Unload command.\n'", "inline=False"])
     @commands.is_owner()
     async def load(self, ctx, extension):
         try:
             await self.bot.load_extension(f'cogs.{extension}')
             self.bot.logger.log(f'Loaded extension - "{extension}"')
-            file = discord.File('./eyebot/images/commands/thumbs-up.png', filename='thumbs-up.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/thumbs-up.png'), filename='thumbs-up.png')
             embed = discord.Embed(color=0x01f31d)
             embed.set_author(name = 'LOADED ' + extension.upper(), icon_url = 'attachment://thumbs-up.png')
             embed.add_field(name = '**__Extension Load__**', value = 'Extension: "' + extension + '" has been loaded successfully.', inline=False)
         except Exception as e:
             self.bot.logger.log(f'{e}')
-            file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name = 'LOADING ' + extension.upper() + ' FAILED', icon_url = 'attachment://warning.png')
             embed.add_field(name = '**__Extension Load__**', value = e, inline=False)
@@ -56,20 +57,20 @@ class Extensions(commands.Cog):
     #----------------------------
     # Unload Command
     #----------------------------
-    @commands.command()
+    @commands.command(extras=["f':stop_sign:  **__Unload__**'", "f'**Usage: `{self.prefix}unload extension`\nWhere `extension = loot, hoard, roll`**\nWill unload one of the listed command extensions. Generally only used when extension becomes unresponsive with no error messages.\n'", "inline=False"])
     @commands.is_owner()
     async def unload(self, ctx, extension):
         try:
             await self.bot.unload_extension(f'cogs.{extension}')
             self.bot.logger.log(f'Unloaded extension - "{extension}"')
-            file = discord.File('./eyebot/images/commands/thumbs-up.png', filename='thumbs-up.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/thumbs-up.png'), filename='thumbs-up.png')
             embed = discord.Embed(color=0x01f31d)
             embed.set_author(name = 'UNLOADED ' + extension.upper(), icon_url = 'attachment://thumbs-up.png')
             embed.add_field(name = '**__Extension Unload__**', value = 'Extension: "' + extension + '" has been unloaded.', inline=False)
 
         except Exception as e:
             self.bot.logger.log(f'{e}')
-            file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name = 'UNLOADING ' + extension.upper() + ' FAILED', icon_url = 'attachment://warning.png')
             embed.add_field(name = '**__Extension Unload__**', value =  e, inline=False)
@@ -83,7 +84,7 @@ class Extensions(commands.Cog):
     #----------------------------
     # Reload Command
     #----------------------------
-    @commands.command()
+    @commands.command(extras=["f':repeat:  **__Reload__**'", "f'**Usage: `{self.prefix}reload extension`\nWhere `extension = loot, hoard, roll`**\nWill perform Unload and Load functions together.\n'", "inline=False"])
     @commands.is_owner()
     async def reload(self, ctx, extension):
         self.bot.logger.log(f'Attempting to reload {extension}')
@@ -99,7 +100,7 @@ class Extensions(commands.Cog):
                 await self.bot.load_extension(f'cogs.{extension}')
                 self.bot.logger.log(f'    - "{extension}" has been loaded.')
                 self.bot.logger.log(f'Reloaded extension - "{extension}" successfully.')
-                file = discord.File('./eyebot/images/commands/thumbs-up.png', filename='thumbs-up.png')
+                file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/thumbs-up.png'), filename='thumbs-up.png')
                 embed = discord.Embed(color=0x01f31d)
                 embed.set_author(name = 'RELOADED ' + extension.upper(), icon_url = 'attachment://thumbs-up.png')
                 embed.add_field(name = '**__Extension Reload__**', value='Reloading "' + extension + '" has been completed successfully.', inline=False)
@@ -107,7 +108,7 @@ class Extensions(commands.Cog):
             except Exception as e:
                 self.bot.logger.log(f'    - {e}')
                 self.bot.logger.log(f'Reload extension - "{extension}" has failed.')
-                file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
+                file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
                 embed = discord.Embed(color=0xcc0000)
                 embed.set_author(name = 'RELOADING ' + extension.upper() + ' FAILED', icon_url = 'attachment://warning.png')
                 embed.add_field(name = '**__Extension Reload__**', value='Reloading "' + extension + '" has failed. Invalid extension or extension not loaded.', inline=False)
