@@ -16,7 +16,7 @@ def t():
     return t
 
 config = ConfigService(path.dirname(__file__) + "/../config.yaml").get()
-logger = LogService("twitch", logging.DEBUG)
+logger = LogService("twitch", config["logging"])
 
 BOT_PREFIX = "!"
 if config["prefix"]:

@@ -15,7 +15,7 @@ from discord.ext import commands
 config = ConfigService(os.path.dirname(__file__) + "/../config.yaml").get()
 TOKEN = config["discord"]["bot_token"]
 
-logger = LogService("discord", config["log_level"])
+logger = LogService("discord", config["logging"])
 logger.log(config["prefix"])
 
 BOT_PREFIX = "!"

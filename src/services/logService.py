@@ -1,15 +1,22 @@
 from datetime import datetime
+import io
 import logging
 import sys
 
 class LogService():
-    def __init__(self, name, level) -> None:
+    def __init__(self, name, config) -> None:
         self.logger = logging.Logger(
             name=name,
-            level=level,
+            level=config["level"],
         )
 
-        handler = logging.StreamHandler(sys.stdout)
+        output = config["output"]
+        if output == "syslog":
+            output = sys.stdout
+        else:
+            output = io.open(output, mode="a")
+
+        handler = logging.StreamHandler(output)
         handler.setFormatter(logging.Formatter(
             datefmt="%Y/%m/%d %H:%M:%S",
             fmt="[%(asctime)s][%(levelname)s] %(name)s - %(message)s"
