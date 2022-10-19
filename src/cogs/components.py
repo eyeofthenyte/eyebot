@@ -1,3 +1,4 @@
+from copyreg import pickle
 import discord
 import os
 import gspread
@@ -9,8 +10,8 @@ from gsheets import Sheets
 
 gsa = 0
 
-if os.path.exists(os.path.dirname(__file__) + '/../../service_account.json'):
-    gsa = gspread.service_account(filename = 'eyebot/service_account.json')
+if os.path.exists(os.path.dirname(__file__) + '../../../service_account.json'):
+    gsa = gspread.service_account(filename = os.path.dirname(__file__) + '../../../service_account.json')
     s = gsa.open_by_key('1wkaF--4DqTComUfX1dYbjhkRimR2raYbJm3IEa1CTq0')
 
 #Time Stamp Generation For Console Logging
@@ -49,10 +50,10 @@ class Components(commands.Cog):
                 return
 
     #----------------------------
-    # Trinkets Command
+    # Collect Command
     #----------------------------
-    @commands.command()
-    async def collect(self, ctx, *, select):
+    @commands.command(aliases=['collect', 'search', 'find', 'gather'], extras=["f':mag:  **__Collect__**'", "f'**Usage: `{self.prefix}collect b `\n`{self.prefix}search` and `{self.prefix}find` can also be used\nwhere `b = biome`**\nValid biome selections are:\n arctic, desert, forest, grass, hills, mountain, swamp, underdark, water, and common(not a biome but a list of components that can be found in any biome).'", "inline=False"])
+    async def _collect(self, ctx, *, select):
 
         pick = select
         biome = ['arctic','common','desert','forest','grass','hills','mountain','swamp','underdark','water']
@@ -60,9 +61,9 @@ class Components(commands.Cog):
         w = ["0", "1", "2", "8", "9", "10"]
         percentage = random.randrange(1,101)
         if pick.lower() in str(biome).lower():
-            for i in range(len(biome)):
+             for i in range(len(biome)):
                 if pick.lower() == biome[i].lower():
-                    biomedoc = open(os.path.join(os.path.dirname(__file__), "./components/" + pick.lower() + ".txt")).read().splitlines()
+                    biomedoc = open(os.path.join(os.path.dirname(__file__), "components/" + pick.lower() + ".txt")).read().splitlines()
                     randline = random.choice(biomedoc)
                     list = randline.split(";")
                     component = list[0]
@@ -77,20 +78,20 @@ class Components(commands.Cog):
                         elif list[1] == '2':
                             qty = str(random.randrange(1,9)*2)
                         else:
-                            common = open(os.path.join(os.path.dirname(__file__), "./components/common.txt")).read().splitlines()
+                            common = open(os.path.join(os.path.dirname(__file__), "components/common.txt")).read().splitlines()
                             randline = random.choice(common)
                             list = randline.split(";")
                             qty = str(random.randrange(1,5))
 
                     m_Response = str(qty) + "x " + list[2]
-                    file = discord.File('./eyebot/images/commands/'+icon[i]+'.png', filename=icon[i]+'.png')
+                    file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/'+icon[i]+'.png'))
                     self.bot.logger.log(f'Components from the ' + pick.upper() + ' biome were found.')
                     embed = discord.Embed(color=0x019cd0)
                     embed.set_author(name = pick.upper() + ' BIOME COMPONENTS', icon_url='attachment://'+icon[i]+'.png')
                     embed.add_field(name = 'You found the following alchemic components:', value = m_Response, inline=False)
 
         elif pick == '?':
-            file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Collect)', icon_url='attachment://warning.png')
             embed.add_field(name='**__Collect__**', value=f"**Usage: `{self.prefix}collect b`\nwhere `b = biome`**\nValid biome selections are:\n arctic, desert, forest, grass, hills, mountain, swamp, underdark, water, and common(not a biome but a list of components that can be found in any biome)", inline=False)
@@ -99,7 +100,7 @@ class Components(commands.Cog):
         else:
             self.bot.logger.log(f'there was an error.')
 
-            file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Collect', icon_url='attachment://prohibited.png')
             embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select an available biome. Type `{self.prefix}collect ?` for more info.", inline=False)
@@ -111,9 +112,11 @@ class Components(commands.Cog):
         elif discord.ChannelType != "private":
             await ctx.send(file=file, embed=embed)
 
-
-    @commands.command()
-    async def hinfo(self, ctx, *, select):
+    #----------------------------
+    # Info Command
+    #----------------------------
+    @commands.command(aliases=['herb', 'hinfo', 'flora'], extras=["f':mushroom:  **__Herb Info__**'", "f'**Usage: `{self.prefix}herb name` or `{self.prefix}hinfo name` \nwhere `name = full name of herb`**\nHerb name is one of the components from [Herbalism and Alchemy](https://drive.google.com/file/d/0B7CIGCMCtoETVmhDNEZMbUVweTg/view) homebrew supplement By [Dalagrath](https://www.reddit.com/r/dndnext/comments/3w1log/5e_herbalism_alchemy_v12_updates_fanmade/) .\n'", "inline=False"])
+    async def _flora(self, ctx, *, select):
         if not gsa:
             return
 
@@ -128,8 +131,7 @@ class Components(commands.Cog):
                 if select.lower() == c_list[i].lower():
                     biomeicons = str(ws.cell(i+1,6).value).replace('Arctic',':snowflake:').replace('Any',':world_map:').replace('Desert',':desert:').replace('Forest',':deciduous_tree:').replace('Grasslands',':seedling:').replace('Hills',':sunrise_over_mountains:').replace('Mountain',':mountain:').replace('Swamp',':ear_of_rice:').replace('Underdark',':hole:').replace('Coastal',':water_wave:')
                     self.bot.logger.log(f'The entry for ' + select.upper() + ' was requested.')
-
-                    file = discord.File('./eyebot/images/commands/open-book.png', filename='open-book.png')
+                    file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/open-book.png'), filename='open-book.png')
                     embed = discord.Embed(color=0x019cd0, title="ALCHEMIST'S JOURNAL")
                     embed.set_author(name = f'DESCRIPTION', icon_url='attachment://open-book.png')
                     embed.add_field(name = f'__*{select.upper()}*__     {biomeicons}', value=f'*{ws.cell(i+1,2).value}*', inline=False)
@@ -138,24 +140,24 @@ class Components(commands.Cog):
 
         elif select == 'list':
             components = str(c_list).replace("'","").replace("[","").replace("]","").replace('"','')
-            file = discord.File('./eyebot/images/commands/open-book.png', filename='open-book.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/open-book.png'), filename='open-book.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Table of Contents', icon_url='attachment://open-book.png')
             embed.add_field(name='**__Herbs__**', value=str(components).replace(',','\n'), inline=False)
             self.bot.logger.log(f'{ctx.message.author} looked at Herb Information table of contents.')
 
         elif select == '?':
-            file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Herb Info)', icon_url='attachment://warning.png')
-            embed.add_field(name='**__Herb Info__**', value=f"**Usage: `{self.prefix}herb name` or `{self.prefix}hinfo name` \nwhere `name = full name of herb`**\nHerb name is one of the components from [Herbalism and Alchemy](https://drive.google.com/file/d/0B7CIGCMCtoETVmhDNEZMbUVweTg/view) homebrew supplement By [Dalagrath](https://www.reddit.com/r/dndnext/comments/3w1log/5e_herbalism_alchemy_v12_updates_fanmade/).\nTo get a list of components please use `{self.prefix}herb list` or `{self.prefix}herb (herb name)` to get a descripton of the component.", inline=False)
+            embed.add_field(name='**__Herb Info__**', value=f"**Usage: `{self.prefix}hinfo name` \nwhere `name = full name of herb`**\nHerb name is one of the components from [Herbalism and Alchemy](https://drive.google.com/file/d/0B7CIGCMCtoETVmhDNEZMbUVweTg/view) homebrew supplement By [Dalagrath](https://www.reddit.com/r/dndnext/comments/3w1log/5e_herbalism_alchemy_v12_updates_fanmade/).\nTo get a list of components please use `{self.prefix}herb list` or `{self.prefix}herb (herb name)` to get a descripton of the component.", inline=False)
             self.bot.logger.log(f'{ctx.message.author} asked for help with Herb Information.')
 
 
         else:
             self.bot.logger.log(f'there was an error.')
 
-            file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Herb Info', icon_url='attachment://prohibited.png')
             embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select a component that has an entry. Type `{self.prefix}herb ?` or `{self.prefix}hinfo ?` for more info.", inline=False)
@@ -167,8 +169,10 @@ class Components(commands.Cog):
         elif discord.ChannelType != "private":
             await ctx.send(file=file, embed=embed)
 
-
-    @commands.command()
+    #----------------------------
+    # Potion Command
+    #----------------------------
+    @commands.command(extras=["f':alembic:  **__Potion__**'", "f'**Usage: `{self.prefix}potion c `\nwhere `c = component` multiple components separated by a `,`**\nValid component selections can be found by using `{self.prefix}herb list` for a list of components or `{self.prefix}herb (name)` for details on a spicific component you wish to combine for effects.'", "inline=False"])
     async def potion(self, ctx, *, select):
         if not gsa:
             return
@@ -207,7 +211,7 @@ class Components(commands.Cog):
 
                 self.bot.logger.log(f'A potion DC was generated.')
 
-                file = discord.File('./eyebot/images/commands/alembic.png', filename='alembic.png')
+                file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/alembic.png'), filename='alembic.png')
                 embed = discord.Embed(color=0x019cd0)
                 embed.set_author(name = 'POTION DIFFICULTY', icon_url='attachment://alembic.png')
                 embed.add_field(name = '__Alchemy Attempt DC__', value = f"The difficulty for a potion\poison\enchantment made from:\n{c_Response}\n\n 10 {m_Response} = **`{total}`**", inline=False)
@@ -215,13 +219,13 @@ class Components(commands.Cog):
             except Exception as e:
                 self.bot.logger.log(f'there was an error: {e}')
 
-                file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
+                file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
                 embed = discord.Embed(color=0xcc0000)
                 embed.set_author(name='Potion', icon_url='attachment://prohibited.png')
                 embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select components within the potion component list. Type `{self.prefix}potion ?`, `{self.prefix}herb list` for a list of components, or `{self.prefix}herb (name)` for details on a spicific component.", inline=False)
 
         elif mix == '?':
-            file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Potion)', icon_url='attachment://warning.png')
             embed.add_field(name='**__Potion__**', value=f"**Usage: `{self.prefix}potion c `\nwhere `c = component` multiple components separated by a `,`**\nValid component selections can be found by using `{self.prefix}herb list` for a list of components or `{self.prefix}herb (name)` for details on a spicific component you wish to combine for effects.", inline=False)
@@ -230,7 +234,7 @@ class Components(commands.Cog):
 
 
         else:
-            file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Potion', icon_url='attachment://prohibited.png')
             embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select components within the potion component list. Type `{self.prefix}potion ?`, `{self.prefix}herb list` for a list of components, or `{self.prefix}herb (name)` for details on a spicific component.", inline=False)
@@ -242,8 +246,10 @@ class Components(commands.Cog):
         elif discord.ChannelType != "private":
             await ctx.send(file=file, embed=embed)
 
-
-    @commands.command()
+    #----------------------------
+    # Poison Command
+    #----------------------------
+    @commands.command(extras=["f':test_tube:  **__Poison__**'", "f'**Usage: `{self.prefix}poison c `\nwhere `c = component` multiple components separated by a `,`**\nValid component selections can be found by using `{self.prefix}herb list` for a list of components or `{self.prefix}herb (name)` for details on a spicific component you wish to combine for effects.'", "inline=False"])
     async def poison(self, ctx, *, select):
         if not gsa:
             return
@@ -284,7 +290,7 @@ class Components(commands.Cog):
 
                     self.bot.logger.log(f'A poison DC was generated.')
 
-                    file = discord.File('./eyebot/images/commands/test-tube.png', filename='test-tube.png')
+                    file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/test-tube.png'), filename='test-tube.png')
                     embed = discord.Embed(color=0x019cd0)
                     embed.set_author(name = 'POISON DIFFICULTY', icon_url='attachment://test-tube.png')
                     embed.add_field(name = '__Alchemy Attempt DC__', value = f"The difficulty for a poison made from:\n{c_Response}\n\n 10 {m_Response} = **`{total}`**", inline=False)
@@ -292,13 +298,13 @@ class Components(commands.Cog):
             except Exception as e:
                 self.bot.logger.log(f'There was an error.: {e}')
 
-                file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
+                file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
                 embed = discord.Embed(color=0xcc0000)
                 embed.set_author(name='Poison', icon_url='attachment://prohibited.png')
                 embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select components within the poison component list. Type `{self.prefix}poison ?` or `{self.prefix}herb list` for more info.", inline=False)
 
         elif mix == '?':
-            file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Poison)', icon_url='attachment://warning.png')
             embed.add_field(name='**__Poison__**', value=f"**Usage: `{self.prefix}poison c `\nwhere `c = component` multiple components separated by a `,`**\nValid component selections can be found by using `{self.prefix}herb list` for a list of components or `{self.prefix}herb (name)` for details on a spicific component you wish to combine for effects.", inline=False)
@@ -306,7 +312,7 @@ class Components(commands.Cog):
             self.bot.logger.log(f'{ctx.message.author} asked for help with {self.prefix}poison')
 
         else:
-            file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Poison', icon_url='attachment://prohibited.png')
             embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select components within the poison component list. Type `{self.prefix}poison ?`, `{self.prefix}herb list` for a list of components, or `{self.prefix}herb (name)` for details on a spicific component.", inline=False)

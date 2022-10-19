@@ -32,7 +32,7 @@ class Admin (commands.Cog):
     # Administrative Commands
     # ---------------------------------------------------------
     #Shutdown bot
-    @commands.command(aliases=['shtudown','sd'])
+    @commands.command(aliases=['shtudown','sd'], extras=["f':octagonal_sign: **__Shutdown__**'", "f'Terminates bot all bot functions. Need to be bot owner to use. Contact Eyeofthenyte#0042 with any issues.'", "inline=False"])
     @commands.is_owner()
     async def _shutdown(self,ctx):
         try:
@@ -44,7 +44,7 @@ class Admin (commands.Cog):
             await ctx.send("There was a problem shutting down the bot. You might not be the bot owner.")
 
     #Disconnect bot from server BOT OWNER ONLY
-    @commands.command()
+    @commands.command(extras=["f':wave:  **__Leave__**'", "f'**Usage: `{self.prefix}leave server`\nWhere `server = name of server`**\nWill make the bot leave the server.\n**Must be server owner to use this command.**\n'", "inline=False"])
     @commands.check_any(commands.has_permissions(administrator=True),commands.is_owner())
     async def leave(self, ctx, *, guild_name):
         guild = discord.utils.get(bot.guilds, name=guild_name)
@@ -57,12 +57,12 @@ class Admin (commands.Cog):
             logger.error(f'connection_broken: {bot.user.name} has left: {guild.name} (id: {guild.id})')
 
     #Check connected servers BOT OWNER ONLY
-    @commands.command()
+    @commands.command(extras=["f':computer: **__Servers__**', "f'A listing of servers the bot is curretntly connected to. Need to be bot owner to use. Contact Eyeofthenyte#0042 with any issues.', "inline=False"])
     @commands.is_owner()
     async def servers(self, ctx):
-        for guild in bot.guilds:
-            logger.info(f'%-10s(id: %s)%-5s-%-5s', ' ', guild.id, ' ', ' ', guild.name)
-            await ctx.author.send(f'%-5s(id: %s)%-5s-%-5s%s', ' ', guild.id, ' ', ' ', guild.name)
+        for guild in self.bot.guilds:
+            self.logger.info(f'%-10s(id: %s)%-5s-%-5s', ' ', bot.guild.id, ' ', ' ', bot.guild.name)
+            await ctx.author.send(f'%-5s(id: %s)%-5s-%-5s%s', ' ', bot.guild.id, ' ', ' ', bot.guild.name)
         logger.info(f'-End of Server Listing-')
 
 

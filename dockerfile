@@ -7,6 +7,6 @@ RUN pip install gsheets
 RUN pip install pyyaml
 
 COPY . /opt/eyebot
-WORKDIR /opt
+WORKDIR /opt/eyebot
 
-CMD ["python", "eyebot/src/eyebot_discord.py"]
+CMD ["python", "src/eyebot_discord.py"]

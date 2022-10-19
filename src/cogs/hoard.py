@@ -26,7 +26,7 @@ class Hoard(commands.Cog):
         if isinstance(error, commands.MissingRequiredArgument):
             self.bot.logger.log(f'missing or invalid argument for .hoard')
             m_Response = "That's not a valid input. Please try again or `{self.prefix}hoard ?` for more information."
-            file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Treasure Hoard', icon_url='attachment://prohibited.png')
             embed.add_field(name='**__Error__**', value=f'{m_Response}', inline=False)
@@ -39,7 +39,7 @@ class Hoard(commands.Cog):
     #----------------------------
     # Hoard Loot Generator
     #----------------------------
-    @commands.command()
+    @commands.command(extras=["f':moneybag:  **__Hoard__**'", "f'**Usage: `{self.prefix}hoard #` where `# = 1-4`**\n Number corresponds to the 4 Treasure Hoard tables in Dungeon Master's Guide - Chapter 7.\nThis will generate all coins and magical items randomly based on table selected.\n'", "inline=False"])
     async def hoard(self, ctx, select):
         #----------------------------
         # Variables
@@ -102,7 +102,7 @@ class Hoard(commands.Cog):
                         mlist[0] = mlist[0]
                     m2_Response[i] = mlist[0]
 
-            file = discord.File('./eyebot/images/commands/money-bag.png', filename='money-bag.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/money-bag.png'), filename='money-bag.png')
             embed = discord.Embed(color=0xffe449)
             embed.set_author(name='Treasure Hoard', icon_url='attachment://money-bag.png')
             embed.add_field(name='**__Challange 0 - 4__**', value = str(m_Response).replace("and","\n") + '\n' + m_Magic[0] + str(m2_Response).replace("'","").replace("[","").replace("]","").replace(",","\n"), inline=False)
@@ -152,7 +152,7 @@ class Hoard(commands.Cog):
                         mlist[0] = mlist[0]
                     m2_Response[i] = mlist[0]
 
-            file = discord.File('./eyebot/images/commands/money-bag.png', filename='money-bag.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/money-bag.png'), filename='money-bag.png')
             embed = discord.Embed(color=0xffe449)
             embed.set_author(name='Treasure Hoard', icon_url='attachment://money-bag.png')
             embed.add_field(name='**__Challange 5 - 10__**', value = str(m_Response).replace("and","\n") + '\n' + m_Magic[0] + str(m2_Response).replace("'","").replace("[","").replace("]","").replace(",","\n"), inline=False)
@@ -228,7 +228,7 @@ class Hoard(commands.Cog):
                         mlist2[0] = mlist2[0]
                     m3_Response[i] = mlist2[0]
 
-            file = discord.File('./eyebot/images/commands/money-bag.png', filename='money-bag.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/money-bag.png'), filename='money-bag.png')
             embed = discord.Embed(color=0xffe449)
             embed.set_author(name='Treasure Hoard', icon_url='attachment://money-bag.png')
             embed.add_field(name='**__Challange 11 - 16__**', value = str(m_Response).replace("and","\n") + '\n' + m_Magic[0] + str(m2_Response).replace("'","").replace("[","").replace("]","").replace(",","\n") + m_Magic[1] + str(m3_Response).replace("'","").replace("[","").replace("]","").replace(",","\n"), inline=False)
@@ -281,7 +281,7 @@ class Hoard(commands.Cog):
                         mlist[0] = mlist[0]
                     m2_Response[i] = mlist[0]
 
-                file = discord.File('./eyebot/images/commands/money-bag.png', filename='money-bag.png')
+                file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/money-bag.png'), filename='money-bag.png')
                 embed = discord.Embed(color=0xffe449)
                 embed.set_author(name='Treasure Hoard', icon_url='attachment://money-bag.png')
                 embed.add_field(name='**__Challange 17+__**', value = str(m_Response).replace("and","\n") + '\n' + m_Magic[0] + str(m2_Response).replace("'","").replace("[","").replace("]","").replace(",","\n"), inline=False)
@@ -291,8 +291,8 @@ class Hoard(commands.Cog):
         # Help Operator
         #----------------------------
         elif select == '?':
-            self.bot.logger.log(f'{ctx.message.author}({ctx.message.author.guild}) asked for help with Hoard Loot.')
-            file = discord.File('./eyebot/images/system/warning.png', filename='warning.png')
+            self.bot.logger.log(f'{ctx.message.author}asked for help with Hoard Loot.')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Hoard)', icon_url='attachment://warning.png')
             embed.add_field(name=':moneybag:  **__Hoard__**', value='**Usage: `{self.prefix}hoard #` where `# = 1-4`**\n Number corresponds to the 4 Treasure Hoard tables in DMG - Chapter 7.\nThis will generate all coins and magical items randomly based on table selected.', inline=False)
@@ -301,7 +301,7 @@ class Hoard(commands.Cog):
         else:
             self.bot.logger.log(f'invalid hoard opterator entered.')
             m_Response = "That's not a valid input. Please try again or `{self.prefix}hoard ?` for more information."
-            file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Treasure Hoard', icon_url='attachment://prohibited.png')
             embed.add_field(name='**__Error__**', value=f'{m_Response}', inline=False)

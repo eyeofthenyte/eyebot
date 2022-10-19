@@ -44,12 +44,13 @@ class Carousing(commands.Cog):
     #----------------------------
     # Carousing Command
     #----------------------------
-    @commands.command()
-    async def carousing(self, ctx):
+    #----------------------------
+    @commands.command(aliases=['carousing','carouse','drinking','getdrinks','pubcrawl'])
+    async def _carousing(self, ctx):
         if ctx == ctx and gsa:
             self.bot.logger.info(f'A selection from the D100 Carousing list was made.')
 
-            file = discord.File('./eyebot/images/commands/mugs.png', filename='mugs.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/mugs.png'), filename='mugs.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_thumbnail(url = 'attachment://mugs.png')
             embed.set_author(name = 'D100 CAROUSING TABLE')
@@ -62,7 +63,7 @@ class Carousing(commands.Cog):
         else:
             self.bot.logger.error(f'there was an error.')
 
-            file = discord.File('./eyebot/images/system/prohibited.png', filename='prohibited.png')
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Carousing', icon_url='attachment://prohibited.png')
             embed.add_field(name='__Error__', value=f"That was not a valid choice. Simply type `{self.prefix}carousing`, `{self.prefix}carouse`, `self.prefixdrinking`, `self.prefixgetdrinks`, or `self.prefixpubcrawl` to get a selection from the table.", inline=False)
