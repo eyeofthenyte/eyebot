@@ -23,37 +23,37 @@ class Dice:
         try:
             self.quantity = int(self.raw_quantity) if self.raw_quantity else 1
         except ValueError:
-            raise ValueError(f'[{self.raw_quantity}] quantity must be a number.')
+            raise ValueError(f'[{self.raw_quantity}] quantity must be a number.\nType `!help roller` for more information.')
             # self.bot.logger.log(f'[{self.raw_quantity}] quantity must be a number.')
 
         try:
             self.sides = int(self.raw_sides)
         except ValueError:
-            raise ValueError(f'[{self.raw_sides}] number of sides must be a number.')
+            raise ValueError(f'[{self.raw_sides}] number of sides must be a number.\nType `!help roller` for more information.')
             # self.bot.logger.log(f'[{self.raw_sides}] number of sides must be a number.')
 
         try:
             self.modifier = int(self.raw_modifier) if self.raw_modifier else 0
         except ValueError:
-            raise ValueError(f'[{self.raw_modifier}] is not a valid modifier.')
+            raise ValueError(f'[{self.raw_modifier}] is not a valid modifier.\nType `!help roller` for more information.')
             # self.bot.logger.log(f'[{self.raw_modifier}] is not a valid modifier.')
 
         try:
             self.single_mod = (int(self.raw_single_mod) if self.raw_single_mod else 0)
         except ValueError:
-            raise ValueError(f'[{self.raw_single_mod}] is not a valid modifier.')
+            raise ValueError(f'[{self.raw_single_mod}] is not a valid modifier.\nType `!help roller` for more information.')
             # self.bot.logger.log(f'[{self.raw_single_mod}] is not a valid modifier.')
 
         if self.quantity < 1:
-            raise ValueError(f'[{self.quantity}] is not a valid number of dice.')
+            raise ValueError(f'[{self.quantity}] is not a valid number of dice.\nType `!help roller` for more information.')
             # self.bot.logger.log(f'[{self.quantity}] is not a valid number of dice.')
 
         if self.quantity > 200:
-            raise ValueError(f'[{self.quantity}] that is too many dice.')
+            raise ValueError(f'[{self.quantity}] that is too many dice.\nType `!help roller` for more information.')
             # self.bot.logger.log(f'[{self.quantity}] that is too many dice.')
 
         if self.sides not in self.VALID_SIDES:
-            raise ValueError(f'[{self.raw}] Allowed dice are: {self.valid_dice}.')
+            raise ValueError(f'[{self.raw}] Allowed dice are: {self.valid_dice}.\nType `!help roller` for more information.')
             # self.bot.logger.log(f'[{self.raw}] Allowed dice are: {self.valid_dice}.')
 
     @property
@@ -157,7 +157,7 @@ class Roll(commands.Cog):
     #----------------------------
     # D20 Roller
     #----------------------------
-    @commands.command()
+    @commands.command(extras=["**__D20__**", "**Usage: `!d20 #` where `# = number <200 of d20 rolls desired`**\n If no number is entered the default is 1.\nIf there is a 1 or a 20 or both present in the roll(s) a message will be displayed appropriately indicating the condition."])
     async def d20(self, ctx, num_dice='1'):
         #Roll one or more d20 dice.
 
@@ -187,7 +187,7 @@ class Roll(commands.Cog):
     #----------------------------
     # All Die Roller
     #----------------------------
-    @commands.command(aliases=['r','roll'])
+    @commands.command(aliases=['r','roll','roller'], extras=["**__Roll__**", "**Usage: `!roll e`\n`!r` can also be usednwhere `e = die roll expression`**\n Roll the specified dice plus optional modifiers:\n```\nExamples:\n     !roll d6            (one d6)\n     !roll 2d8           (two d8s)\n     !roll 3d10-1        (three d10s with a -1 on each roll)\n     !roll (3d8)+3       (three d8s with a +3 to the total)\n     !roll 2d8, 2d6      (comma-separated: two d8s and two d6s)\n     !roll 1d20\n           1d8                 (multi-line: one d20 and one d8)\n```"])
     async def _roll(self, ctx, *, args=None):
         name = ctx.message.author.display_name
 

@@ -32,7 +32,7 @@ class Admin (commands.Cog):
     # Administrative Commands
     # ---------------------------------------------------------
     #Shutdown bot
-    @commands.command(aliases=['shtudown','sd'], extras=["f':octagonal_sign: **__Shutdown__**'", "f'Terminates bot all bot functions. Need to be bot owner to use. Contact Eyeofthenyte#0042 with any issues.'", "inline=False"])
+    @commands.command(aliases=['shutdown','sd'], extras=[":octagonal_sign: **__Shutdown__**", "Terminates bot all bot functions. Need to be bot owner to use. Contact Eyeofthenyte#0042 with any issues."])
     @commands.is_owner()
     async def _shutdown(self,ctx):
         try:
@@ -44,7 +44,7 @@ class Admin (commands.Cog):
             await ctx.send("There was a problem shutting down the bot. You might not be the bot owner.")
 
     #Disconnect bot from server BOT OWNER ONLY
-    @commands.command(extras=["f':wave:  **__Leave__**'", "f'**Usage: `{self.prefix}leave server`\nWhere `server = name of server`**\nWill make the bot leave the server.\n**Must be server owner to use this command.**\n'", "inline=False"])
+    @commands.command(extras=[":wave:  **__Leave__**", "**Usage: `!leave server`\nWhere `server = name of server`**\n\mWill make the bot leave the server.\n**Must be server owner to use this command.**\n"])
     @commands.check_any(commands.has_permissions(administrator=True),commands.is_owner())
     async def leave(self, ctx, *, guild_name):
         guild = discord.utils.get(bot.guilds, name=guild_name)
@@ -57,7 +57,7 @@ class Admin (commands.Cog):
             logger.error(f'connection_broken: {bot.user.name} has left: {guild.name} (id: {guild.id})')
 
     #Check connected servers BOT OWNER ONLY
-    @commands.command(extras=["f':computer: **__Servers__**', "f'A listing of servers the bot is curretntly connected to. Need to be bot owner to use. Contact Eyeofthenyte#0042 with any issues.', "inline=False"])
+    @commands.command(extras=[":computer:  **__Servers__**", "A listing of servers the bot is curretntly connected to. Need to be bot owner to use. Contact Eyeofthenyte#0042 with any issues."])
     @commands.is_owner()
     async def servers(self, ctx):
         for guild in self.bot.guilds:

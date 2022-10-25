@@ -27,7 +27,7 @@ class WildMagic(commands.Cog):
     #----------------------------
     # Wild Magic Surge
     #----------------------------
-    @commands.command(aliases=['wildmagic', 'wm', 'surge'], extras=["f':sparkles:  **__WildMagic__**'", "f'**Usage: `{self.prefix}wildmagic #`\n other aliases `{self.prefix}wm, {self.prefix}surge` will also work\nwhere `# = 1` for Net Libram of Magical Efects v1.2 (edited) \nwhere `# = 2` for Net Libram of Magical Efects v2.0**\n Takes random selection of one of the magic effects selections. Good luck!\n'", "inline=False"])
+    @commands.command(aliases=['wildmagic', 'wm', 'surge'], extras=[":sparkles:  **__WildMagic__**", "**Usage:** `!wildmagic #`\n other aliases `!wm, !surge` will also work\n**where** `# = 1` for Net Libram of Magical Efects v1.2 (edited) \nwhere `# = 2` for Net Libram of Magical Efects v2.0\n Takes random selection of one of the magic effects selections. Good luck!\n"])
     async def _wildmagic(self, ctx, *, select):
 
         if select == '1':
@@ -56,19 +56,12 @@ class WildMagic(commands.Cog):
             except Exception as e:
                 self.bot.logger.log(f'{e}')
 
-        elif select == '?':
-            self.bot.logger.log(f'{ctx.message.author} asked for help with {self.prefix}wildmagic command.')
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
-            embed = discord.Embed(color=0x019cd0)
-            embed.set_author(name='Help (Wild Magic)', icon_url='attachment://warning.png')
-            embed.add_field(name='__WildMagic__', value=f'**Usage: `{self.prefix}wildmagic #`\n other aliases `{self.prefix}wm, {self.prefix}surge` will also work\nwhere `# = 1` for Net Libram of Magical Efects v1.2 (edited) \nwhere `# = 2` for Net Libram of Magical Efects v2.0**\n Takes random selection of one of the magic effects selections. Good luck!', inline=False)
-
         else:
-            self.bot.logger.log(f'Invalid input for {self.prefix}wildmagic command.')
+            self.bot.logger.log(f'Invalid input for !wildmagic command.')
             file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Wild Magic', icon_url='attachment://prohibited.png')
-            embed.add_field(name='__Error__', value=f'That is not a valid input. Please try again or use `{self.prefix}wildmagic ?` for more information.', inline=False)
+            embed.add_field(name='__Error__', value=f'That is not a valid input. Please try again or use `!help wildmagic` for more information.', inline=False)
 
 
         if discord.ChannelType == "private":

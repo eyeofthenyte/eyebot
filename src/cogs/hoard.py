@@ -25,7 +25,7 @@ class Hoard(commands.Cog):
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
             self.bot.logger.log(f'missing or invalid argument for .hoard')
-            m_Response = "That's not a valid input. Please try again or `{self.prefix}hoard ?` for more information."
+            m_Response = "That's not a valid input. Please try again or `!hoard ?` for more information."
             file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Treasure Hoard', icon_url='attachment://prohibited.png')
@@ -39,7 +39,7 @@ class Hoard(commands.Cog):
     #----------------------------
     # Hoard Loot Generator
     #----------------------------
-    @commands.command(extras=["f':moneybag:  **__Hoard__**'", "f'**Usage: `{self.prefix}hoard #` where `# = 1-4`**\n Number corresponds to the 4 Treasure Hoard tables in Dungeon Master's Guide - Chapter 7.\nThis will generate all coins and magical items randomly based on table selected.\n'", "inline=False"])
+    @commands.command(extras=[":moneybag:  **__Hoard__**", "**Usage: `!hoard #` where `# = 1-4`**\n Number corresponds to the 4 Treasure Hoard tables in DMG - Chapter 7.\nThis will generate all coins and magical items randomly based on table selected.\n"])
     async def hoard(self, ctx, select):
         #----------------------------
         # Variables
@@ -286,21 +286,9 @@ class Hoard(commands.Cog):
                 embed.set_author(name='Treasure Hoard', icon_url='attachment://money-bag.png')
                 embed.add_field(name='**__Challange 17+__**', value = str(m_Response).replace("and","\n") + '\n' + m_Magic[0] + str(m2_Response).replace("'","").replace("[","").replace("]","").replace(",","\n"), inline=False)
 
-
-        #----------------------------
-        # Help Operator
-        #----------------------------
-        elif select == '?':
-            self.bot.logger.log(f'{ctx.message.author}asked for help with Hoard Loot.')
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
-            embed = discord.Embed(color=0x019cd0)
-            embed.set_author(name='Help (Hoard)', icon_url='attachment://warning.png')
-            embed.add_field(name=':moneybag:  **__Hoard__**', value='**Usage: `{self.prefix}hoard #` where `# = 1-4`**\n Number corresponds to the 4 Treasure Hoard tables in DMG - Chapter 7.\nThis will generate all coins and magical items randomly based on table selected.', inline=False)
-
-
         else:
             self.bot.logger.log(f'invalid hoard opterator entered.')
-            m_Response = "That's not a valid input. Please try again or `{self.prefix}hoard ?` for more information."
+            m_Response = "That's not a valid input. Please try again or `!help hoard` for more information."
             file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Treasure Hoard', icon_url='attachment://prohibited.png')

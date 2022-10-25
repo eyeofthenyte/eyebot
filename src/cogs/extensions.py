@@ -32,7 +32,7 @@ class Extensions(commands.Cog):
     # Load Command
     #----------------------------
 
-    @commands.command(extras=["f':floppy_disk:  **__Load__**'", "'**Usage: `{self.prefix}load extension`\nWhere `extension = loot, hoard, roll`**\nWill load one of the listed command extensions following the use of the Unload command.\n'", "inline=False"])
+    @commands.command(extras=[":floppy_disk:  **__Load__**", "**Usage: `!load extension`\nWhere `extension = cog name`**\nWill load one of the listed command extensions following the use of the Unload command.\n"])
     @commands.is_owner()
     async def load(self, ctx, extension):
         try:
@@ -57,7 +57,7 @@ class Extensions(commands.Cog):
     #----------------------------
     # Unload Command
     #----------------------------
-    @commands.command(extras=["f':stop_sign:  **__Unload__**'", "f'**Usage: `{self.prefix}unload extension`\nWhere `extension = loot, hoard, roll`**\nWill unload one of the listed command extensions. Generally only used when extension becomes unresponsive with no error messages.\n'", "inline=False"])
+    @commands.command(extras=[":stop_sign:  **__Unload__**", "**Usage: `!unload extension`\nWhere `extension = cog name`**\nWill unload one of the listed command extensions. Generally only used when extension becomes unresponsive with no error messages.\n"])
     @commands.is_owner()
     async def unload(self, ctx, extension):
         try:
@@ -84,7 +84,7 @@ class Extensions(commands.Cog):
     #----------------------------
     # Reload Command
     #----------------------------
-    @commands.command(extras=["f':repeat:  **__Reload__**'", "f'**Usage: `{self.prefix}reload extension`\nWhere `extension = loot, hoard, roll`**\nWill perform Unload and Load functions together.\n'", "inline=False"])
+    @commands.command(extras=[":repeat:  **__Reload__**", "**Usage: `!reload extension`\nWhere `extension = cog name`**\nWill perform Unload and Load functions together.\n"])
     @commands.is_owner()
     async def reload(self, ctx, extension):
         self.bot.logger.log(f'Attempting to reload {extension}')

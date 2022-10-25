@@ -26,7 +26,7 @@ class Loot(commands.Cog):
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
             self.bot.logger.log(f'missing or invalid argument for .loot')
-            m_Response = "That's not a valid input. Please try again or `{self.prefix}loot ?` for more information."
+            m_Response = "That's not a valid input. Please try again or `!loot ?` for more information."
             file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Indivdual Treasure', icon_url='attachment://prohibited.png')
@@ -41,7 +41,7 @@ class Loot(commands.Cog):
     #----------------------------
     # Loot Command
     #----------------------------
-    @commands.command(extras=["f':dollar:  **__Loot__**'", "f'**Usage: `{self.prefix}loot #` where `# = 1-4`**\n Number corresponds to the 4 Individual Treasure tables in Dungeon Master's Guide - Chapter 7.\nThis will generate all coins randomly based on table selected.\n'", "inline=False"])
+    @commands.command(extras=[":dollar:  **__Loot__**", "**Usage: `!loot #` where `# = 1-4`**\n Number corresponds to the 4 Individual Treasure tables in DMG - Chapter 7.\nThis will generate all coins randomly based on table selected.\n"])
     async def loot(self, ctx, *, select):
 
         # Variables
@@ -135,17 +135,9 @@ class Loot(commands.Cog):
             embed.set_author(name='Indivdual Treasure', icon_url='attachment://coin.png')
             embed.add_field(name='**__Challange 17+__**', value=f'{m_Response}', inline=False)
 
-        # Help Operator
-        elif select == '?':
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
-            self.bot.logger.log(f'{ctx.message.author} asked for help with Loot.')
-            embed = discord.Embed(color=0x019cd0)
-            embed.set_author(name='Help (Loot)', icon_url='attachment://warning.png')
-            embed.add_field(name='**__Loot__**', value='**Usage: `{self.prefix}loot #` where `# = 1-4`**\n Number corresponds to the 4 Individual Treasure tables in DMG - Chapter 7.\nThis will generate all coins randomly based on table selected.', inline=False)
-
         else:
             self.bot.logger.log(f'{ctx.message.author} entered invalid hoard opterator')
-            m_Response = "That's not a valid input. Please try again or `{self.prefix}loot ?` for more information."
+            m_Response = "That's not a valid input. Please try again or `!help loot` for more information."
             file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Indivdual Treasure', icon_url='attachment://prohibited.png')

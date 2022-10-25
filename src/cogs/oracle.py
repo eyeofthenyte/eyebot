@@ -41,11 +41,8 @@ class Oracle (commands.Cog):
                 await ctx.send(file=file, embed=embed)
 
 
-    @commands.command()
+    @commands.command(extras=[":crystal_ball:  **__Oracle__**", "**Usage: `!oracle q`\n Where `question = the question you want to ask`**\nSimple general responses to questions. Careful the oracle can be a bit sassy!"])
     async def oracle(self, ctx, *, question):
-
-
-
         replies = ["Yes.", "No.", "I said NO!", "Do you really want an answer to that?", "Ask again later.", "Go play in the street.", "Shut your cock holster!","How can you even ask something like that?", "If you don't know the answer already I certainly can't help you.", "Lets be honest you could use the life experience.", "Lets just say... your best option would be to put your head between your legs and kiss your ass goodbye.", "Definitely maybe.", "Ask me again someday.", "*~Unintelligable, Yet Frightening Wispers~*","*~Disembodied Laughter of Children~*"];
         if (int(question.count(" ")) >= 2):
             file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/crystal-ball.png'), filename='crystal-ball.png')
@@ -60,20 +57,8 @@ class Oracle (commands.Cog):
                 self.bot.logger.log(f'{ctx.message.author} has sought guidance.')
                 await ctx.send(file=file, embed=embed)
 
-        elif question == '?':
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
-            embed = discord.Embed(color=0x019cd0)
-            embed.set_author(name='Help (Oracle)', icon_url='attachment://warning.png')
-            embed.add_field(name=f"**__Oracle__**", value=f"**Usage: `self.prefixoracle q`\n Where `question = the question you want to ask`**\nSimple general responses to questions. Careful the oracle can be a bit sassy!", inline=False)
-            if discord.ChannelType == "private":
-                self.bot.logger.log(f'{ctx.message.author} asked for help with oracle')
-                await ctx.message.author.send(file=file, embed=embed)
-            elif discord.ChannelType != "private":
-                self.bot.logger.log(f'{ctx.message.author} asked for help with oracle')
-                await ctx.send(file=file, embed=embed)
-
         else:
-            m_Response = f"That's not a valid input. Please try again or `self.prefixoracle ?` for more information."
+            m_Response = f"That's not a valid input. Please try again or `!help oracle` for more information."
             file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Oracle', icon_url='attachment://prohibited.png')

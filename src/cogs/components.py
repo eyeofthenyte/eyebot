@@ -52,7 +52,7 @@ class Components(commands.Cog):
     #----------------------------
     # Collect Command
     #----------------------------
-    @commands.command(aliases=['collect', 'search', 'find', 'gather'], extras=["f':mag:  **__Collect__**'", "f'**Usage: `{self.prefix}collect b `\n`{self.prefix}search` and `{self.prefix}find` can also be used\nwhere `b = biome`**\nValid biome selections are:\n arctic, desert, forest, grass, hills, mountain, swamp, underdark, water, and common(not a biome but a list of components that can be found in any biome).'", "inline=False"])
+    @commands.command(aliases=['collect', 'search', 'find', 'gather'], extras=[":mag:  **__Collect__**", "**Usage: `!collect b `\n`!search` and `!find` can also be used\nwhere `b = biome`**\n\nValid biome selections are:\n arctic, desert, forest, grass, hills, mountain, swamp, underdark, water, and common(not a biome but a list of components that can be found in any biome)."])
     async def _collect(self, ctx, *, select):
 
         pick = select
@@ -94,8 +94,8 @@ class Components(commands.Cog):
             file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Help (Collect)', icon_url='attachment://warning.png')
-            embed.add_field(name='**__Collect__**', value=f"**Usage: `{self.prefix}collect b`\nwhere `b = biome`**\nValid biome selections are:\n arctic, desert, forest, grass, hills, mountain, swamp, underdark, water, and common(not a biome but a list of components that can be found in any biome)", inline=False)
-            self.bot.logger.log(f'{ctx.message.author} asked for help with {self.prefix}collect.')
+            embed.add_field(name='**__Collect__**', value=f"**Usage: `!collect b`\nwhere `b = biome`**\nValid biome selections are:\n arctic, desert, forest, grass, hills, mountain, swamp, underdark, water, and common(not a biome but a list of components that can be found in any biome)", inline=False)
+            self.bot.logger.log(f'{ctx.message.author} asked for help with !collect.')
 
         else:
             self.bot.logger.log(f'there was an error.')
@@ -103,7 +103,7 @@ class Components(commands.Cog):
             file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Collect', icon_url='attachment://prohibited.png')
-            embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select an available biome. Type `{self.prefix}collect ?` for more info.", inline=False)
+            embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select an available biome. Type `!help collect` for more info.", inline=False)
 
             self.bot.logger.log(f'{ctx.message.author} gave an invalid input for collect command.')
 
@@ -115,7 +115,7 @@ class Components(commands.Cog):
     #----------------------------
     # Info Command
     #----------------------------
-    @commands.command(aliases=['herb', 'hinfo', 'flora'], extras=["f':mushroom:  **__Herb Info__**'", "f'**Usage: `{self.prefix}herb name` or `{self.prefix}hinfo name` \nwhere `name = full name of herb`**\nHerb name is one of the components from [Herbalism and Alchemy](https://drive.google.com/file/d/0B7CIGCMCtoETVmhDNEZMbUVweTg/view) homebrew supplement By [Dalagrath](https://www.reddit.com/r/dndnext/comments/3w1log/5e_herbalism_alchemy_v12_updates_fanmade/) .\n'", "inline=False"])
+    @commands.command(aliases=['hinfo', 'flora'], extras=[":mushroom:  **__Herb Info__**", "**Usage: `!flora name` or `!hinfo name` \nwhere `name = full name of herb`**\n\n For a full list of herbs type `!hinfo list`\nHerb name is one of the components from [Herbalism and Alchemy](https://drive.google.com/file/d/0B7CIGCMCtoETVmhDNEZMbUVweTg/view) homebrew supplement By [Dalagrath](https://www.reddit.com/r/dndnext/comments/3w1log/5e_herbalism_alchemy_v12_updates_fanmade/) .\n"])
     async def _flora(self, ctx, *, select):
         if not gsa:
             return
@@ -146,21 +146,13 @@ class Components(commands.Cog):
             embed.add_field(name='**__Herbs__**', value=str(components).replace(',','\n'), inline=False)
             self.bot.logger.log(f'{ctx.message.author} looked at Herb Information table of contents.')
 
-        elif select == '?':
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
-            embed = discord.Embed(color=0x019cd0)
-            embed.set_author(name='Help (Herb Info)', icon_url='attachment://warning.png')
-            embed.add_field(name='**__Herb Info__**', value=f"**Usage: `{self.prefix}hinfo name` \nwhere `name = full name of herb`**\nHerb name is one of the components from [Herbalism and Alchemy](https://drive.google.com/file/d/0B7CIGCMCtoETVmhDNEZMbUVweTg/view) homebrew supplement By [Dalagrath](https://www.reddit.com/r/dndnext/comments/3w1log/5e_herbalism_alchemy_v12_updates_fanmade/).\nTo get a list of components please use `{self.prefix}herb list` or `{self.prefix}herb (herb name)` to get a descripton of the component.", inline=False)
-            self.bot.logger.log(f'{ctx.message.author} asked for help with Herb Information.')
-
-
         else:
             self.bot.logger.log(f'there was an error.')
 
             file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Herb Info', icon_url='attachment://prohibited.png')
-            embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select a component that has an entry. Type `{self.prefix}herb ?` or `{self.prefix}hinfo ?` for more info.", inline=False)
+            embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select a component that has an entry. Type `!help hinfo` for more info.", inline=False)
 
             self.bot.logger.log(f'{ctx.message.author} gave an invalid input for herb command.')
 
@@ -172,7 +164,7 @@ class Components(commands.Cog):
     #----------------------------
     # Potion Command
     #----------------------------
-    @commands.command(extras=["f':alembic:  **__Potion__**'", "f'**Usage: `{self.prefix}potion c `\nwhere `c = component` multiple components separated by a `,`**\nValid component selections can be found by using `{self.prefix}herb list` for a list of components or `{self.prefix}herb (name)` for details on a spicific component you wish to combine for effects.'", "inline=False"])
+    @commands.command(extras=[":alembic:  **__Potion__**", "**Usage: `!potion c `\nwhere `c = component` multiple components separated by a `,`**\n\nValid component selections can be found by using `!herb list` for a list of components or `!herb (name)` for details on a spicific component you wish to combine for effects."])
     async def potion(self, ctx, *, select):
         if not gsa:
             return
@@ -222,22 +214,13 @@ class Components(commands.Cog):
                 file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
                 embed = discord.Embed(color=0xcc0000)
                 embed.set_author(name='Potion', icon_url='attachment://prohibited.png')
-                embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select components within the potion component list. Type `{self.prefix}potion ?`, `{self.prefix}herb list` for a list of components, or `{self.prefix}herb (name)` for details on a spicific component.", inline=False)
-
-        elif mix == '?':
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
-            embed = discord.Embed(color=0x019cd0)
-            embed.set_author(name='Help (Potion)', icon_url='attachment://warning.png')
-            embed.add_field(name='**__Potion__**', value=f"**Usage: `{self.prefix}potion c `\nwhere `c = component` multiple components separated by a `,`**\nValid component selections can be found by using `{self.prefix}herb list` for a list of components or `{self.prefix}herb (name)` for details on a spicific component you wish to combine for effects.", inline=False)
-
-            self.bot.logger.log(f'{ctx.message.author} asked for help with {self.prefix}potion')
-
+                embed.add_field(name='__Error__', value=f"That was not a valid choice. Try again or type `!help potion` for more info.", inline=False)
 
         else:
             file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Potion', icon_url='attachment://prohibited.png')
-            embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select components within the potion component list. Type `{self.prefix}potion ?`, `{self.prefix}herb list` for a list of components, or `{self.prefix}herb (name)` for details on a spicific component.", inline=False)
+            embed.add_field(name='__Error__', value=f"That was not a valid choice. Try again or type `!help potion` for more info.", inline=False)
 
             self.bot.logger.log(f'{ctx.message.author} gave an invalid input for potion command.')
 
@@ -249,7 +232,7 @@ class Components(commands.Cog):
     #----------------------------
     # Poison Command
     #----------------------------
-    @commands.command(extras=["f':test_tube:  **__Poison__**'", "f'**Usage: `{self.prefix}poison c `\nwhere `c = component` multiple components separated by a `,`**\nValid component selections can be found by using `{self.prefix}herb list` for a list of components or `{self.prefix}herb (name)` for details on a spicific component you wish to combine for effects.'", "inline=False"])
+    @commands.command(extras=[":test_tube:  **__Poison__**", "**Usage: `!poison c `\nwhere `c = component` multiple components separated by a `,`**\n\nValid component selections can be found by using `!herb list` for a list of components or `!herb (name)` for details on a spicific component you wish to combine for effects."])
     async def poison(self, ctx, *, select):
         if not gsa:
             return
@@ -301,21 +284,13 @@ class Components(commands.Cog):
                 file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
                 embed = discord.Embed(color=0xcc0000)
                 embed.set_author(name='Poison', icon_url='attachment://prohibited.png')
-                embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select components within the poison component list. Type `{self.prefix}poison ?` or `{self.prefix}herb list` for more info.", inline=False)
-
-        elif mix == '?':
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
-            embed = discord.Embed(color=0x019cd0)
-            embed.set_author(name='Help (Poison)', icon_url='attachment://warning.png')
-            embed.add_field(name='**__Poison__**', value=f"**Usage: `{self.prefix}poison c `\nwhere `c = component` multiple components separated by a `,`**\nValid component selections can be found by using `{self.prefix}herb list` for a list of components or `{self.prefix}herb (name)` for details on a spicific component you wish to combine for effects.", inline=False)
-
-            self.bot.logger.log(f'{ctx.message.author} asked for help with {self.prefix}poison')
+                embed.add_field(name='__Error__', value=f"That was not a valid choice. Try again or type `!help poison` for more info.", inline=False)
 
         else:
             file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Poison', icon_url='attachment://prohibited.png')
-            embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select components within the poison component list. Type `{self.prefix}poison ?`, `{self.prefix}herb list` for a list of components, or `{self.prefix}herb (name)` for details on a spicific component.", inline=False)
+            embed.add_field(name='__Error__', value=f"That was not a valid choice. Try again or type `!help poison` for more info.", inline=False)
 
             self.bot.logger.log(f'{ctx.message.author} gave an invalid input for poison command.')
 

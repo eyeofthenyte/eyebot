@@ -29,7 +29,7 @@ class Help (commands.Cog):
     async def cog_command_error(self, ctx, error):
         self.logger.error(f"error trying to run help: {error}")
         if isinstance(error, commands.CommandError):
-            await ctx.send('Something went wrong. Try `{self.prefix}reload help`.')
+            await ctx.send('Something went wrong. Try `!reload help`.')
 
 
     # ---------------------------------------------------------
@@ -53,6 +53,7 @@ class Help (commands.Cog):
             embed.set_author(name=f'Available Commands', icon_url='attachment://warning.png')
             embed.add_field(name=f'**__Commands__**', value="Below is a list of the individual commands available and all aliases that can be used to activate a given command.\n\n" + "\n".join(cmd_list), inline=False)
             print("Displayed all commands available to Administrators or Server Owners.")
+
         else:
             cmd_list.remove('reload','load','unload','servers','shutdown')
             file = discord.File(os.path.join(os.path.dirname(__file__) + '/../../images/system/warning.png'), filename='warning.png')
@@ -75,22 +76,34 @@ class Help (commands.Cog):
         def get_help():
             help_list=[]
             x=[]
+            entry=[]
             for y in self.bot.commands:
                 x.append([y.name, y.aliases, y.extras])
-            print (x)
 
-
-
+            if len(x) != 0:
+                for a in range(len(x)):
+                    for b in range(len(x[a])):
+                        if select.lower() in x[a][b]:
+                            entry = x[a][b+1]
+                        else:
+                            for c in range(len(x[a][b])):
+                                if select.lower() in x[a][b][c]:
+                                    entry = x[a][b]
+            else:
+                entry=['**__Input Error__**', 'No such command exists. Try `!commands` for a full list of commands.', 'False']
+            return(entry)
 
         help_list = get_help()
 
+        file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
+        embed = discord.Embed(color=0x019cd0)
+        embed.set_author(name=f'Command Help', icon_url='attachment://warning.png')
+        embed.add_field(name=help_list[0], value=help_list[1], inline=False)
 
-        #await ctx.send(help_list)
-
-            #file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
-            #embed = discord.Embed(color=0x019cd0)
-            #embed.set_author(name=f'All Command Help', icon_url='attachment://prohibited.png')
-            #embed.add_field()        
+        if discord.ChannelType == "private":
+            await ctx.message.author.send(file=file, embed=embed)
+        elif discord.ChannelType != "private":
+            await ctx.send(file=file, embed=embed)
 
         #if commands.is_owner() or (ctx.author==ctx.guild.owner or ctx.author.has_permissions(administrator=True)):
         #    file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
@@ -130,11 +143,6 @@ class Help (commands.Cog):
         #    embed.add_field(name=f':test_tube:  **__Poison__**', value=f"**Usage: `{self.prefix}poison c `\nwhere `c = component` multiple components separated by a `,`**\nValid component selections can be found by using `{self.prefix}herb list` for a list of components or `{self.prefix}herb (name)` for details on a spicific component you wish to combine for effects.", inline=False)
         #    print("Displayed all commands available to Users.")
 
-
-        #if discord.ChannelType == "private":
-        #    await ctx.message.author.send(file=file, embed=embed)
-        #elif discord.ChannelType != "private":
-        #    await ctx.send(file=file, embed=embed)
 
 async def setup(bot):
     await bot.add_cog(Help(bot))

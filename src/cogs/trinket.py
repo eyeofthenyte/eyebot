@@ -35,8 +35,8 @@ class Trinket(commands.Cog):
 
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
-            self.bot.logger.log(f'{ctx.message.author}is missing or invalid argument for {self.prefix}trinket')
-            error_m = f'Please select one of the following classes:\n' + str(sheet_list).replace("'","").replace("[","").replace("]","") + f'.\n Type `{self.prefix}trinket ?` for more info.'
+            self.bot.logger.log(f'{ctx.message.author}is missing or invalid argument for !trinket')
+            error_m = f'Please select one of the following classes:\n' + str(sheet_list).replace("'","").replace("[","").replace("]","") + f'.\n Type `!trinket ?` for more info.'
             file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Trinket', icon_url='attachment://prohibited.png')
@@ -50,7 +50,7 @@ class Trinket(commands.Cog):
     #----------------------------
     # Trinkets Command
     #----------------------------
-    @commands.command(extras=["f':ring:  **__Trinket__**'", "f'**Usage: `{self.prefix}trinket c ` \nwhere `c = character class`**\nCharacter class referrs to Dungeons and Dragons character classes.\nThis data is taken from [Ted's (Nerd Immersion)](https://www.youtube.com/c/NerdImmersion1 'Nerd Immersion') random trinket's tables.\n'", "inline=False"])
+    @commands.command(extras=[":ring:  **__Trinket__**", "**Usage: `!trinket c ` \nwhere `c = character class`**\nCharacter class referrs to Dungeons and Dragons character classes.\nThis data is taken from [Ted (Nerd Immersion)](https://www.youtube.com/c/NerdImmersion1 'Nerd Immersion') random trinket tables.\n"])
     async def trinket(self, ctx, *, select):
         if select.lower() in str(sheet_list).lower():
             for i in range(len(sheet_list)):
@@ -65,21 +65,13 @@ class Trinket(commands.Cog):
                     embed.set_author(name = select.upper() + ' TRINKET')
                     embed.add_field(name = 'You found the following:', value=random.choice(v_list), inline=False)
 
-
-        elif select == '?':
-            self.bot.logger.log(f'{ctx.message.author} asked for help with {self.prefix}trinket command.')
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
-            embed = discord.Embed(color=0x019cd0)
-            embed.set_author(name='Help (Trinket)', icon_url='attachment://warning.png')
-            embed.add_field(name='**__Trinket__**', value="**Usage: `{self.prefix}trinket c ` \nwhere `c = character class`**\nCharacter class referrs to Dungeons and Dragons character classes.\nThis data is taken from [Ted's (Nerd Immersion)](https://www.youtube.com/c/NerdImmersion1 'Nerd Immersion') random trinket's tables.", inline=False)
-
         else:
             self.bot.logger.log(f'there was an error.')
             file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Trinket', icon_url='attachment://prohibited.png')
-            embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select an available Character Class. Type `trinket ?` for more info.", inline=False)
-            self.bot.logger.log(f'Invalid input for {self.prefix}trinket command.')
+            embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select an available Character Class. Type `!help trinket` for more info.", inline=False)
+            self.bot.logger.log(f'Invalid input for !trinket command.')
 
         if discord.ChannelType == "private":
             await ctx.message.author.send(file=file, embed=embed)

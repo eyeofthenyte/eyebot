@@ -29,8 +29,8 @@ class Gems(commands.Cog):
             self.bot.logger.log(f'missing or invalid argument for gems')
             file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0x019cd0)
-            embed.set_author(name='Help (Gems)', icon_url='attachment://prohibited.png')
-            embed.add_field(name=':gem:  **__Gems__**', value='**Usage: `{self.prefix}gems g n` \nwhere `g = value of gems desired`**\n*10, 50, 100, 500, 1000, 5000*\n**`     n = number of gems to be generated`**\n The value of gems corresponds to the Gem Tables DMG - Chapter 7.\nThis will generate a number of gems of a single gold value type based the table selected.', inline=False)
+            embed.set_author(name='RANDOM GEM SELECTION', icon_url='attachment://prohibited.png')
+            embed.add_field(name="**__Error__**", value="That's not a valid input. Please try again or `!help gems` for more information.", inline=False)
 
             if discord.ChannelType == "private":
                 await ctx.message.author.send(file=file, embed=embed)
@@ -43,7 +43,7 @@ class Gems(commands.Cog):
     #----------------------------
     # Gems Command
     #----------------------------
-    @commands.command(extras=["f':gem:  **__Gems__**'","f'**Usage: `{self.prefix}gems g n` \nwhere `g = value of gems desired`**\n*10, 50, 100, 500, 1000, 5000*\n**`n = number of gems to be generated`**\n Number corresponds to the 4 Individual Treasure tables in DMG - Chapter 7.\nThis will generate all coins randomly based on table selected.\n'", "inline=False"])
+    @commands.command(extras=[":gem:  **__Gems__**","**Usage: `!gems g n` \nwhere `g = value of gems desired`**\n*10, 50, 100, 500, 1000, 5000*\n**`n = number of gems to be generated`**\n\nNumber corresponds to the 4 Individual Treasure tables in DMG - Chapter 7.\nThis will generate all coins randomly based on table selected.\n"])
     async def gems(self, ctx, *, gemstring):
         #----------------------------
         # Variables
@@ -82,27 +82,15 @@ class Gems(commands.Cog):
                 await ctx.send(file=file, embed=embed)
 
         else:
-            if lstr == 1 and gemstring == '?':
-                self.bot.logger.log(f"{ctx.message.author}({ctx.message.author.guild}) asked for help with .gems command")
-                file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
-                embed = discord.Embed(color=0x019cd0)
-                embed.set_author(name='Help (Gems)', icon_url='attachment://warning.png')
-                embed.add_field(name=':gem:  **__Gems__**', value='**Usage: `{self.prefix}gems g n` \nwhere `g = value of gems desired`**\n*10, 50, 100, 500, 1000, 5000*\n**`     n = number of gems to be generated`**\n The value of gems corresponds to the Gem Tables DMG - Chapter 7.\nThis will generate a number of gems of a single gold value type based the table selected.', inline=False)
-                if discord.ChannelType == "private":
-                    await ctx.message.author.send(file=file, embed=embed)
-                elif discord.ChannelType != "private":
-                    await ctx.send(file=file, embed=embed)
-
-            else:
-                self.bot.logger.log(" : ({ctx.message.author.guild}) entered invalid argument")
-                file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
-                embed = discord.Embed(color=0x019cd0)
-                embed.set_author(name='Help (Gems)', icon_url='attachment://prohibited.png')
-                embed.add_field(name=':gem:  **__Gems__**', value='**Usage: `{self.prefix}gems g n` \nwhere `g = value of gems desired`**\n*10, 50, 100, 500, 1000, 5000*\n**`     n = number of gems to be generated`**\n The value of gems corresponds to the Gem Tables DMG - Chapter 7.\nThis will generate a number of gems of a single gold value type based the table selected.', inline=False)
-                if discord.ChannelType == "private":
-                    await ctx.message.author.send(file=file, embed=embed)
-                elif discord.ChannelType != "private":
-                    await ctx.send(file=file, embed=embed)
+            self.bot.logger.log(" : ({ctx.message.author.guild}) entered invalid argument")
+            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
+            embed = discord.Embed(color=0x019cd0)
+            embed.set_author(name='Help (Gems)', icon_url='attachment://prohibited.png')
+            embed.add_field(name='**__Error__**', value="That's not a valid input. Please try again or `!help gems` for more information.", inline=False)
+            if discord.ChannelType == "private":
+                await ctx.message.author.send(file=file, embed=embed)
+            elif discord.ChannelType != "private":
+                await ctx.send(file=file, embed=embed)
 
 async def setup(bot):
     await bot.add_cog(Gems(bot))

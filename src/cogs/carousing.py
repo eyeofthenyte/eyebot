@@ -35,10 +35,10 @@ class Carousing(commands.Cog):
         if isinstance(error, commands.MissingRequiredArgument):
             self.bot.logger.error(f'{ctx.message.author} is missing or invalid argument for .carousing')
             if discord.ChannelType == "private":
-                await ctx.message.author.send(f'Please only type `{self.prefix}carousing` to get a random result.\n Type `help` for more info.')
+                await ctx.message.author.send(f'Please only type `!carousing` to get a random result.\n Type `help` for more info.')
                 return
             else:
-                await ctx.send(f'Please only type `{self.prefix}carousing` to get a random result.\n Type `help` for more info.')
+                await ctx.send(f'Please only type `!carousing` to get a random result.\n Type `help` for more info.')
                 return
 
     #----------------------------
@@ -66,7 +66,7 @@ class Carousing(commands.Cog):
             file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Carousing', icon_url='attachment://prohibited.png')
-            embed.add_field(name='__Error__', value=f"That was not a valid choice. Simply type `{self.prefix}carousing`, `{self.prefix}carouse`, `self.prefixdrinking`, `self.prefixgetdrinks`, or `self.prefixpubcrawl` to get a selection from the table.", inline=False)
+            embed.add_field(name='__Error__', value=f"That was not a valid choice. Simply type `!carousing`, `!carouse`, `self.prefixdrinking`, `self.prefixgetdrinks`, or `self.prefixpubcrawl` to get a selection from the table.", inline=False)
 
             self.bot.logger.error(f'Invalid input for carousing command.')
             if discord.ChannelType == "private":
