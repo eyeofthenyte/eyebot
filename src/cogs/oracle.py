@@ -41,7 +41,7 @@ class Oracle (commands.Cog):
                 await ctx.send(file=file, embed=embed)
 
 
-    @commands.command(extras=[":crystal_ball:  **__Oracle__**", "**Usage: `!oracle q`\n Where `question = the question you want to ask`**\nSimple general responses to questions. Careful the oracle can be a bit sassy!"])
+    @commands.command(extras=[":crystal_ball:  **__Oracle__**", "**Usage: `!oracle q`\n Where `question = the question you want to ask`**\nSimple general responses to questions. Requires at least a 2 word question. Careful the oracle can be a bit sassy!"])
     async def oracle(self, ctx, *, question):
         replies = ["Yes.", "No.", "I said NO!", "Do you really want an answer to that?", "Ask again later.", "Go play in the street.", "Shut your cock holster!","How can you even ask something like that?", "If you don't know the answer already I certainly can't help you.", "Lets be honest you could use the life experience.", "Lets just say... your best option would be to put your head between your legs and kiss your ass goodbye.", "Definitely maybe.", "Ask me again someday.", "*~Unintelligable, Yet Frightening Wispers~*","*~Disembodied Laughter of Children~*"];
         if (int(question.count(" ")) >= 2):
