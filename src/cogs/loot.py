@@ -27,15 +27,15 @@ class Loot(commands.Cog):
         if isinstance(error, commands.MissingRequiredArgument):
             self.bot.logger.log(f'missing or invalid argument for .loot')
             m_Response = "That's not a valid input. Please try again or `!loot ?` for more information."
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
+            icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Indivdual Treasure', icon_url='attachment://prohibited.png')
             embed.add_field(name='**__Error__**', value=f'{m_Response}', inline=False)
 
         if discord.ChannelType == "private":
-            await ctx.message.author.send(file=file, embed=embed)
+            await ctx.message.author.send(file=icon, embed=embed)
         elif discord.ChannelType != "private":
-            await ctx.send(file=file, embed=embed)
+            await ctx.send(file=icon, embed=embed)
 
 
     #----------------------------
@@ -64,7 +64,7 @@ class Loot(commands.Cog):
             else:
                 list[0] = 'There was an error.'
             m_Response = "At the end of your job you find... \n" + list[0] + "."
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/coin.png'), filename='coin.png')
+            icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/coin.png'), filename='coin.png')
             embed = discord.Embed(color=0xffe449)
             embed.set_author(name='Indivdual Treasure', icon_url='attachment://coin.png')
             embed.add_field(name='**__Challange 0 - 4__**', value=f'{m_Response}', inline=False)
@@ -89,7 +89,7 @@ class Loot(commands.Cog):
             else:
                 list[0] = 'There was an error.'
             m_Response = "At the end of your job you find...\n" + list[0] + '\n' + list[1]
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/coin.png'), filename='coin.png')
+            icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/coin.png'), filename='coin.png')
             embed = discord.Embed(color=0xffe449)
             embed.set_author(name='Indivdual Treasure', icon_url='attachment://coin.png')
             embed.add_field(name='**__Challange 5 - 10__**', value=f'{m_Response}', inline=False)
@@ -111,7 +111,7 @@ class Loot(commands.Cog):
             else:
                 list[0] = 'There was an error.'
             m_Response = "At the end of your job you find...\n" + list[0] + '\n' + list[1]
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/coin.png'), filename='coin.png')
+            icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/coin.png'), filename='coin.png')
             embed = discord.Embed(color=0xffe449)
             embed.set_author(name='Indivdual Treasure', icon_url='attachment://coin.png')
             embed.add_field(name='**__Challange 11 - 16__**', value=f'{m_Response}', inline=False)
@@ -130,7 +130,7 @@ class Loot(commands.Cog):
             else:
                 list[0] = 'There was an error.'
             m_Response = "At the end of your job you find...\n" + list[0] + '\n' + list[1]
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/coin.png'), filename='coin.png')
+            icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/coin.png'), filename='coin.png')
             embed = discord.Embed(color=0xffe449)
             embed.set_author(name='Indivdual Treasure', icon_url='attachment://coin.png')
             embed.add_field(name='**__Challange 17+__**', value=f'{m_Response}', inline=False)
@@ -138,17 +138,17 @@ class Loot(commands.Cog):
         else:
             self.bot.logger.log(f'{ctx.message.author} entered invalid hoard opterator')
             m_Response = "That's not a valid input. Please try again or `!help loot` for more information."
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
+            icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Indivdual Treasure', icon_url='attachment://prohibited.png')
             embed.add_field(name='**__Error__**', value=f'{m_Response}', inline=False)
 
         if discord.ChannelType == "private":
             self.bot.logger.log(f'{ctx.message.author} rolled for loot from table {select}.')
-            await ctx.message.author.send(file=file, embed=embed)
+            await ctx.message.author.send(file=icon, embed=embed)
         elif discord.ChannelType != "private":
             self.bot.logger.log(f'{ctx.message.author} rolled for loot from table {select}.')
-            await ctx.send(file=file, embed=embed)
+            await ctx.send(file=icon, embed=embed)
 
 async def setup(bot):
     await bot.add_cog(Loot(bot))

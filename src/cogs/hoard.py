@@ -26,15 +26,15 @@ class Hoard(commands.Cog):
         if isinstance(error, commands.MissingRequiredArgument):
             self.bot.logger.log(f'missing or invalid argument for .hoard')
             m_Response = "That's not a valid input. Please try again or `!hoard ?` for more information."
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
+            icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Treasure Hoard', icon_url='attachment://prohibited.png')
             embed.add_field(name='**__Error__**', value=f'{m_Response}', inline=False)
 
         if discord.ChannelType == "private":
-            await ctx.message.author.send(file=file, embed=embed)
+            await ctx.message.author.send(file=icon, embed=embed)
         elif discord.ChannelType != "private":
-            await ctx.send(file=file, embed=embed)
+            await ctx.send(file=icon, embed=embed)
 
     #----------------------------
     # Hoard Loot Generator
@@ -102,7 +102,7 @@ class Hoard(commands.Cog):
                         mlist[0] = mlist[0]
                     m2_Response[i] = mlist[0]
 
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/money-bag.png'), filename='money-bag.png')
+            icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/money-bag.png'), filename='money-bag.png')
             embed = discord.Embed(color=0xffe449)
             embed.set_author(name='Treasure Hoard', icon_url='attachment://money-bag.png')
             embed.add_field(name='**__Challange 0 - 4__**', value = str(m_Response).replace("and","\n") + '\n' + m_Magic[0] + str(m2_Response).replace("'","").replace("[","").replace("]","").replace(",","\n"), inline=False)
@@ -152,7 +152,7 @@ class Hoard(commands.Cog):
                         mlist[0] = mlist[0]
                     m2_Response[i] = mlist[0]
 
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/money-bag.png'), filename='money-bag.png')
+            icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/money-bag.png'), filename='money-bag.png')
             embed = discord.Embed(color=0xffe449)
             embed.set_author(name='Treasure Hoard', icon_url='attachment://money-bag.png')
             embed.add_field(name='**__Challange 5 - 10__**', value = str(m_Response).replace("and","\n") + '\n' + m_Magic[0] + str(m2_Response).replace("'","").replace("[","").replace("]","").replace(",","\n"), inline=False)
@@ -228,7 +228,7 @@ class Hoard(commands.Cog):
                         mlist2[0] = mlist2[0]
                     m3_Response[i] = mlist2[0]
 
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/money-bag.png'), filename='money-bag.png')
+            icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/money-bag.png'), filename='money-bag.png')
             embed = discord.Embed(color=0xffe449)
             embed.set_author(name='Treasure Hoard', icon_url='attachment://money-bag.png')
             embed.add_field(name='**__Challange 11 - 16__**', value = str(m_Response).replace("and","\n") + '\n' + m_Magic[0] + str(m2_Response).replace("'","").replace("[","").replace("]","").replace(",","\n") + m_Magic[1] + str(m3_Response).replace("'","").replace("[","").replace("]","").replace(",","\n"), inline=False)
@@ -281,7 +281,7 @@ class Hoard(commands.Cog):
                         mlist[0] = mlist[0]
                     m2_Response[i] = mlist[0]
 
-                file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/money-bag.png'), filename='money-bag.png')
+                icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/money-bag.png'), filename='money-bag.png')
                 embed = discord.Embed(color=0xffe449)
                 embed.set_author(name='Treasure Hoard', icon_url='attachment://money-bag.png')
                 embed.add_field(name='**__Challange 17+__**', value = str(m_Response).replace("and","\n") + '\n' + m_Magic[0] + str(m2_Response).replace("'","").replace("[","").replace("]","").replace(",","\n"), inline=False)
@@ -289,7 +289,7 @@ class Hoard(commands.Cog):
         else:
             self.bot.logger.log(f'invalid hoard opterator entered.')
             m_Response = "That's not a valid input. Please try again or `!help hoard` for more information."
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
+            icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Treasure Hoard', icon_url='attachment://prohibited.png')
             embed.add_field(name='**__Error__**', value=f'{m_Response}', inline=False)
@@ -304,7 +304,7 @@ class Hoard(commands.Cog):
                 self.bot.logger.log(f'{ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]} {list[8]}')
             elif select == '4':
                 self.bot.logger.log(f'{ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]}')
-            await ctx.message.author.send(file=file, embed=embed)
+            await ctx.message.author.send(file=icon, embed=embed)
             return
         elif discord.ChannelType != "private":
             if select == '1':
@@ -315,7 +315,7 @@ class Hoard(commands.Cog):
                 self.bot.logger.log(f'{ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]} {list[8]}')
             elif select == '4':
                 self.bot.logger.log(f'{ctx.message.author} rolled for hoard loot from table {select} & magic table(s) {list[4]}')
-            await ctx.send(file=file, embed=embed)
+            await ctx.send(file=icon, embed=embed)
             return
 
 

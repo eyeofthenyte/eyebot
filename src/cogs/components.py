@@ -84,23 +84,16 @@ class Components(commands.Cog):
                             qty = str(random.randrange(1,5))
 
                     m_Response = str(qty) + "x " + list[2]
-                    file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/'+icon[i]+'.png'))
+                    icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/'+icon[i]+'.png'))
                     self.bot.logger.log(f'Components from the ' + pick.upper() + ' biome were found.')
                     embed = discord.Embed(color=0x019cd0)
                     embed.set_author(name = pick.upper() + ' BIOME COMPONENTS', icon_url='attachment://'+icon[i]+'.png')
                     embed.add_field(name = 'You found the following alchemic components:', value = m_Response, inline=False)
 
-        elif pick == '?':
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
-            embed = discord.Embed(color=0x019cd0)
-            embed.set_author(name='Help (Collect)', icon_url='attachment://warning.png')
-            embed.add_field(name='**__Collect__**', value=f"**Usage: `!collect b`\nwhere `b = biome`**\nValid biome selections are:\n arctic, desert, forest, grass, hills, mountain, swamp, underdark, water, and common(not a biome but a list of components that can be found in any biome)", inline=False)
-            self.bot.logger.log(f'{ctx.message.author} asked for help with !collect.')
-
         else:
             self.bot.logger.log(f'there was an error.')
 
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
+            icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Collect', icon_url='attachment://prohibited.png')
             embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select an available biome. Type `!help collect` for more info.", inline=False)
@@ -108,9 +101,9 @@ class Components(commands.Cog):
             self.bot.logger.log(f'{ctx.message.author} gave an invalid input for collect command.')
 
         if discord.ChannelType == "private":
-            await ctx.message.author.send(file=file, embed=embed)
+            await ctx.message.author.send(file=icon, embed=embed)
         elif discord.ChannelType != "private":
-            await ctx.send(file=file, embed=embed)
+            await ctx.send(file=icon, embed=embed)
 
     #----------------------------
     # Info Command
@@ -131,7 +124,7 @@ class Components(commands.Cog):
                 if select.lower() == c_list[i].lower():
                     biomeicons = str(ws.cell(i+1,6).value).replace('Arctic',':snowflake:').replace('Any',':world_map:').replace('Desert',':desert:').replace('Forest',':deciduous_tree:').replace('Grasslands',':seedling:').replace('Hills',':sunrise_over_mountains:').replace('Mountain',':mountain:').replace('Swamp',':ear_of_rice:').replace('Underdark',':hole:').replace('Coastal',':water_wave:')
                     self.bot.logger.log(f'The entry for ' + select.upper() + ' was requested.')
-                    file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/open-book.png'), filename='open-book.png')
+                    icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/open-book.png'), filename='open-book.png')
                     embed = discord.Embed(color=0x019cd0, title="ALCHEMIST'S JOURNAL")
                     embed.set_author(name = f'DESCRIPTION', icon_url='attachment://open-book.png')
                     embed.add_field(name = f'__*{select.upper()}*__     {biomeicons}', value=f'*{ws.cell(i+1,2).value}*', inline=False)
@@ -140,7 +133,7 @@ class Components(commands.Cog):
 
         elif select == 'list':
             components = str(c_list).replace("'","").replace("[","").replace("]","").replace('"','')
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/open-book.png'), filename='open-book.png')
+            icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/open-book.png'), filename='open-book.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Table of Contents', icon_url='attachment://open-book.png')
             embed.add_field(name='**__Herbs__**', value=str(components).replace(',','\n'), inline=False)
@@ -149,7 +142,7 @@ class Components(commands.Cog):
         else:
             self.bot.logger.log(f'there was an error.')
 
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
+            icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Herb Info', icon_url='attachment://prohibited.png')
             embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select a component that has an entry. Type `!help hinfo` for more info.", inline=False)
@@ -157,9 +150,9 @@ class Components(commands.Cog):
             self.bot.logger.log(f'{ctx.message.author} gave an invalid input for herb command.')
 
         if discord.ChannelType == "private":
-            await message.author.send(file=file, embed=embed)
+            await message.author.send(file=icon, embed=embed)
         elif discord.ChannelType != "private":
-            await ctx.send(file=file, embed=embed)
+            await ctx.send(file=icon, embed=embed)
 
     #----------------------------
     # Potion Command
@@ -203,7 +196,7 @@ class Components(commands.Cog):
 
                 self.bot.logger.log(f'A potion DC was generated.')
 
-                file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/alembic.png'), filename='alembic.png')
+                icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/alembic.png'), filename='alembic.png')
                 embed = discord.Embed(color=0x019cd0)
                 embed.set_author(name = 'POTION DIFFICULTY', icon_url='attachment://alembic.png')
                 embed.add_field(name = '__Alchemy Attempt DC__', value = f"The difficulty for a potion\poison\enchantment made from:\n{c_Response}\n\n 10 {m_Response} = **`{total}`**", inline=False)
@@ -211,13 +204,13 @@ class Components(commands.Cog):
             except Exception as e:
                 self.bot.logger.log(f'there was an error: {e}')
 
-                file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
+                icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
                 embed = discord.Embed(color=0xcc0000)
                 embed.set_author(name='Potion', icon_url='attachment://prohibited.png')
                 embed.add_field(name='__Error__', value=f"That was not a valid choice. Try again or type `!help potion` for more info.", inline=False)
 
         else:
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
+            icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Potion', icon_url='attachment://prohibited.png')
             embed.add_field(name='__Error__', value=f"That was not a valid choice. Try again or type `!help potion` for more info.", inline=False)
@@ -225,9 +218,9 @@ class Components(commands.Cog):
             self.bot.logger.log(f'{ctx.message.author} gave an invalid input for potion command.')
 
         if discord.ChannelType == "private":
-            await ctx.message.author.send(file=file, embed=embed)
+            await ctx.message.author.send(file=icon, embed=embed)
         elif discord.ChannelType != "private":
-            await ctx.send(file=file, embed=embed)
+            await ctx.send(file=icon, embed=embed)
 
     #----------------------------
     # Poison Command
@@ -273,7 +266,7 @@ class Components(commands.Cog):
 
                     self.bot.logger.log(f'A poison DC was generated.')
 
-                    file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/test-tube.png'), filename='test-tube.png')
+                    icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/test-tube.png'), filename='test-tube.png')
                     embed = discord.Embed(color=0x019cd0)
                     embed.set_author(name = 'POISON DIFFICULTY', icon_url='attachment://test-tube.png')
                     embed.add_field(name = '__Alchemy Attempt DC__', value = f"The difficulty for a poison made from:\n{c_Response}\n\n 10 {m_Response} = **`{total}`**", inline=False)
@@ -281,13 +274,13 @@ class Components(commands.Cog):
             except Exception as e:
                 self.bot.logger.log(f'There was an error.: {e}')
 
-                file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
+                icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
                 embed = discord.Embed(color=0xcc0000)
                 embed.set_author(name='Poison', icon_url='attachment://prohibited.png')
                 embed.add_field(name='__Error__', value=f"That was not a valid choice. Try again or type `!help poison` for more info.", inline=False)
 
         else:
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
+            icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Poison', icon_url='attachment://prohibited.png')
             embed.add_field(name='__Error__', value=f"That was not a valid choice. Try again or type `!help poison` for more info.", inline=False)
@@ -295,9 +288,9 @@ class Components(commands.Cog):
             self.bot.logger.log(f'{ctx.message.author} gave an invalid input for poison command.')
 
         if discord.ChannelType == "private":
-            await ctx.message.author.send(file=file, embed=embed)
+            await ctx.message.author.send(file=icon, embed=embed)
         elif discord.ChannelType != "private":
-            await ctx.send(file=file, embed=embed)
+            await ctx.send(file=icon, embed=embed)
 
 async def setup(bot):
     await bot.add_cog(Components(bot))

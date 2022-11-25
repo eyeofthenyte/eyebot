@@ -37,14 +37,14 @@ class Trinket(commands.Cog):
         if isinstance(error, commands.MissingRequiredArgument):
             self.bot.logger.log(f'{ctx.message.author}is missing or invalid argument for !trinket')
             error_m = f'Please select one of the following classes:\n' + str(sheet_list).replace("'","").replace("[","").replace("]","") + f'.\n Type `!trinket ?` for more info.'
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
+            icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Trinket', icon_url='attachment://prohibited.png')
             embed.add_field(name='__Error__', value=f'{error_m}', inline=False)
             if discord.ChannelType == "private":
-                await ctx.message.author.send(file=file, embed=embed)
+                await ctx.message.author.send(file=icon, embed=embed)
             elif discord.ChannelType != "private":
-                await ctx.send(file=file, embed=embed)
+                await ctx.send(file=icon, embed=embed)
 
 
     #----------------------------
@@ -58,7 +58,7 @@ class Trinket(commands.Cog):
                     worksheet = s.worksheet(str(sheet_list[i]))
                     v_list = worksheet.col_values(2)
                     v_list = list(filter(None, v_list))
-                    file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/classes/'+select.lower()+'.jpeg'), filename=select.lower()+'.jpeg')
+                    icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/classes/'+select.lower()+'.jpeg'), filename=select.lower()+'.jpeg')
                     self.bot.logger.log(f'{ctx.message.author} drew a random trinket from the ' + select.upper() + ' list.')
                     embed = discord.Embed(color=0x019cd0)
                     embed.set_thumbnail(url = 'attachment://'+select.lower()+'.jpeg')
@@ -67,16 +67,16 @@ class Trinket(commands.Cog):
 
         else:
             self.bot.logger.log(f'there was an error.')
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
+            icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Trinket', icon_url='attachment://prohibited.png')
             embed.add_field(name='__Error__', value=f"That was not a valid choice. Please select an available Character Class. Type `!help trinket` for more info.", inline=False)
             self.bot.logger.log(f'Invalid input for !trinket command.')
 
         if discord.ChannelType == "private":
-            await ctx.message.author.send(file=file, embed=embed)
+            await ctx.message.author.send(file=icon, embed=embed)
         elif discord.ChannelType != "private":
-            await ctx.send(file=file, embed=embed)
+            await ctx.send(file=icon, embed=embed)
 
 
 async def setup(bot):

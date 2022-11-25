@@ -35,7 +35,7 @@ class WildMagic(commands.Cog):
                lines = open(os.path.join(os.path.dirname(__file__), 'wildmagic/randommagicaleffects2.0.txt')).read().splitlines()
                self.bot.logger.log('A magical surge was chosen from NLoRME v1.2.')
                surge=random.choice(lines)
-               file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/sparkles.png'), filename='sparkles.png')
+               icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/sparkles.png'), filename='sparkles.png')
                embed = discord.Embed(color=0x019cd0)
                embed.set_thumbnail(url='attachment://sparkles.png')
                embed.set_author(name='Wild Magic')
@@ -48,7 +48,7 @@ class WildMagic(commands.Cog):
                 lines = open(os.path.join(os.path.dirname(__file__), 'wildmagic/randommagicaleffects2.0.txt')).read().splitlines()
                 self.bot.logger.log('A magical surge was chosen NLoRME v2.0.')
                 surge=random.choice(lines)
-                file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/sparkles.png'), filename='sparkles.png')
+                icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/sparkles.png'), filename='sparkles.png')
                 embed = discord.Embed(color=0x019cd0)
                 embed.set_thumbnail(url='attachment://sparkles.png')
                 embed.set_author(name='Wild Magic')
@@ -58,16 +58,16 @@ class WildMagic(commands.Cog):
 
         else:
             self.bot.logger.log(f'Invalid input for !wildmagic command.')
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
+            icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Wild Magic', icon_url='attachment://prohibited.png')
             embed.add_field(name='__Error__', value=f'That is not a valid input. Please try again or use `!help wildmagic` for more information.', inline=False)
 
 
         if discord.ChannelType == "private":
-            await ctx.message.author.send(file=file, embed=embed)
+            await ctx.message.author.send(file=icon, embed=embed)
         elif discord.ChannelType != "private":
-            await ctx.send(file=file, embed=embed)
+            await ctx.send(file=icon, embed=embed)
 
 async def setup(bot):
     await bot.add_cog(WildMagic(bot))

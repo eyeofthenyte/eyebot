@@ -48,7 +48,7 @@ class Help (commands.Cog):
 
         if commands.is_owner() or (ctx.author==ctx.guild.owner or ctx.author.has_permissions(administrator=True)):
 
-            file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
+            icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name=f'Available Commands', icon_url='attachment://warning.png')
             embed.add_field(name=f'**__Commands__**', value="Below is a list of the individual commands available and all aliases that can be used to activate a given command.\n\n" + "\n".join(cmd_list), inline=False)
@@ -56,16 +56,16 @@ class Help (commands.Cog):
 
         else:
             cmd_list.remove('reload','load','unload','servers','shutdown')
-            file = discord.File(os.path.join(os.path.dirname(__file__) + '/../../images/system/warning.png'), filename='warning.png')
+            icon = discord.File(os.path.join(os.path.dirname(__file__) + '/../../images/system/warning.png'), filename='warning.png')
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name=f'Available Commands', icon_url='attachment://warning.png')
             embed.add_field(name=f'**__Commands__**', value=f"\n".join(cmd_list), inline=False)
             print("Displayed all commands available to Users.")
 
         if discord.ChannelType == "private":
-            await ctx.message.author.send(file=file, embed=embed)
+            await ctx.message.author.send(file=icon, embed=embed)
         elif discord.ChannelType != "private":
-            await ctx.send(file=file, embed=embed)
+            await ctx.send(file=icon, embed=embed)
 
 
     # ---------------------------------------------------------
@@ -95,18 +95,18 @@ class Help (commands.Cog):
 
         help_list = get_help()
 
-        file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
+        icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/warning.png'), filename='warning.png')
         embed = discord.Embed(color=0x019cd0)
         embed.set_author(name=f'Command Help', icon_url='attachment://warning.png')
         embed.add_field(name=help_list[0], value=help_list[1], inline=False)
 
         if discord.ChannelType == "private":
-            await ctx.message.author.send(file=file, embed=embed)
+            await ctx.message.author.send(file=icon, embed=embed)
         elif discord.ChannelType != "private":
-            await ctx.send(file=file, embed=embed)
+            await ctx.send(file=icon, embed=embed)
 
         #if commands.is_owner() or (ctx.author==ctx.guild.owner or ctx.author.has_permissions(administrator=True)):
-        #    file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
+        #    icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
         #    embed = discord.Embed(color=0x019cd0)
         #    embed.set_author(name=f'All Command Help', icon_url='attachment://prohibited.png')
         #    embed.add_field(name=f':dollar:  **__Loot__**', value=f'**Usage: `{self.prefix}loot #` where `# = 1-4`**\n Number corresponds to the 4 Individual Treasure tables in Dungeon Master's Guide - Chapter 7.\nThis will generate all coins randomly based on table selected.\n", inline=False)
@@ -128,7 +128,7 @@ class Help (commands.Cog):
         #    print("Displayed Help for  Administrators or Server Owners.")
 
         #else:
-        #    file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
+        #    icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
         #    embed = discord.Embed(color=0x019cd0)
         #    embed.set_author(name=f'All Command Help', icon_url='attachment://prohibited.png')
         #    embed.add_field(name=f':dollar:  **__Loot__**', value=f"**Usage: `{self.prefix}loot #` where `# = 1-4`**\n Number corresponds to the 4 Individual Treasure tables in Dungeon Master's Guide - Chapter 7.\nThis will generate all coins randomly based on table selected.\n", inline=False)
