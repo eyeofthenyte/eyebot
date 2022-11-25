@@ -57,7 +57,7 @@ class Components(commands.Cog):
 
         pick = select
         biome = ['arctic','common','desert','forest','grass','hills','mountain','swamp','underdark','water']
-        icon = ['snowflake','world-map','desert','deciduous-tree','seedling','sunrise-over-mountains','mountain','sheaf-of-rice','hole','water-wave']
+        bicon = ['snowflake','world-map','desert','deciduous-tree','seedling','sunrise-over-mountains','mountain','sheaf-of-rice','hole','water-wave']
         w = ["0", "1", "2", "8", "9", "10"]
         percentage = random.randrange(1,101)
         if pick.lower() in str(biome).lower():
@@ -84,10 +84,10 @@ class Components(commands.Cog):
                             qty = str(random.randrange(1,5))
 
                     m_Response = str(qty) + "x " + list[2]
-                    icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/'+icon[i]+'.png'))
+                    icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/'+bicon[i]+'.png'), filename=bicon[i]+'.png')
                     self.bot.logger.log(f'Components from the ' + pick.upper() + ' biome were found.')
                     embed = discord.Embed(color=0x019cd0)
-                    embed.set_author(name = pick.upper() + ' BIOME COMPONENTS', icon_url='attachment://'+icon[i]+'.png')
+                    embed.set_author(name = pick.upper() + ' BIOME COMPONENTS', icon_url='attachment://'+bicon[i]+'.png')
                     embed.add_field(name = 'You found the following alchemic components:', value = m_Response, inline=False)
 
         else:
