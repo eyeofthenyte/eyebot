@@ -25,7 +25,7 @@ class Hoard(commands.Cog):
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
             self.bot.logger.log(f'missing or invalid argument for .hoard')
-            m_Response = "That's not a valid input. Please try again or `!hoard ?` for more information."
+            m_Response = "That's not a valid input. Please try again or `!help hoard` for more information."
             icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Treasure Hoard', icon_url='attachment://prohibited.png')

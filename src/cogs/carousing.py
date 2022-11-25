@@ -33,12 +33,12 @@ class Carousing(commands.Cog):
     async def cog_command_error(self, ctx, error):
         self.bot.logger.error(f'Carousing encountered error {error}')
         if isinstance(error, commands.MissingRequiredArgument):
-            self.bot.logger.error(f'{ctx.message.author} is missing or invalid argument for .carousing')
+            self.bot.logger.error(f'{ctx.message.author} is missing or invalid argument for carousing')
             if discord.ChannelType == "private":
-                await ctx.message.author.send(f'Please only type `!carousing` to get a random result.\n Type `help` for more info.')
+                await ctx.message.author.send(f'Please only type `!carousing` to get a random result.\n Type `!help carousing` for more info.')
                 return
             else:
-                await ctx.send(f'Please only type `!carousing` to get a random result.\n Type `help` for more info.')
+                await ctx.send(f'Please only type `!carousing` to get a random result.\n Type `!help carousing` for more info.')
                 return
 
     #----------------------------
