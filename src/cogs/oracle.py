@@ -28,16 +28,15 @@ class Oracle (commands.Cog):
     async def cog_command_error(self, ctx, error):
         if isinstance(error, commands.MissingRequiredArgument):
             self.bot.logger.log(f'missing or invalid argument for oracle')
-            m_Response = f"That's not a valid input. Please try again or `self.prefixoracle ?` for more information."
+            m_Response = f"That's not a valid input. Please try again or `!help oracle` for more information."
             file = discord.File(os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png'), filename='prohibited.png')
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Oracle', icon_url='attachment://prohibited.png')
             embed.add_field(name='**__Error__**', value=f"{m_Response}", inline=False)
+
             if discord.ChannelType == "private":
-                self.bot.logger.log(f"{ctx.message.author} has asked the oracle something it doesn't understand")
                 await ctx.message.author.send(file=file, embed=embed)
             elif discord.ChannelType != "private":
-                self.bot.logger.log(f"{ctx.message.author} has asked the oracle something it doesn't understand")
                 await ctx.send(file=file, embed=embed)
 
 
@@ -49,13 +48,7 @@ class Oracle (commands.Cog):
             embed = discord.Embed(color=0x019cd0)
             embed.set_author(name='Oracle', icon_url='attachment://crystal-ball.png')
             embed.add_field(name='__Response__', value=random.choice(replies), inline=False)
-
-            if discord.ChannelType == "private":
-                self.bot.logger.log(f'{ctx.message.author} has sought guidance.')
-                await ctx.message.author.send(file=file, embed=embed)
-            elif discord.ChannelType != "private":
-                self.bot.logger.log(f'{ctx.message.author} has sought guidance.')
-                await ctx.send(file=file, embed=embed)
+            self.bot.logger.log(f'{ctx.message.author} has sought guidance.')
 
         else:
             m_Response = f"That's not a valid input. Please try again or `!help oracle` for more information."
@@ -63,12 +56,12 @@ class Oracle (commands.Cog):
             embed = discord.Embed(color=0xcc0000)
             embed.set_author(name='Oracle', icon_url='attachment://prohibited.png')
             embed.add_field(name='**__Error__**', value=f"{m_Response}", inline=False)
-            if discord.ChannelType == "private":
-                self.bot.logger.log(f"{ctx.message.author} has asked the oracle something it doesn't understand")
-                await ctx.message.author.send(file=file, embed=embed)
-            elif discord.ChannelType != "private":
-                self.bot.logger.log(f"{ctx.message.author} has asked the oracle something it doesn't understand")
-                await ctx.send(file=file, embed=embed)
+            self.bot.logger.log(f"{ctx.message.author} has asked the oracle something it doesn't understand")
+
+        if discord.ChannelType == "private": 
+            await ctx.message.author.send(file=file, embed=embed)
+        elif discord.ChannelType != "private":
+            await ctx.send(file=file, embed=embed)
 
 
 async def setup(bot):
