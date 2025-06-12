@@ -5,6 +5,6 @@
 **Garnet**;*(transparent red, brown-green, or violet)*
 **Jade**;*(translucent light green, deep green, or white)*
 **Jet**;*(opaque deep black)*
-**Pearl**;*(opaque lustrous white, yellow, or pink)*
+**Pearl**;*(opaque lustrous white, yellow, pink, or silver)*
 **Spinel**;*(transparent red, red-brown, or deep green)*
 **Tourmaline**;*(transparent pale green, blue, brown, or red)*

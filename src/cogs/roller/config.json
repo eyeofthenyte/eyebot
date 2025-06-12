@@ -1,0 +1,57 @@
+{
+  "894086190603595826": {
+    "aliases": {
+      "stats": {
+        "expression": "4d6k3i6",
+        "creator": "eyeofthenyte#0",
+        "created": "2025-06-07T18:55:52.318582"
+      }
+    },
+    "dm_channel": "UNSET",
+    "dm_role": "UNSET",
+    "guild_name": "Tanisjr's D&D Hideout",
+    "user_channels": {}
+  },
+  "999770956203556944": {
+    "aliases": {
+      "Nyssas Punishment": {
+        "expression": "3d6",
+        "creator": "eyeofthenyte#0",
+        "created": "2025-06-07T19:13:12.189800"
+      },
+      "Kais Lesson": {
+        "expression": "3d6",
+        "creator": "eyeofthenyte#0",
+        "created": "2025-06-07T19:13:59.787166"
+      },
+      "Mirras Correction": {
+        "expression": "3d6",
+        "creator": "eyeofthenyte#0",
+        "created": "2025-06-07T20:59:57.233116"
+      }
+    },
+    "dm_channel": "1000501674013638697",
+    "dm_role": "DM",
+    "guild_name": "Whalinvale",
+    "user_channels": {
+      "429109319171309578": "1007403102346936420",
+      "540540073070952464": "1356147907358752812",
+      "652474333767270400": "1007403202464993280",
+      "315965340750184448": "1356158326370734184"
+    }
+  },
+  "225623840489734144": {
+    "dm_channel": "UNSET",
+    "dm_role": "UNSET",
+    "guild_name": "The Grand Draconaeum",
+    "aliases": {},
+    "user_channels": {}
+  },
+  "812512379397079041": {
+    "dm_channel": "UNSET",
+    "dm_role": "UNSET",
+    "guild_name": "DND",
+    "aliases": {},
+    "user_channels": {}
+  }
+}

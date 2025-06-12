@@ -1,8 +1,10 @@
-**Black opal**;*(translucent dark green with black mottling and golden flecks)*
-**Blue sapphire**;*(transparent blue-white to medium blue)*
+**Black Opal**;*(translucent dark green with black mottling and golden flecks)*
+**Black Star Sapphire**;*(translucent to opaque black with golden inclusions forming a star when polished)*
+**Blue Sapphire**;*(transparent blue-white to medium blue)*
+**Corundum**;*(transparent firey yellow to rich purple)*
 **Emerald**;*(transparent deep bright green)*
-**Fire opal**;*(translucent fiery red)*
+**Fire Opal**;*(translucent fiery red)*
 **Opal**;*(translucent pale blue with green and golden mottling)*
-**Star ruby**;*(translucent ruby with white star-shaped center)*
-**Star sapphire**;*(translucent blue sapphire with white star-shaped center)*
-**Yellow sapphire**;*(transparent fiery yellow or yellow-green)*
+**Star Ruby**;*(translucent ruby with white star-shaped center)*
+**Star Sapphire**;*(translucent blue sapphire with white star-shaped center)*
+**Yellow Sapphire**;*(transparent fiery yellow or yellow-green)*
