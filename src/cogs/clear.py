@@ -17,9 +17,7 @@ class Clear(commands.Cog):
     def cog_unload(self):
         self.timer_loop.cancel()
 
-    # ---------------------------------------
     # Config Handling
-    # ---------------------------------------
     def load_config(self):
         default = {
             "mod_channels": {},
@@ -46,9 +44,7 @@ class Clear(commands.Cog):
         with open(CONFIG_PATH, "w") as f:
             json.dump(self.config, f, indent=4)
 
-    # ---------------------------------------
     # Mod Channel Setup
-    # ---------------------------------------
     async def ensure_mod_channel(self, ctx):
         guild_id = str(ctx.guild.id)
         current = self.config["mod_channels"].get(guild_id)
@@ -167,16 +163,53 @@ class Clear(commands.Cog):
         return None
 
     # ---------------------------------------
-    # Commands
+    # Clear Command
     # ---------------------------------------
-    @commands.command(name="clear", aliases=["purge"], as=[":wastebasket:  **__Clear__**", "**Usage: `!clear # `\nWhere `# = number of messages you want to clear`**\nWill delete the number of messeges indicated or 100 if no number is given.\n"])
+    @commands.command(name="clear", aliases=["purge"])
     @commands.has_permissions(manage_messages=True)
     async def clear(self, ctx, amount: int = 100):
+        """
+        Delete a number of recent messages from the current channel.
+
+        - Deletes up to 100 messages (default if none specified).
+        - Requires Manage Messages permission.
+        - Prompts for confirmation if deleting more than 5 messages.
+        - Logs deletion in the mod channel (if enabled).
+
+        Usage:
+        `!clear #`
+        `!purge #`
+        `!clear`          ← deletes 100 messages (with confirmation)
+        """
+
         mod_channel = await self.ensure_mod_channel(ctx)
         if amount < 1:
             return await ctx.send(":x: Amount must be at least 1.")
 
         amount = min(amount, 100)
+
+        if amount > 5:
+            confirm = await ctx.send(
+                f"⚠️ You are about to delete **{amount}** messages.\nReact with ✅ to confirm, ❌ to cancel."
+            )
+            await confirm.add_reaction("✅")
+            await confirm.add_reaction("❌")
+
+            def check(reaction, user):
+                return user == ctx.author and reaction.message.id == confirm.id and str(reaction.emoji) in ["✅", "❌"]
+
+            try:
+                reaction, _ = await self.bot.wait_for("reaction_add", timeout=30.0, check=check)
+            except asyncio.TimeoutError:
+                await confirm.edit(content="⏳ Timed out. No messages were deleted.")
+                return
+
+            if str(reaction.emoji) == "❌":
+                await confirm.edit(content="❌ Deletion cancelled.")
+                return
+
+            await confirm.delete()
+
         deleted = await ctx.channel.purge(limit=amount + 1)
         await ctx.send(f":wastebasket: Cleared {len(deleted) - 1} messages.", delete_after=5)
 
@@ -189,9 +222,34 @@ class Clear(commands.Cog):
             )
             await mod_channel.send(embed=embed)
 
+    # ---------------------------------------
+    # Set Mod Channel Command
+    # ---------------------------------------
     @commands.command(name="setmodchannel", extras=[":bookmark:  **__Set Mod Channel__**", "**Usage: `!setmodchannel`**\n:one: Will keep current channel.\n:two: Will reset to new channel.\n:three: Will create a new mod channel.\n:mute: Disables mod channel\n:x: Cancels out of menu and applies no changes."])
     @commands.has_permissions(manage_guild=True)
     async def set_mod_channel(self, ctx):
+        """
+        Interactive setup for the mod log channel.
+
+        Allows server managers to:
+        • ✅ Keep the current mod channel
+        • 🔁 Reset and choose a new one
+        • 🆕 Create a `mod-logs` channel automatically
+        • 🔇 Disable logging
+        • ❌ Cancel the setup
+
+        Used for logging actions like message clearing and auto-clear timers.
+
+        Permissions:
+        • Requires Manage Server permission
+
+        Usage:
+        `!setmodchannel`
+        """
+
+        if ctx.guild is None:
+            return await ctx.send(":x: This command cannot be used in direct messages.")
+
         guild_id = str(ctx.guild.id)
         current_id = self.config["mod_channels"].get(guild_id)
         current_channel = ctx.guild.get_channel(current_id) if isinstance(current_id, int) else None
@@ -239,18 +297,60 @@ class Clear(commands.Cog):
             await ctx.send(":information: No mod channel set. Starting setup...")
             await self.ensure_mod_channel(ctx)
 
-    @commands.command(name="settimer")
+    @commands.command(name="timer")
     @commands.has_permissions(manage_channels=True)
-    async def settimer(self, ctx, interval: int, duration: int = None):
+    async def timer(self, ctx, interval: int, duration: int = None):
+        """
+        Sets or disables an auto-clear timer for the current channel.
+
+        When enabled, the bot will automatically clear messages every X minutes.
+        Optionally, you can set a duration (in minutes) for how long the timer runs.
+
+        Usage Examples:
+        • `!timer 10` → Clears every 10 minutes until disabled
+        • `!timer 5 60` → Clears every 5 minutes for 1 hour
+        • `!timer 0` → Disables the timer
+
+        Auto-clear events are logged to the mod channel (if configured).
+
+        Permissions:
+        • Requires Manage Channels
+
+        Examples:
+        !timer 15
+        !timer 5 30
+        !timer 0
+        """
+
+        if ctx.guild is None:
+            return await ctx.send(":x: This command cannot be used in direct messages.")
+
         mod_channel = await self.ensure_mod_channel(ctx)
         guild_id = str(ctx.guild.id)
         channel_id = str(ctx.channel.id)
+        timer_data = self.config.get("timers", {}).get(guild_id, {}).get(channel_id)
 
+        # Show current timer if no arguments provided
+        if interval is None:
+            if not timer_data:
+                return await ctx.send("📭 No timer set in this channel.")
+
+            interval_mins = timer_data.get("interval_minutes", "❓")
+            expires_at = timer_data.get("expires_at")
+            message = f"⏱️ Auto-clear interval: **{interval_mins}** minute(s)"
+            if expires_at:
+                try:
+                    end = datetime.fromisoformat(expires_at)
+                    message += f"\n🕓 Ends at: **{end.strftime('%Y-%m-%d %H:%M UTC')}**"
+                except Exception:
+                    message += "\n🕓 Ends at: Unknown format"
+            return await ctx.send(message)
+
+        # Disable timer
         if interval < 0:
             return await ctx.send(":stopwatch: Interval must be at least 0. Set to 0 to disable.")
 
         if interval == 0:
-            # Disable timer
             self.config["timers"].get(guild_id, {}).pop(channel_id, None)
             self.save_config()
             await ctx.send(f":octagonal_sign: Auto-clear timer disabled in {ctx.channel.mention}")
@@ -265,8 +365,8 @@ class Clear(commands.Cog):
                 await mod_channel.send(embed=embed)
             return
 
-        # Otherwise, set timer...
-        self.config["timers"].setdefault(guild_id, {})
+        # Set or update timer
+        self.config.setdefault("timers", {}).setdefault(guild_id, {})
         expires_at = None
         if duration:
             expires_at = (datetime.utcnow() + timedelta(minutes=duration)).isoformat()
@@ -279,9 +379,9 @@ class Clear(commands.Cog):
 
         self.save_config()
 
-        await ctx.send(f":white_check_mark: Auto-clear every {interval} minutes" + (f" for {duration} minutes." if duration else "."))
+        await ctx.send(f":white_check_mark: Auto-clear every {interval} minutes" +
+                       (f" for {duration} minutes." if duration else "."))
 
-        # 🔔 Log to mod channel
         if mod_channel:
             embed = discord.Embed(
                 title=":stopwatch: Auto-Clear Timer Set",

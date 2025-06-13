@@ -134,6 +134,7 @@ class Roll(commands.Cog):
             'advantage': advantage, 'disadvantage': disadvantage, 'repeat': repeat
         }
 
+
     # Rolls a die with optional reroll and explode logic.
     def roll_die(self, sides, reroll=None, explode=False, max_explode=10):
         def should_reroll(value):
@@ -229,53 +230,222 @@ class Roll(commands.Cog):
                 all_details.append((op, details, part))
         return total, all_details
 
+
     # ---------------------------------------
-    # Remove Alias (case sensitive)
+    # Alias Command
     # ---------------------------------------
-    @commands.command()
-    async def removealias(self, ctx, *, alias: str):
-        # Remove a saved alias for this server.
+    @commands.group(invoke_without_command=True)
+    async def alias(self, ctx):
+        """
+        Manage custom roll aliases that let you save and reuse dice expressions.
+
+        Subcommands:
+        • `add <name> <expression>` – Save a new alias
+        • `remove <name>` – Delete an alias (creator or mod only)
+        • `list [@user]` – View saved aliases, optionally for a specific user
+
+        Alias names can include spaces or hyphens (up to 32 characters).
+        Expressions must be valid dice syntax (e.g. 2d6+4, 1d20adv, etc.).
+
+        Examples:
+        `!alias add fireball big hit 8d6`
+        `!alias remove fireball big hit`
+        `!alias list`
+        `!alias list @MyUsername`
+        """
+        await ctx.send("Usage: `!alias add <name> <roll>`, `!alias remove <name>`, or `!alias list [@user]`")
+
+    # ---------------------------------------
+    # Add Alias
+    # ---------------------------------------
+    @alias.command(name="add")
+    async def alias_add(self, ctx, *, input_text: str):
+        """
+        Add a roll alias. Supports alias names with spaces and asks for confirmation before overwriting.
+
+        Usage:
+        `!alias add Name With Spaces <expression>`
+        """
+        guild_id = str(ctx.guild.id)
+
+        try:
+            alias_part, expression = re.split(r'\s+(?=\d+d\d+|\d+\b)', input_text.strip(), maxsplit=1)
+        except ValueError:
+            return await ctx.send("❌ Usage: `!alias add <alias name> <expression>`")
+
+        alias = alias_part.strip()
+
+        if not re.fullmatch(r'[\w\s\-]{1,32}', alias):
+            return await ctx.send("❌ Invalid alias name. Must be 1–32 characters with letters, numbers, spaces, or hyphens.")
+
+        try:
+            _ = self.roll_full_expression(expression)  # Validate expression
+        except ValueError as e:
+            return await ctx.send(f"❌ Invalid expression: {e}")
+
+        self.config.setdefault(guild_id, {}).setdefault("aliases", {})
+        existing = self.config[guild_id]["aliases"].get(alias)
+
+        if existing:
+            embed = discord.Embed(
+                title="⚠️ Confirm Overwrite",
+                description=(
+                    f"The alias `@{alias}` already exists:\n"
+                    f"> `{existing['expression']}` by {existing.get('creator', 'Unknown')}\n\n"
+                    f"Do you want to overwrite it with:\n"
+                    f"> `{expression}`?"
+                ),
+                color=discord.Color.orange()
+            )
+            embed.set_footer(text="React with ✅ to confirm, ❌ to cancel.")
+
+            msg = await ctx.send(embed=embed)
+            await msg.add_reaction("✅")
+            await msg.add_reaction("❌")
+
+            def check(reaction, user):
+                return user == ctx.author and reaction.message.id == msg.id and str(reaction.emoji) in ["✅", "❌"]
+
+            try:
+                reaction, _ = await self.bot.wait_for("reaction_add", timeout=30.0, check=check)
+            except asyncio.TimeoutError:
+                await msg.edit(content="⏳ Timed out. Alias was not changed.", embed=None)
+                return
+
+            if str(reaction.emoji) == "❌":
+                await msg.edit(content="❌ Alias update cancelled.", embed=None)
+                return
+
+            await msg.delete()
+
+        self.config[guild_id]["aliases"][alias] = {
+            "expression": expression,
+            "creator": str(ctx.author),
+            "created": datetime.utcnow().isoformat()
+        }
+
+        save_config(self.config)
+        try:
+            await ctx.message.delete()
+        except discord.Forbidden:
+            pass
+
+        await ctx.send(f"✅ Alias `@{alias}` {'updated' if existing else 'added'}.")
+
+    # ---------------------------------------
+    # Remove Alias (with confirmation)
+    # ---------------------------------------
+    @alias.command(name="remove")
+    async def alias_remove(self, ctx, *, alias: str):
+        """
+        Removes an alias if the user is the creator or has Manage Guild permission.
+
+        Usage:
+        `!alias remove <alias name>`
+        """
 
         try:
             await ctx.message.delete()
         except discord.Forbidden:
             pass
 
-        alias = alias.strip()
         guild_id = str(ctx.guild.id)
+        alias = alias.strip()
+        aliases = self.config.get(guild_id, {}).get("aliases", {})
 
-        if guild_id in self.config and alias in self.config[guild_id].get("aliases", {}):
-            del self.config[guild_id]["aliases"][alias]
+        if alias not in aliases:
+            return await ctx.send(f"❌ Alias `@{alias}` not found.")
+
+        alias_data = aliases[alias]
+        creator_str = alias_data.get("creator")
+
+        is_creator = creator_str == str(ctx.author)
+        is_mod = ctx.author.guild_permissions.manage_guild
+
+        if not (is_creator or is_mod):
+            return await ctx.send("❌ You don't have permission to remove this alias. Only the creator or a server mod can do that.")
+
+        # Send confirmation embed
+        embed = discord.Embed(
+            title="🗑️ Confirm Alias Deletion",
+            description=f"Are you sure you want to delete the alias `@{alias}`?\nCreated by: `{creator_str}`",
+            color=discord.Color.red()
+        )
+        embed.set_footer(text="React with ✅ to confirm, ❌ to cancel.")
+
+        confirm_msg = await ctx.send(embed=embed)
+        await confirm_msg.add_reaction("✅")
+        await confirm_msg.add_reaction("❌")
+
+        def check(reaction, user):
+            return (
+                user == ctx.author and
+                str(reaction.emoji) in ["✅", "❌"] and
+                reaction.message.id == confirm_msg.id
+            )
+
+        try:
+            reaction, _ = await self.bot.wait_for('reaction_add', timeout=20.0, check=check)
+        except asyncio.TimeoutError:
+            await confirm_msg.edit(content="⏳ Timed out. Alias not removed.", embed=None)
+            return
+
+        if str(reaction.emoji) == "✅":
+            del aliases[alias]
             save_config(self.config)
-            await ctx.send(f"✅ Removed alias @{alias}.")
+            await confirm_msg.edit(content=f"✅ Alias `@{alias}` has been removed.", embed=None)
         else:
-            await ctx.send(f"❌ Alias @{alias} not found.")
+            await confirm_msg.edit(content="❌ Alias removal cancelled.", embed=None)
+
+        try:
+            await confirm_msg.clear_reactions()
+        except discord.Forbidden:
+            pass
 
     # ---------------------------------------
     # List Aliases
     # ---------------------------------------
-    @commands.command()
-    async def listaliases(self, ctx):
-        """List all saved aliases for this server."""
+    @alias.command(name="list")
+    async def alias_list(self, ctx, member: discord.Member = None):
+        """
+        Lists all aliases on the server or by alias creator.
+
+        Usage:
+        `!alias list`
+        `!alias list @MyUsername`
+        """
+
         guild_id = str(ctx.guild.id)
         aliases = self.config.get(guild_id, {}).get("aliases", {})
 
         if not aliases:
             return await ctx.send("📭 No aliases saved for this server.")
 
-        embed = discord.Embed(
-            title=f"📘 Saved Aliases for {ctx.guild.name}",
-            color=discord.Color.teal()
-        )
+        filtered = {}
+        if member:
+            for name, data in aliases.items():
+                if data.get("creator") == str(member):
+                    filtered[name] = data
+        else:
+            filtered = aliases
 
-        for name, data in aliases.items():
+        if not filtered:
+            return await ctx.send(f"📭 No aliases found for {member.display_name}." if member else "📭 No aliases found.")
+
+        title = f"📘 Saved Aliases"
+        if member:
+            title += f" by {member.display_name}"
+
+        embed = discord.Embed(title=title, color=discord.Color.teal())
+
+        for name, data in filtered.items():
             expression = data.get("expression", "❓")
             creator = data.get("creator", "Unknown")
             created = data.get("created", "Unknown")
 
             embed.add_field(
                 name=f"@{name}",
-                value=f"**Roll**: {expression}\n👤 **By**: {creator}\n🕓 **On**: {created}",
+                value=f"**Roll**: `{expression}`\n👤 **By**: {creator}\n🕓 **On**: {created}",
                 inline=False
             )
 
@@ -284,9 +454,25 @@ class Roll(commands.Cog):
     # ---------------------------------------
     # DM Channel
     # ---------------------------------------
-    @commands.command()
-    async def set_dm_channel(self, ctx, create_channel: bool = False):
-        """Sets the current channel as the DM channel and selects/creates a DM role."""
+    @commands.command(name="set_dm")
+    async def set_dm(self, ctx):
+        """
+        Interactive setup for the DM system.
+
+        Allows an admin or DM to configure:
+        • 📑 The DM-only channel (existing, new, or reset)
+        • 👤 The DM role (existing, new, or reset)
+
+        This setup uses embeds and emoji reactions to guide configuration.
+        Only one DM role and channel can be active per server.
+
+        Permissions:
+        • Must be a server Admin or have the current DM role
+
+        Usage:
+        `!set_dm`
+        """
+
         guild = ctx.guild
         guild_id = str(guild.id)
 
@@ -297,60 +483,168 @@ class Roll(commands.Cog):
                 "aliases": {}
             }
 
+        # Permission check
+        dm_role_name = self.config[guild_id].get("dm_role", "UNSET")
+        dm_channel_id = self.config[guild_id].get("dm_channel", "UNSET")
+
+        dm_role_obj = discord.utils.get(guild.roles, name=dm_role_name) if dm_role_name != "UNSET" else None
+        dm_channel_obj = guild.get_channel(int(dm_channel_id)) if dm_channel_id != "UNSET" else None
+
+        is_admin = ctx.author.guild_permissions.administrator
+        has_dm_role = dm_role_obj in ctx.author.roles if dm_role_obj else False
+
+        if not (is_admin or has_dm_role):
+            return await ctx.send("❌ You must be a server admin or have the DM role to use this command.")
+
         try:
             await ctx.message.delete()
         except discord.Forbidden:
             pass
 
-        await ctx.send("🧙 Please enter the name of the DM role you'd like to use (or type create to make a new one):")
+        # Display current DM channel and role
+        current_channel_display = dm_channel_obj.mention if dm_channel_obj else "Unset"
+        current_role_display = dm_role_obj.mention if dm_role_obj else "Unset"
+
+        main_embed = discord.Embed(
+            title="DM Setup",
+            description=(
+                f"**Current Settings:**\n"
+                f"• 📑 DM Channel: {current_channel_display}\n"
+                f"• 👤 DM Role: {current_role_display}\n\n"
+                f"**React to configure:**\n"
+                f"📑 Set **DM Channel**\n"
+                f"👤 Set **DM Role**\n"
+                f"❌ Cancel setup"
+            ),
+            color=discord.Color.blurple()
+        )
+
+        menu_msg = await ctx.send(embed=main_embed)
+        reactions = {"📑": "channel", "👤": "role", "❌": "cancel"}
+        for emoji in reactions:
+            await menu_msg.add_reaction(emoji)
+
+        def check(reaction, user):
+            return user == ctx.author and reaction.message.id == menu_msg.id and str(reaction.emoji) in reactions
 
         try:
-            response = await self.bot.wait_for(
-                'message',
-                check=lambda m: m.author == ctx.author and m.channel == ctx.channel,
-                timeout=60
-            )
+            reaction, _ = await self.bot.wait_for('reaction_add', timeout=60.0, check=check)
         except asyncio.TimeoutError:
-            await ctx.send("⏳ No response received. DM role setup cancelled.")
-            return
+            return await menu_msg.edit(content="⏳ No response received. Setup cancelled.", embed=None, delete_after=10)
 
-        role_name = response.content.strip()
+        choice = reactions[str(reaction.emoji)]
 
-        if role_name.lower() == 'create':
-            new_role_name = "DM"
-            dm_role = await guild.create_role(name=new_role_name, permissions=discord.Permissions(0))
-            await ctx.send(f"✅ New DM role {dm_role.name} created.")
-        else:
-            dm_role = discord.utils.get(guild.roles, name=role_name)
-            if not dm_role:
-                await ctx.send(f"❌ Role {role_name} not found. Try again with a valid role name or use create to make one.")
-                return
+        if choice == "cancel":
+            return await menu_msg.edit(content="❌ Setup cancelled.", embed=None, delete_after=10)
 
-        # Save the DM role and channel to config
-        self.config[guild_id]["dm_role"] = dm_role.name
-        self.config[guild_id]["dm_channel"] = str(ctx.channel.id)
-        save_config(self.config)
+        # -------- DM CHANNEL SETUP --------
+        if choice == "channel":
+            channel_embed = discord.Embed(
+                title="Set DM Channel",
+                description="📁 Choose Existing Channel\n"
+                            "🆕 Create New Channel\n"
+                            "🔄 Reset to UNSET\n"
+                            "❌ Cancel",
+                color=discord.Color.green()
+            )
+            await menu_msg.edit(embed=channel_embed)
+            channel_opts = {"📁": "existing", "🆕": "create", "🔄": "reset", "❌": "cancel"}
+            await menu_msg.clear_reactions()
+            for emoji in channel_opts:
+                await menu_msg.add_reaction(emoji)
 
-        await ctx.send(f"✅ DM channel set to <#{ctx.channel.id}> and DM role set to {dm_role.name}.")
-
-        # Optionally create private channel
-        if create_channel:
-            overwrites = {
-                guild.default_role: discord.PermissionOverwrite(read_messages=False),
-                dm_role: discord.PermissionOverwrite(read_messages=True)
-            }
+            def chan_check(reaction, user):
+                return user == ctx.author and reaction.message.id == menu_msg.id and str(reaction.emoji) in channel_opts
 
             try:
-                new_channel = await guild.create_text_channel("dm-rolls", overwrites=overwrites)
-                await ctx.send(f"🆕 Private channel {new_channel.name} created for role {dm_role.name}.")
-            except discord.Forbidden:
-                await ctx.send("❌ I don't have permission to create channels.")
+                reaction, _ = await self.bot.wait_for('reaction_add', timeout=60.0, check=chan_check)
+            except asyncio.TimeoutError:
+                return await menu_msg.edit(content="⏳ No response. DM channel setup cancelled.", embed=None, delete_after=10)
+
+            chan_choice = channel_opts[str(reaction.emoji)]
+            if chan_choice == "cancel":
+                return await menu_msg.edit(content="❌ Channel setup cancelled.", embed=None, delete_after=10)
+            elif chan_choice == "existing":
+                await menu_msg.edit(content="💬 Mention the channel to set as DM channel:", embed=None)
+                try:
+                    msg = await self.bot.wait_for('message', timeout=60.0, check=lambda m: m.author == ctx.author)
+                except asyncio.TimeoutError:
+                    return await ctx.send("⏳ No channel mentioned. Cancelled.")
+                if msg.channel_mentions:
+                    self.config[guild_id]["dm_channel"] = str(msg.channel_mentions[0].id)
+                    save_config(self.config)
+                    return await ctx.send(f"✅ DM channel set to {msg.channel_mentions[0].mention}.", delete_after=10)
+                return await ctx.send("❌ No valid channel mentioned.", delete_after=10)
+            elif chan_choice == "create":
+                overwrites = {
+                    guild.default_role: discord.PermissionOverwrite(read_messages=False)
+                }
+                if dm_role:
+                    overwrites[dm_role] = discord.PermissionOverwrite(read_messages=True)
+
+                new_chan = await guild.create_text_channel("dm-rolls", overwrites=overwrites)
+                self.config[guild_id]["dm_channel"] = str(new_chan.id)
+                save_config(self.config)
+                return await ctx.send(f"🆕 Created and set DM channel to {new_chan.mention}.", delete_after=10)
+            elif chan_choice == "reset":
+                self.config[guild_id]["dm_channel"] = "UNSET"
+                save_config(self.config)
+                return await ctx.send("🔄 DM channel reset to UNSET.", delete_after=10)
+
+        # -------- DM ROLE SETUP --------
+        if choice == "role":
+            role_embed = discord.Embed(
+                title="Set DM Role",
+                description="👥 Choose Existing Role\n"
+                            "🛠️ Create New Role\n"
+                            "🔄 Reset to UNSET\n"
+                            "❌ Cancel",
+                color=discord.Color.orange()
+            )
+            await menu_msg.edit(embed=role_embed)
+            role_opts = {"👥": "existing", "🛠️": "create", "🔄": "reset", "❌": "cancel"}
+            await menu_msg.clear_reactions()
+            for emoji in role_opts:
+                await menu_msg.add_reaction(emoji)
+
+            def role_check(reaction, user):
+                return user == ctx.author and reaction.message.id == menu_msg.id and str(reaction.emoji) in role_opts
+
+            try:
+                reaction, _ = await self.bot.wait_for('reaction_add', timeout=60.0, check=role_check)
+            except asyncio.TimeoutError:
+                return await ctx.send("⏳ No response. DM role setup cancelled.", delete_after=10)
+
+            role_choice = role_opts[str(reaction.emoji)]
+            if role_choice == "cancel":
+                return await ctx.send("❌ Role setup cancelled.")
+            elif role_choice == "existing":
+                await menu_msg.edit(content="📝 Type the role name:", embed=None)
+                try:
+                    msg = await self.bot.wait_for('message', timeout=60.0, check=lambda m: m.author == ctx.author)
+                except asyncio.TimeoutError:
+                    return await ctx.send("⏳ No role name received.")
+                role = discord.utils.get(guild.roles, name=msg.content.strip())
+                if role:
+                    self.config[guild_id]["dm_role"] = role.name
+                    save_config(self.config)
+                    return await ctx.send(f"✅ DM role set to **{role.name}**.")
+                return await ctx.send("❌ Role not found.", delete_after=10)
+            elif role_choice == "create":
+                new_role = await guild.create_role(name="DM", permissions=discord.Permissions(0))
+                self.config[guild_id]["dm_role"] = new_role.name
+                save_config(self.config)
+                return await ctx.send(f"🆕 Created and set DM role to **{new_role.name}**.", delete_after=10)
+            elif role_choice == "reset":
+                self.config[guild_id]["dm_role"] = "UNSET"
+                save_config(self.config)
+                return await ctx.send("🔄 DM role reset to UNSET.", delete_after=10)
 
     #----------------------------
     # User Private Roll Channels
     #----------------------------
     @commands.command()
-    async def privaterollchannel(self, ctx, action: str = None, channel: discord.TextChannel = None, target_user: discord.Member = None):
+    async def privateroll(self, ctx, action: str = None, channel: discord.TextChannel = None, target_user: discord.Member = None):
         """Manage private roll channels.
 
         - `set #channel` — Set your own
@@ -358,6 +652,12 @@ class Roll(commands.Cog):
         - `disable` — Remove your private channel
         - `show` — Show your current private channel
         - `list` — [Mods only] Show all users with private roll channels
+
+        Usage:
+        `!privaterollchannel set #channel [@user]`
+        `!privaterollchannel disable`
+        `!privaterollchannel show`
+        `!privaterollchannel list`
         """
         guild_id = str(ctx.guild.id)
         user_channels = self.config.setdefault(guild_id, {}).setdefault("user_channels", {})
@@ -434,7 +734,33 @@ class Roll(commands.Cog):
     #----------------------------
     @commands.command(aliases=["r"])
     async def roll(self, ctx, *, args=None):
-        """Roll dice with optional -dm tag for private results."""
+        """
+        Rolls dice using standard and advanced modifiers.
+
+        Basic usage:
+        `!roll 2d6+4`
+        `!roll 1d20adv-2`
+        `!roll @myattack`  ← Use an alias (case sensitive)
+
+        Supports:
+        • Advantage/Disadvantage: `adv`, `dis`
+        • Keep/Drop: `k2` (keep highest 2), `l1` (drop lowest 1)
+        • Exploding Dice: `ex`
+        • Reroll: `r=1`, `r<2`, `r>3`
+        • Repeat Rolls: `i2`
+        • Flat modifiers: `+2`, `-1`
+        • Aliases: Save with `@aliasname *` or call with `@aliasname`
+
+        Special flags:
+        • `-dm` → sends result privately
+        • `-blind` → suppresses output
+
+        Examples:
+        `!roll 2d20+5`
+        `!roll 4d6kl3+1i2`
+        `!roll smite 2d8+2d6 -dm`
+        `!roll @fireball big hit`
+        """
         if not args:
             return await ctx.send("Provide a dice expression, e.g. 2d6+4. Support: adv, dis, k, l, ex, r<3, i2")
 
@@ -450,7 +776,10 @@ class Roll(commands.Cog):
             is_dm = True
             args = args[:-7].strip()
 
+        message_deleted = False
+
         expressions = re.split(r'[\n,]+', args.strip())
+
         for expr in expressions:
             expr = expr.strip()
             if not expr:
@@ -464,11 +793,14 @@ class Roll(commands.Cog):
                 expr = expr[:-6].strip()
                 force_overwrite = True
 
-            guild_id = str(ctx.guild.id)
-            aliases = self.config.get(guild_id, {}).get("aliases", {})
+            guild_id = str(ctx.guild.id) if ctx.guild else None
+            aliases = self.config.get(guild_id, {}).get("aliases", {}) if guild_id else {}
 
             # Remove leading '@' if present for alias lookup
             alias_candidate = expr.lstrip('@').strip()
+
+            if guild_id is None:
+                aliases = {}  # No alias support in DMs
 
             # Check if the whole expr is exactly an alias name (no dice expression)
             if alias_candidate in aliases and (expr == alias_candidate or expr == '@' + alias_candidate):
@@ -479,7 +811,6 @@ class Roll(commands.Cog):
                 if not saved:
                     await ctx.send(f"❌ Alias {alias} not found.")
                     continue
-
                 expr = saved["expression"]
 
             else:
@@ -502,6 +833,10 @@ class Roll(commands.Cog):
                 total, details = self.roll_full_expression(expr)
             except ValueError as e:
                 await ctx.send(f"Error in {expr}: {e}")
+                continue
+
+            if guild_id is None and save_alias:
+                await ctx.send("❌ Saving aliases is only supported in servers.")
                 continue
 
             # Save alias if requested
@@ -557,7 +892,7 @@ class Roll(commands.Cog):
                 elif total == min_possible:
                     embed_color = discord.Color.red()
 
-            user_nick = ctx.author.nick or ctx.author.name
+            user_nick = ctx.author.nick if hasattr(ctx.author, 'nick') else ctx.author.name
             title = f"🎲 {user_nick} Rolled"
             if rollalias:
                 title += f" ({rollalias})"
@@ -591,6 +926,15 @@ class Roll(commands.Cog):
 
             embed.set_footer(text=f"🎯 Final Total: {total}")
 
+            if not message_deleted:
+                try:
+                    await ctx.message.delete()
+                    message_deleted = True
+                except (discord.Forbidden, discord.NotFound):
+                    pass
+
+            await ctx.send(embed=embed)
+
             # Handle -dm logic
             if is_dm:
                 guild_id = str(ctx.guild.id)
@@ -621,15 +965,19 @@ class Roll(commands.Cog):
                         await user.send(embed=embed)
                     except discord.Forbidden:
                         pass
-                await ctx.message.add_reaction("📩")
-                return
-            try:
-                await ctx.message.delete()
-            except discord.Forbidden:
-                pass
+                try:
+                    await ctx.message.add_reaction("📩")
+                except (discord.Forbidden, discord.NotFound):
+                    pass
 
-        # Default: public
-        await ctx.send(embed=embed)
+            if not message_deleted:
+                try:
+                    await ctx.message.delete()
+                    message_deleted = True
+                except (discord.Forbidden, discord.NotFound):
+                    pass
+
+            await ctx.send(embed=embed)
 
 
 async def setup(bot):

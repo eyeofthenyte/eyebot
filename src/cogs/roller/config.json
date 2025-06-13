@@ -14,21 +14,26 @@
   },
   "999770956203556944": {
     "aliases": {
-      "Nyssas Punishment": {
-        "expression": "3d6",
-        "creator": "eyeofthenyte#0",
-        "created": "2025-06-07T19:13:12.189800"
-      },
-      "Kais Lesson": {
-        "expression": "3d6",
-        "creator": "eyeofthenyte#0",
-        "created": "2025-06-07T19:13:59.787166"
-      },
-      "Mirras Correction": {
-        "expression": "3d6",
-        "creator": "eyeofthenyte#0",
-        "created": "2025-06-07T20:59:57.233116"
-      }
+        "Nyssas Punishment": {
+            "expression": "3d6",
+            "creator": "eyeofthenyte#0",
+            "created": "2025-06-07T19:13:12.189800"
+        },
+        "Kais Lesson": {
+            "expression": "3d6",
+            "creator": "eyeofthenyte#0",
+            "created": "2025-06-07T19:13:59.787166"
+        },
+        "Mirras Correction": {
+            "expression": "3d6",
+            "creator": "eyeofthenyte#0",
+            "created": "2025-06-07T20:59:57.233116"
+        },
+        "Roll Stats": {
+            "expression": "4d6k3i6",
+            "creator": "eyeofthenyte#0",
+            "created": "2025-06-13T04:52:36.118567"
+        }
     },
     "dm_channel": "1000501674013638697",
     "dm_role": "DM",
