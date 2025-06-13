@@ -1,0 +1,12 @@
+discord:
+  bot_token: NTYzNTI2MDA5MDczNDM0Njc0.GRGki1.Sg5s6jXKla-a7gxELpd1bSvoK-yX7N1yTgL4WE
+logging:
+  level: DEBUG
+  output: syslog
+prefix: '!'
+twitch:
+  channels:
+  - eyeofthenyte
+  client_id: q7fq6ps915b4km2ldn60d7q8q5wmcl
+  nick: frankthewhelp
+  tmi_token: oauth:27mt6qhei8uofa122hktgj7qu4zlfa
