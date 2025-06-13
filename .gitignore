@@ -13,6 +13,7 @@ servers.txt
 service_account.json
 storage.json
 eyebot.cfg
+*.bak
 logs/
 experimental/
 
