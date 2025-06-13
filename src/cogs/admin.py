@@ -32,20 +32,9 @@ class Admin (commands.Cog):
     # Administrative Commands
     # ---------------------------------------------------------
     #Shutdown bot
-    @commands.command(aliases=['shutdown','sd'])
+    @commands.command(aliases=['shutdown','sd'], extras=[":octagonal_sign: **__Shutdown__**", "Terminates bot all bot functions. Need to be bot owner to use. Contact Eyeofthenyte#0042 with any issues."])
     @commands.is_owner()
     async def _shutdown(self,ctx):
-        """
-        🔒 Gracefully shuts down the bot.
-
-        Usage:
-        `!shutdown`
-
-        Aliases:`!sd`, `!_shutdown`
-        
-        Access: Bot Owner Only
-        """
-
         try:
             await ctx.send("Shutting down the bot...")
             await self.bot.close()
@@ -55,22 +44,9 @@ class Admin (commands.Cog):
             await ctx.send("There was a problem shutting down the bot. You might not be the bot owner.")
 
     #Disconnect bot from server BOT OWNER ONLY
-    @commands.command()
+    @commands.command(extras=[":wave:  **__Leave__**", "**Usage: `!leave server`\nWhere `server = name of server`**\n\mWill make the bot leave the server.\n**Must be server owner to use this command.**\n"])
     @commands.check_any(commands.has_permissions(administrator=True),commands.is_owner())
     async def leave(self, ctx, *, guild_name):
-        """
-        📤 Forces the bot to leave a server by its name.
-
-        Usage:
-        `!leave <Server Name>`
-
-        Example:
-        `!leave My Cool Server`
-
-        Note: Server name is case-sensitive
-        Access: Server Administrator or Bot Owner
-        """
-
         guild = discord.utils.get(bot.guilds, name=guild_name)
         if guild is None:
             await ctx.send("I don't recognize that guild. Please enter the server name. (case sensitive)")
@@ -81,18 +57,9 @@ class Admin (commands.Cog):
             logger.error(f'connection_broken: {bot.user.name} has left: {guild.name} (id: {guild.id})')
 
     #Check connected servers BOT OWNER ONLY
-    @commands.command()
+    @commands.command(extras=[":computer:  **__Servers__**", "A listing of servers the bot is curretntly connected to. Need to be bot owner to use. Contact Eyeofthenyte#0042 with any issues."])
     @commands.is_owner()
     async def servers(self, ctx):
-        """
-        📋 Lists all servers the bot is currently connected to via DM.\n"
-
-        Usage:
-        `!servers`
-
-        Access: Bot Owner Only
-        """
-
         for guild in self.bot.guilds:
             self.logger.info(f'%-10s(id: %s)%-5s-%-5s', ' ', bot.guild.id, ' ', ' ', bot.guild.name)
             await ctx.author.send(f'%-5s(id: %s)%-5s-%-5s%s', ' ', bot.guild.id, ' ', ' ', bot.guild.name)
