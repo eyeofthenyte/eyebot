@@ -2,6 +2,7 @@ name: eyebot
 
 services:
   eyebot:
+    cointainer_name: EyeBot
     image: ${IMAGE_NAME:-eyebot}:${EYEBOT_VERSION:-latest}
     build:
       context: .
