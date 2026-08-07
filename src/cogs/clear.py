@@ -103,11 +103,11 @@ class Clear(commands.Cog):
             msg = await ctx.send(
                 f":clipboard: A `{mod_channel_name}` channel exists. Use it for logging?\nReact with :white_check_mark: to confirm, :x: to skip."
             )
-            await msg.add_reaction(":white_check_mark:")
-            await msg.add_reaction(":x:")
+            await msg.add_reaction("✅")
+            await msg.add_reaction("❌")
 
             def check(r, u):
-                return u == ctx.author and r.message.id == msg.id and str(r.emoji) in [":white_check_mark:", ":x:"]
+                return u == ctx.author and r.message.id == msg.id and str(r.emoji) in ["✅", "❌"]
 
             try:
                 r, _ = await self.bot.wait_for("reaction_add", timeout=120.0, check=check)
@@ -116,7 +116,7 @@ class Clear(commands.Cog):
                 await msg.delete()
                 return None
 
-            if str(r.emoji) == ":white_check_mark:":
+            if str(r.emoji) == "✅":
                 self.guild_config(guild_id)["mod_channel"] = existing.id
                 self.save_config()
                 await existing.send(f":white_check_mark: Logging enabled by {ctx.author.mention}")
@@ -139,7 +139,7 @@ class Clear(commands.Cog):
             ":mute: Disable logging\n"
             ":x: Cancel"
         )
-        for emoji in [":one:", ":two:", ":mute:", ":x:"]:
+        for emoji in ["1️⃣", "2️⃣", "🔇", "❌"]:
             await prompt.add_reaction(emoji)
 
         def check(r, u):
@@ -152,7 +152,7 @@ class Clear(commands.Cog):
             await prompt.delete()
             return None
 
-        if str(r.emoji) == ":one:":
+        if str(r.emoji) == "1️⃣":
             channels = [ch for ch in guild.text_channels]
             msg_list = ":clipboard: Reply with the number of the channel:\n"
             for idx, ch in enumerate(channels, 1):
@@ -177,7 +177,7 @@ class Clear(commands.Cog):
             except asyncio.TimeoutError:
                 return None
 
-        elif str(r.emoji) == ":two:":
+        elif str(r.emoji) == "2️⃣":
             overwrites = {
                 guild.default_role: discord.PermissionOverwrite(read_messages=False),
                 guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True),
@@ -195,7 +195,7 @@ class Clear(commands.Cog):
                 await ctx.send(":x: I don't have permission to create a channel.")
                 return None
 
-        elif str(r.emoji) == ":mute:":
+        elif str(r.emoji) == "🔇":
             self.guild_config(guild_id)["mod_channel"] = "DISABLED"
             self.save_config()
             await ctx.send(":mute: Logging disabled.")
@@ -252,11 +252,11 @@ class Clear(commands.Cog):
                 ":mute: Disable\n"
                 ":x: Cancel"
             )
-            for emoji in [":one:", ":two:", ":three:", ":mute:", ":x:"]:
+            for emoji in ["1️⃣", "2️⃣", "3️⃣", "🔇", "❌"]:
                 await msg.add_reaction(emoji)
 
             def check(r, u):
-                return r.message.id == msg.id and u == ctx.author and str(r.emoji) in [":one:", ":two:", ":three:", ":mute:", ":x:"]
+                return r.message.id == msg.id and u == ctx.author and str(r.emoji) in ["1️⃣", "2️⃣", "3️⃣", "🔇", "❌"]
 
             try:
                 r, _ = await self.bot.wait_for("reaction_add", timeout=60.0, check=check)
@@ -265,23 +265,23 @@ class Clear(commands.Cog):
                 await msg.delete()
                 return await ctx.send("⏰ Timed out.")
 
-            if str(r.emoji) == ":one:":
+            if str(r.emoji) == "1️⃣":
                 return await ctx.send(f":white_check_mark: Keeping {current_channel.mention}")
-            elif str(r.emoji) == ":two:":
+            elif str(r.emoji) == "2️⃣":
                 self.guild_config(guild_id)["mod_channel"] = "UNSET"
                 self.save_config()
                 await ctx.send(":repeat: Resetting...")
                 await self.ensure_mod_channel(ctx)
-            elif str(r.emoji) == ":three:":
+            elif str(r.emoji) == "3️⃣":
                 self.guild_config(guild_id)["mod_channel"] = "UNSET"
                 self.save_config()
                 await self.ensure_mod_channel(ctx)
-            elif str(r.emoji) == ":mute:":
+            elif str(r.emoji) == "🔇":
                 self.guild_config(guild_id)["mod_channel"] = "DISABLED"
                 self.save_config()
                 await ctx.send(":mute: Logging disabled.")
-            elif str(r.emoji) == ":x:":
-                await ctx.send(":x; Canceled.")
+            elif str(r.emoji) == "❌":
+                await ctx.send(":x: Canceled.")
         else:
             await ctx.send(":information: No mod channel set. Starting setup...")
             await self.ensure_mod_channel(ctx)
