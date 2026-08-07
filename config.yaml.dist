@@ -1,0 +1,13 @@
+---
+# default is !
+prefix: !
+
+logging:
+    level: DEBUG
+    output: output.log # syslog, filename
+
+google_sheets:
+    # Can also be set with GOOGLE_SERVICE_ACCOUNT_FILE.
+    credentials_file: service_account.json
+    # Cache worksheet snapshots to limit API calls.
+    cache_ttl: 300

@@ -1,0 +1,100 @@
+;You get no loot and No Magic Items; ; ;
+;You get no loot and No Magic Items; ; ;
+1; x 1000 gp gems and Roll ;7; time(s) on Magic Item Table ;C
+1; x 1000 gp gems and Roll ;7; time(s) on Magic Item Table ;C
+1; x 1000 gp gems and Roll ;7; time(s) on Magic Item Table ;C
+2; x 2500 gp art objects and Roll ;7; time(s) on Magic Item Table ;C
+2; x 2500 gp art objects and Roll ;7; time(s) on Magic Item Table ;C
+2; x 2500 gp art objects and Roll ;7; time(s) on Magic Item Table ;C
+3; x 7500 gp art objects and Roll ;7; time(s) on Magic Item Table ;C
+3; x 7500 gp art objects and Roll ;7; time(s) on Magic Item Table ;C
+3; x 7500 gp art objects and Roll ;7; time(s) on Magic Item Table ;C
+4; x 5000 gp gems and Roll ;7; time(s) on Magic Item Table ;C
+4; x 5000 gp gems and Roll ;7; time(s) on Magic Item Table ;C
+4; x 5000 gp gems and Roll ;7; time(s) on Magic Item Table ;C
+1; x 1000 gp gems and Roll ;9; time(s) on Magic Item Table ;D
+1; x 1000 gp gems and Roll ;9; time(s) on Magic Item Table ;D
+1; x 1000 gp gems and Roll ;9; time(s) on Magic Item Table ;D
+1; x 1000 gp gems and Roll ;9; time(s) on Magic Item Table ;D
+1; x 1000 gp gems and Roll ;9; time(s) on Magic Item Table ;D
+1; x 1000 gp gems and Roll ;9; time(s) on Magic Item Table ;D
+1; x 1000 gp gems and Roll ;9; time(s) on Magic Item Table ;D
+1; x 1000 gp gems and Roll ;9; time(s) on Magic Item Table ;D
+2; x 2500 gp art objects and Roll ;9; time(s) on Magic Item Table ;D
+2; x 2500 gp art objects and Roll ;9; time(s) on Magic Item Table ;D
+2; x 2500 gp art objects and Roll ;9; time(s) on Magic Item Table ;D
+2; x 2500 gp art objects and Roll ;9; time(s) on Magic Item Table ;D
+2; x 2500 gp art objects and Roll ;9; time(s) on Magic Item Table ;D
+2; x 2500 gp art objects and Roll ;9; time(s) on Magic Item Table ;D
+2; x 2500 gp art objects and Roll ;9; time(s) on Magic Item Table ;D
+2; x 2500 gp art objects and Roll ;9; time(s) on Magic Item Table ;D
+3; x 7500 gp art objects and Roll ;9; time(s) on Magic Item Table ;D
+3; x 7500 gp art objects and Roll ;9; time(s) on Magic Item Table ;D
+3; x 7500 gp art objects and Roll ;9; time(s) on Magic Item Table ;D
+3; x 7500 gp art objects and Roll ;9; time(s) on Magic Item Table ;D
+3; x 7500 gp art objects and Roll ;9; time(s) on Magic Item Table ;D
+3; x 7500 gp art objects and Roll ;9; time(s) on Magic Item Table ;D
+3; x 7500 gp art objects and Roll ;9; time(s) on Magic Item Table ;D
+3; x 7500 gp art objects and Roll ;9; time(s) on Magic Item Table ;D
+4; x 5000 gp gems and Roll ;9; time(s) on Magic Item Table ;D
+4; x 5000 gp gems and Roll ;9; time(s) on Magic Item Table ;D
+4; x 5000 gp gems and Roll ;9; time(s) on Magic Item Table ;D
+4; x 5000 gp gems and Roll ;9; time(s) on Magic Item Table ;D
+4; x 5000 gp gems and Roll ;9; time(s) on Magic Item Table ;D
+4; x 5000 gp gems and Roll ;9; time(s) on Magic Item Table ;D
+4; x 5000 gp gems and Roll ;9; time(s) on Magic Item Table ;D
+4; x 5000 gp gems and Roll ;9; time(s) on Magic Item Table ;D
+1; x 1000 gp gems and Roll ;9; time(s) on Magic Item Table ;E
+1; x 1000 gp gems and Roll ;9; time(s) on Magic Item Table ;E
+1; x 1000 gp gems and Roll ;9; time(s) on Magic Item Table ;E
+1; x 1000 gp gems and Roll ;9; time(s) on Magic Item Table ;E
+1; x 1000 gp gems and Roll ;9; time(s) on Magic Item Table ;E
+1; x 1000 gp gems and Roll ;9; time(s) on Magic Item Table ;E
+2; x 2500 gp art objects and Roll ;9; time(s) on Magic Item Table ;E
+2; x 2500 gp art objects and Roll ;9; time(s) on Magic Item Table ;E
+2; x 2500 gp art objects and Roll ;9; time(s) on Magic Item Table ;E
+2; x 2500 gp art objects and Roll ;9; time(s) on Magic Item Table ;E
+2; x 2500 gp art objects and Roll ;9; time(s) on Magic Item Table ;E
+2; x 2500 gp art objects and Roll ;9; time(s) on Magic Item Table ;E
+3; x 7500 gp art objects and Roll ;9; time(s) on Magic Item Table ;E
+3; x 7500 gp art objects and Roll ;9; time(s) on Magic Item Table ;E
+3; x 7500 gp art objects and Roll ;9; time(s) on Magic Item Table ;E
+3; x 7500 gp art objects and Roll ;9; time(s) on Magic Item Table ;E
+3; x 7500 gp art objects and Roll ;9; time(s) on Magic Item Table ;E
+4; x 5000 gp gems and Roll ;9; time(s) on Magic Item Table ;E
+4; x 5000 gp gems and Roll ;9; time(s) on Magic Item Table ;E
+4; x 5000 gp gems and Roll ;9; time(s) on Magic Item Table ;E
+4; x 5000 gp gems and Roll ;9; time(s) on Magic Item Table ;E
+4; x 5000 gp gems and Roll ;9; time(s) on Magic Item Table ;E
+1; x 1000 gp gems and Roll ;8; time(s) on Magic Item Table ;G
+2; x 2500 gp art objects and Roll ;8; time(s) on Magic Item Table ;G
+3; x 7500 gp art objects and Roll ;8; time(s) on Magic Item Table ;G
+4; x 5000 gp gems and Roll ;8; time(s) on Magic Item Table ;G
+1; x 1000 gp gems and Roll ;8; time(s) on Magic Item Table ;H
+1; x 1000 gp gems and Roll ;8; time(s) on Magic Item Table ;H
+2; x 2500 gp art objects and Roll ;8; time(s) on Magic Item Table ;H
+2; x 2500 gp art objects and Roll ;8; time(s) on Magic Item Table ;H
+3; x 7500 gp art objects and Roll ;8; time(s) on Magic Item Table ;H
+3; x 7500 gp art objects and Roll ;8; time(s) on Magic Item Table ;H
+4; x 5000 gp gems and Roll ;8; time(s) on Magic Item Table ;H
+4; x 5000 gp gems and Roll ;8; time(s) on Magic Item Table ;H
+1; x 1000 gp gems and Roll ;8; time(s) on Magic Item Table ;I
+1; x 1000 gp gems and Roll ;8; time(s) on Magic Item Table ;I
+1; x 1000 gp gems and Roll ;8; time(s) on Magic Item Table ;I
+1; x 1000 gp gems and Roll ;8; time(s) on Magic Item Table ;I
+1; x 1000 gp gems and Roll ;8; time(s) on Magic Item Table ;I
+2; x 2500 gp art objects and Roll ;8; time(s) on Magic Item Table ;I
+2; x 2500 gp art objects and Roll ;8; time(s) on Magic Item Table ;I
+2; x 2500 gp art objects and Roll ;8; time(s) on Magic Item Table ;I
+2; x 2500 gp art objects and Roll ;8; time(s) on Magic Item Table ;I
+2; x 2500 gp art objects and Roll ;8; time(s) on Magic Item Table ;I
+3; x 7500 gp art objects and Roll ;8; time(s) on Magic Item Table ;I
+3; x 7500 gp art objects and Roll ;8; time(s) on Magic Item Table ;I
+3; x 7500 gp art objects and Roll ;8; time(s) on Magic Item Table ;I
+3; x 7500 gp art objects and Roll ;8; time(s) on Magic Item Table ;I
+3; x 7500 gp art objects and Roll ;8; time(s) on Magic Item Table ;I
+4; x 5000 gp gems and Roll ;8; time(s) on Magic Item Table ;I
+4; x 5000 gp gems and Roll ;8; time(s) on Magic Item Table ;I
+4; x 5000 gp gems and Roll ;8; time(s) on Magic Item Table ;I
+4; x 5000 gp gems and Roll ;8; time(s) on Magic Item Table ;I
+4; x 5000 gp gems and Roll ;8; time(s) on Magic Item Table ;I

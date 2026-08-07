@@ -1,0 +1,10 @@
+**Alexandrite**;*(transparent dark green)*
+**Aquamarine**;*(transparent pale blue-green)*
+**Black pearl**;*(opaque pure black)*
+**Blue spinel**;*(transparent deep blue)*
+**Diamond**;*(transparent blue-white, canary, pink, brown, or blue)*
+**Garnet**;*(transparent hues of violet)*
+**Pearl**;*(opaque black)*
+**Peridot**;*(transparent rich olive green)*
+**Spinel**;*(transparent deep blue)*
+**Topaz**;*(transparent golden yellow)*

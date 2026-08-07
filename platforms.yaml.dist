@@ -1,0 +1,94 @@
+---
+# Platform credentials and connector-wide options.
+discord:
+  enabled: true
+  bot_token:
+  mod_channel_name: mod-logs
+
+twitch:
+  enabled: false
+  tmi_token:
+  client_id:
+  nick:
+  channels:
+    - your_channel_name
+
+youtube:
+  enabled: false
+  api_key:
+  client_id:
+  client_secret:
+  refresh_token:
+  channel_id:
+  destination_channel:
+  videos_enabled: false
+  community_posts_enabled: false
+  livestream_chat_commands_enabled: false
+
+facebook:
+  enabled: false
+  app_id:
+  app_secret:
+  access_token:
+  page_id:
+  destination_channel:
+  posting_enabled: false
+  livestream_chat_commands_enabled: false
+
+kick:
+  enabled: false
+  client_id:
+  client_secret:
+  access_token:
+  channel:
+  livestream_chat_commands_enabled: false
+
+twitter:
+  enabled: false
+  api_key:
+  api_secret:
+  bearer_token:
+  access_token:
+  access_token_secret:
+  posting_enabled: false
+
+bluesky:
+  enabled: false
+  handle:
+  app_password:
+  posting_enabled: false
+
+tiktok:
+  enabled: false
+  client_key:
+  client_secret:
+  access_token:
+  open_id:
+  posting_enabled: false
+
+instagram:
+  enabled: false
+  app_id:
+  app_secret:
+  access_token:
+  account_id:
+  posting_enabled: false
+
+substack:
+  enabled: false
+  publication_url:
+  email:
+  credential:
+  destination_channel:
+  newsletters_enabled: false
+  podcasts_enabled: false
+
+kofi:
+  enabled: false
+  page_url:
+  verification_token:
+  destination_channel:
+  donations_enabled: false
+  memberships_enabled: false
+  shop_orders_enabled: false
+  webhooks_enabled: false

@@ -1,0 +1,11 @@
+**Amber**;*(transparent watery gold to rich gold)*
+**Amethyst**;*(transparent deep purple)*
+**Chrysoberyl**;*(transparent yellow-green to pale green)*
+**Coral**;*(opaque crimson)*
+**Diamond**;*(transparent blue-white, canary, pink, brown, or blue)*
+**Garnet**;*(transparent red, brown-green, or violet)*
+**Jade**;*(translucent light green, deep green, or white)*
+**Jet**;*(opaque deep black)*
+**Pearl**;*(opaque lustrous white, yellow, pink, or silver)*
+**Spinel**;*(transparent red, red-brown, or deep green)*
+**Tourmaline**;*(transparent pale green, blue, brown, or red)*

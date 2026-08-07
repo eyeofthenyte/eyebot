@@ -1,0 +1,54 @@
+name: eyebot
+
+services:
+  eyebot:
+    image: ${IMAGE_NAME:-eyebot}:${EYEBOT_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: dockerfile
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      EYEBOT_PROCESS: src/eyebot.py
+      EYEBOT_GUILD_CONFIG_DIR: /app/data/guilds
+      EYEBOT_SECRET_DIR: /app/data/secrets
+      EYEBOT_MASTER_KEY_FILE: /run/secrets/eyebot_master_key
+    secrets:
+      - eyebot_master_key
+    volumes:
+      # Set EYEBOT_CONFIG_PATH to select another host-side config file.
+      - type: bind
+        source: ${EYEBOT_CONFIG_PATH:-./config.yaml}
+        target: /app/config.yaml
+        bind:
+          # Fail instead of silently creating a directory when the file is absent.
+          create_host_path: false
+      - type: bind
+        source: ${EYEBOT_PLATFORM_CONFIG_PATH:-./platforms.yaml}
+        target: /app/platforms.yaml
+        bind:
+          create_host_path: false
+      - type: volume
+        source: guild-data
+        target: /app/data/guilds
+      - type: volume
+        source: secret-data
+        target: /app/data/secrets
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - healthcheck.py
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  guild-data:
+  secret-data:
+
+secrets:
+  eyebot_master_key:
+    file: ${EYEBOT_MASTER_KEY_SOURCE:-./secrets/eyebot_master_key}
