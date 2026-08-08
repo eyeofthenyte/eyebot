@@ -1,10 +1,21 @@
-"""Placeholder entrypoint for the future EyeBot TikTok integration."""
+"""TikTok approved Content Posting job child."""
 
-from adapters.tiktok_adapter import TIKTOK_ADAPTER
+import asyncio
+
+from services.liveNotificationService import load_platform_runtime
+from services.logService import LogService
+from services.platformWorkerService import PlatformWorkerService
+
+
+async def run():
+    config, service = load_platform_runtime("tiktok")
+    await PlatformWorkerService(
+        "tiktok", service, LogService("tiktok", config["logging"])
+    ).run_forever()
 
 
 def main():
-    TIKTOK_ADAPTER.require_implementation()
+    asyncio.run(run())
 
 
 if __name__ == "__main__":

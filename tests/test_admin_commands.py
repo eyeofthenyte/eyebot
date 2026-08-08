@@ -68,13 +68,22 @@ class Logger:
 
 class AdminServerCommandTests(unittest.IsolatedAsyncioTestCase):
     async def test_servers_uses_injected_bot_and_sends_one_dm(self):
+        class PlatformStatusService:
+            def effective_guild_platform(self, guild_id, platform_name):
+                return {
+                    "enabled": platform_name == "discord"
+                    or (platform_name == "twitch" and guild_id == 1)
+                }
+
         admin = Admin()
         admin.bot = types.SimpleNamespace(
             guilds=(
                 types.SimpleNamespace(id=1, name="First"),
                 types.SimpleNamespace(id=2, name="Second"),
-            )
+            ),
+            platform_config_service=PlatformStatusService(),
         )
+        admin.config = {}
         admin.logger = Logger()
         author = Recorder()
         channel = Recorder()
@@ -85,6 +94,9 @@ class AdminServerCommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(author.messages), 1)
         self.assertIn("First (id: 1)", author.messages[0])
         self.assertIn("Second (id: 2)", author.messages[0])
+        self.assertIn("discord: enabled", author.messages[0])
+        self.assertIn("twitch: enabled", author.messages[0])
+        self.assertIn("youtube: disabled", author.messages[0])
         self.assertEqual(
             channel.messages,
             ["✅ I sent the connected server list by direct message."],

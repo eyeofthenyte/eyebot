@@ -155,6 +155,7 @@ class PlatformConfigService(ConfigService):
             "aliases": {},
             "user_channels": {},
             "mod_channel": "UNSET",
+            "socialmedia_sources_channel": "UNSET",
             "timers": {},
         }
         for key, value in defaults.items():

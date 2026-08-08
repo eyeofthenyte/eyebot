@@ -12,6 +12,13 @@ twitch:
   nick:
   channels:
     - your_channel_name
+  # In shared mode, each guild can override this with:
+  # !platform twitch set channel <twitch_login>
+  channel:
+  # Discord destination for go-live posts. Guilds should override this with:
+  # !platform twitch set destination_channel <#channel>
+  destination_channel:
+  live_poll_seconds: 60
 
 youtube:
   enabled: false
@@ -19,8 +26,12 @@ youtube:
   client_id:
   client_secret:
   refresh_token:
+  access_token:
   channel_id:
   destination_channel:
+  # Search.list costs 100 quota units; 900 seconds stays near the default
+  # 10,000-unit daily quota for one monitored channel.
+  live_poll_seconds: 900
   videos_enabled: false
   community_posts_enabled: false
   livestream_chat_commands_enabled: false
@@ -30,8 +41,11 @@ facebook:
   app_id:
   app_secret:
   access_token:
+  refresh_token:
+  webhook_verify_token:
   page_id:
   destination_channel:
+  live_poll_seconds: 60
   posting_enabled: false
   livestream_chat_commands_enabled: false
 
@@ -40,7 +54,10 @@ kick:
   client_id:
   client_secret:
   access_token:
+  refresh_token:
   channel:
+  destination_channel:
+  live_poll_seconds: 60
   livestream_chat_commands_enabled: false
 
 twitter:
@@ -50,6 +67,12 @@ twitter:
   bearer_token:
   access_token:
   access_token_secret:
+  client_id:
+  client_secret:
+  refresh_token:
+  user_id:
+  destination_channel:
+  live_poll_seconds: 60
   posting_enabled: false
 
 bluesky:
@@ -63,7 +86,10 @@ tiktok:
   client_key:
   client_secret:
   access_token:
+  refresh_token:
   open_id:
+  destination_channel:
+  live_poll_seconds: 60
   posting_enabled: false
 
 instagram:
@@ -71,7 +97,11 @@ instagram:
   app_id:
   app_secret:
   access_token:
+  refresh_token:
+  webhook_verify_token:
   account_id:
+  destination_channel:
+  live_poll_seconds: 60
   posting_enabled: false
 
 substack:

@@ -18,11 +18,11 @@ logs/
 experimental/
 cogs/namegen/originals/
 cogs/roller/config.json
+
+config.yaml
+platforms.yaml
 data/guilds/
 data/secrets/
 secrets/
 *.secrets
-
-config.yaml
-platforms.yaml
 output.log

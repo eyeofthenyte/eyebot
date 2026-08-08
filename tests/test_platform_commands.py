@@ -1,4 +1,5 @@
 import ast
+import os
 import tempfile
 import types
 import unittest
@@ -31,6 +32,8 @@ for node in TREE.body:
                 "_can_manage",
                 "_resolve_target",
                 "_require_mod_channel",
+                "_send_setup_instructions",
+                "_ensure_socialmedia_source_channel",
             }:
                 method.decorator_list = []
                 methods.append(method)
@@ -80,11 +83,14 @@ class Guild:
             guild_permissions=types.SimpleNamespace(manage_guild=True)
         )
 
+    def get_channel(self, channel_id):
+        return getattr(self, "channels", {}).get(channel_id)
+
 
 class Recorder:
     def __init__(self, guild=None, *, channel_id=999):
         self.guild = guild
-        self.author = types.SimpleNamespace(id=7)
+        self.author = RecorderDestination(id=7)
         self.channel = types.SimpleNamespace(id=channel_id)
         self.messages = []
         self.deleted = 0
@@ -92,6 +98,15 @@ class Recorder:
 
     async def delete(self):
         self.deleted += 1
+
+    async def send(self, message):
+        self.messages.append(message)
+
+
+class RecorderDestination:
+    def __init__(self, *, id=None):
+        self.id = id
+        self.messages = []
 
     async def send(self, message):
         self.messages.append(message)
@@ -109,6 +124,21 @@ class PlatformValueValidationTests(unittest.TestCase):
         self.assertEqual(validate_parameter_value(rule, valid), valid)
         with self.assertRaises(PlatformValueError):
             validate_parameter_value(rule, "not-a-channel")
+
+    def test_twitch_channel_is_normalized_and_validated(self):
+        rule = PLATFORM_RULES["twitch"]["channel"]
+        self.assertEqual(validate_parameter_value(rule, "EyeBot_Channel"), "eyebot_channel")
+        with self.assertRaises(PlatformValueError):
+            validate_parameter_value(rule, "invalid channel name")
+
+    def test_twitch_destination_requires_discord_channel(self):
+        rule = PLATFORM_RULES["twitch"]["destination_channel"]
+        self.assertEqual(
+            validate_parameter_value(rule, "<#123456789012345678>"),
+            "123456789012345678",
+        )
+        with self.assertRaises(PlatformValueError):
+            validate_parameter_value(rule, "#stream-alerts")
 
     def test_discord_channel_mentions_are_normalized_to_ids(self):
         rule = PLATFORM_RULES["youtube"]["destination_channel"]
@@ -156,6 +186,7 @@ class PlatformCommandTests(unittest.IsolatedAsyncioTestCase):
         self.bot = types.SimpleNamespace(
             platform_config_service=self.service,
             guilds=(self.guild,),
+            config={},
         )
         self.cog = Platform(self.bot)
         self.context = Recorder(self.guild)
@@ -184,6 +215,27 @@ class PlatformCommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("api_key", saved["platforms"]["youtube"])
         self.assertEqual(self.context.deleted, 1)
 
+    async def test_twitch_go_live_destination_is_saved_per_guild(self):
+        await self.cog.platform_command(
+            self.context,
+            "twitch",
+            "set",
+            "destination_channel",
+            value="<#123456789012345678>",
+        )
+
+        effective = self.service.effective_guild_platform(42, "twitch")
+        self.assertEqual(effective["destination_channel"], "123456789012345678")
+        saved = yaml.safe_load(
+            (Path(self.temp.name) / "data/guilds/42.yaml").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(
+            saved["platforms"]["twitch"]["destination_channel"],
+            "123456789012345678",
+        )
+
     async def test_enable_and_disable_change_only_service_state(self):
         self.service.set_guild_platform_override(
             42,
@@ -202,6 +254,45 @@ class PlatformCommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(overrides["enabled"])
         self.assertTrue(overrides["videos_enabled"])
         self.assertEqual(self.context.deleted, 2)
+
+    async def test_enabling_social_platform_prompts_for_source_channel(self):
+        async def wait_for(event, timeout, check):
+            message = types.SimpleNamespace(
+                author=self.context.author,
+                channel=self.context.channel,
+                content="3",
+                delete=self.context.delete,
+            )
+            self.assertTrue(check(message))
+            return message
+
+        self.bot.wait_for = wait_for
+        await self.cog.platform_command(self.context, "twitter", "enable")
+
+        output = "\n".join(self.context.messages)
+        self.assertIn("social-media source channel", output)
+        self.assertIn("Image posting remains unavailable", output)
+
+    async def test_connect_sends_signed_link_only_to_manager_dm(self):
+        self.bot.config = {
+            "gateway": {
+                "enabled": True,
+                "public_base_url": "https://bot.example.com",
+            }
+        }
+        previous = os.environ.get("EYEBOT_OAUTH_STATE_KEY")
+        os.environ["EYEBOT_OAUTH_STATE_KEY"] = "x" * 32
+        try:
+            await self.cog.platform_command(self.context, "youtube", "connect")
+        finally:
+            if previous is None:
+                os.environ.pop("EYEBOT_OAUTH_STATE_KEY", None)
+            else:
+                os.environ["EYEBOT_OAUTH_STATE_KEY"] = previous
+
+        self.assertIn("/oauth/youtube/start?request=", self.context.author.messages[0])
+        self.assertNotIn("/oauth/youtube/start?request=", "\n".join(self.context.messages))
+        self.assertIn("sent to your DM", self.context.messages[-1])
 
     async def test_enable_rejects_extra_parameters_without_changing_state(self):
         await self.cog.platform_command(
@@ -313,6 +404,64 @@ class PlatformCommandTests(unittest.IsolatedAsyncioTestCase):
         overrides = self.service.discord_guilds()["84"]["platforms"]["youtube"]
         self.assertTrue(overrides["enabled"])
         self.assertNotIn("platforms", self.service.discord_guilds()["42"])
+
+    async def test_instructions_are_sent_to_configured_mod_channel(self):
+        mod_channel = RecorderDestination(id=999)
+        self.guild.channels = {999: mod_channel}
+
+        await self.cog.platform_command(
+            self.context,
+            "twitch",
+            "instructions",
+        )
+
+        output = "\n".join(mod_channel.messages)
+        self.assertIn("# Twitch setup", output)
+        self.assertIn("https://dev.twitch.tv/console/apps", output)
+        self.assertIn("--guild 42", output)
+        self.assertEqual(self.context.deleted, 1)
+        self.assertEqual(self.context.author.messages, [])
+
+    async def test_instructions_fall_back_to_dm_without_mod_channel(self):
+        self.service.discord_guilds()["42"]["mod_channel"] = "UNSET"
+
+        await self.cog.platform_command(
+            self.context,
+            "youtube",
+            "instructions",
+        )
+
+        output = "\n".join(self.context.author.messages)
+        self.assertIn("# YouTube setup", output)
+        self.assertIn("https://console.cloud.google.com/", output)
+        self.assertIn("sent the platform setup instructions by DM", self.context.messages[-1])
+
+    async def test_all_instructions_cover_every_platform(self):
+        self.service.discord_guilds()["42"]["mod_channel"] = "UNSET"
+
+        await self.cog.platform_command(
+            self.context,
+            "all",
+            "instructions",
+        )
+
+        output = "\n".join(self.context.author.messages)
+        expected_headings = (
+            "# Discord setup",
+            "# Twitch setup",
+            "# YouTube setup",
+            "# Facebook setup",
+            "# Kick setup",
+            "# Twitter/X setup",
+            "# Bluesky setup",
+            "# TikTok setup",
+            "# Instagram setup",
+            "# Substack setup",
+            "# Ko-fi setup",
+        )
+        for heading in expected_headings:
+            self.assertIn(heading, output)
+        self.assertTrue(all(len(message) <= 1900 for message in self.context.author.messages))
 
 
 if __name__ == "__main__":

@@ -2,6 +2,19 @@
 # default is !
 prefix: !
 
+# Keep true for a single-owner installation. Set false only when one hosted
+# EyeBot instance serves multiple Discord guilds and may join their Twitch
+# channels.
+private_install: true
+
+# OAuth callbacks and signed platform webhooks. Put this behind a TLS reverse
+# proxy and set public_base_url to its externally reachable HTTPS origin.
+gateway:
+    enabled: false
+    host: 0.0.0.0
+    port: 8080
+    public_base_url: https://bot.example.com
+
 logging:
     level: DEBUG
     output: output.log # syslog, filename

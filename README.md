@@ -1,16 +1,17 @@
 # EyeBot
 
+Current release: **2.0.0**
+
 EyeBot is a Python bot framework for tabletop-RPG utilities and shared chat
 commands. Discord and Twitch are currently implemented. A platform-neutral
 request/response layer allows the same gameplay commands to run through either
 transport, while Discord-specific administration remains in Discord cogs.
 
-The overall supervisor starts every enabled platform bot as a separate child
-process inside one container. YouTube, Facebook, Kick, Twitter/X, Bluesky,
-TikTok, Instagram, Substack, and Ko-fi currently have configuration and
-entrypoint placeholders only. Their pinned Python API dependencies are included
-in `requirements.txt`; installing them does not make the placeholder adapters
-operational until their authentication and transport logic is implemented.
+The overall supervisor starts every enabled platform connector as a separate
+child process inside one container. Optional connectors provide live alerts,
+OAuth, signed webhooks, social publishing, or feed delivery according to the
+capabilities listed below. External application approval and scopes are still
+required before a connector can call its production platform API.
 
 ## Contents
 
@@ -21,6 +22,7 @@ operational until their authentication and transport logic is implemented.
 - [Installation with Docker Compose](#installation-with-docker-compose)
 - [Local installation](#local-installation)
 - [Encrypted platform secrets](#encrypted-platform-secrets)
+- [Per-guild OAuth and webhook gateway](#per-guild-oauth-and-webhook-gateway)
 - [Configuration reference](#configuration-reference)
 - [Google Sheets setup](#google-sheets-setup)
 - [Permissions](#permissions)
@@ -47,23 +49,24 @@ operational until their authentication and transport logic is implemented.
 
 ## Platform status
 
-| Platform | Config section | Status | Shared chat commands |
-| --- | --- | --- | --- |
-| Discord | `discord` | Implemented | Yes |
-| Twitch | `twitch` | Implemented | Yes |
-| YouTube | `youtube` | Placeholder | No |
-| Facebook | `facebook` | Placeholder | No |
-| Kick | `kick` | Placeholder | No |
-| Twitter/X | `twitter` | Placeholder | No |
-| Bluesky | `bluesky` | Placeholder | No |
-| TikTok | `tiktok` | Placeholder | No |
-| Instagram | `instagram` | Placeholder | No |
-| Substack | `substack` | Placeholder | No |
-| Ko-fi | `kofi` | Placeholder | No |
+| Platform | Config section | Connector status | Live alerts | Shared chat commands |
+| --- | --- | --- | --- | --- |
+| Discord | `discord` | Implemented | Destination | Yes |
+| Twitch | `twitch` | Implemented | Yes | Yes |
+| YouTube | `youtube` | Live alerts and chat API adapter | Yes | API adapter |
+| Facebook | `facebook` | Live alerts and Page posting | Yes | Webhook events |
+| Kick | `kick` | Live alerts implemented | Yes | No |
+| Twitter/X | `twitter` | Spaces alerts and posting | Yes | No |
+| Bluesky | `bluesky` | Posting implemented | No | No |
+| TikTok | `tiktok` | Approved Content Posting; LIVE API unavailable | No | No |
+| Instagram | `instagram` | Live alerts and image posting | Yes | No |
+| Substack | `substack` | RSS newsletters/podcasts | No | No |
+| Ko-fi | `kofi` | Signed webhook delivery | No | No |
 
-Leave placeholder platforms disabled. Enabling one starts its placeholder
-entrypoint, which exits with a not-implemented error; the supervisor then stops
-the other children so the container does not silently run a partial setup.
+Keep a connector disabled until its credentials, scopes, guild account mapping,
+and external provider approval are complete. A required child exiting causes
+the supervisor to stop the container instead of silently running a partial
+configuration.
 
 ## Requirements
 
@@ -332,17 +335,116 @@ Supported secret parameters:
 | --- | --- |
 | Discord | `bot_token` |
 | Twitch | `tmi_token`, `client_id` |
-| YouTube | `api_key`, `client_id`, `client_secret`, `refresh_token` |
-| Facebook | `app_id`, `app_secret`, `access_token` |
-| Kick | `client_id`, `client_secret`, `access_token` |
-| Twitter/X | `api_key`, `api_secret`, `bearer_token`, `access_token`, `access_token_secret` |
+| YouTube | `api_key`, `client_id`, `client_secret`, `access_token`, `refresh_token` |
+| Facebook | `app_id`, `app_secret`, `access_token`, `refresh_token`, `webhook_verify_token` |
+| Kick | `client_id`, `client_secret`, `access_token`, `refresh_token` |
+| Twitter/X | `api_key`, `api_secret`, `bearer_token`, `client_id`, `client_secret`, `access_token`, `access_token_secret`, `refresh_token` |
 | Bluesky | `app_password` |
-| TikTok | `client_key`, `client_secret`, `access_token` |
-| Instagram | `app_id`, `app_secret`, `access_token` |
+| TikTok | `client_key`, `client_secret`, `access_token`, `refresh_token` |
+| Instagram | `app_id`, `app_secret`, `access_token`, `refresh_token`, `webhook_verify_token` |
 | Substack | `email`, `credential` |
 | Ko-fi | `verification_token` |
 
 Direct entrypoints do not provide overall process supervision.
+
+## Per-guild OAuth and webhook gateway
+
+YouTube, Facebook, Instagram, Kick, X, and TikTok use the optional EyeBot
+gateway for per-guild OAuth callbacks. Enable it only behind an HTTPS reverse
+proxy:
+
+```yaml
+# config.yaml
+gateway:
+  enabled: true
+  host: 0.0.0.0
+  port: 8080
+  public_base_url: https://bot.example.com
+```
+
+The Compose port defaults to `127.0.0.1:8080`, so it is not directly exposed
+to the internet. Configure nginx, Caddy, or another TLS proxy; an nginx example
+is provided at `deploy/nginx-eyebot.conf.example`. Register the exact callback
+for each application:
+
+```text
+https://bot.example.com/oauth/<platform>/callback
+```
+
+Store the platform application client ID/secret with `manage_secrets.py`, set
+the guild's source account/channel parameters, then have a Manage Server user
+run this in the guild mod channel:
+
+```text
+!platform youtube connect
+!platform facebook connect
+!platform instagram connect
+!platform kick connect
+!platform twitter connect
+!platform tiktok connect
+```
+
+EyeBot deletes the guild invocation and sends a signed, single-use, ten-minute
+authorization link to the moderator's DM. Callback state is HMAC-signed and
+uses PKCE where the provider supports it. Access and refresh tokens are stored
+only in the encrypted per-guild secret file. Public metadata such as scopes,
+expiration, connection time, and account name is stored in that guild's YAML.
+Account discovery verifies the authorized YouTube channel, Meta Page/Instagram
+professional account, X user, or TikTok identity before saving it.
+
+Disconnect and remove the guild's OAuth tokens with:
+
+```text
+!platform <platform> disconnect
+```
+
+Meta and Ko-fi webhooks use these routes:
+
+```text
+https://bot.example.com/webhooks/facebook/<guild_id>
+https://bot.example.com/webhooks/instagram/<guild_id>
+https://bot.example.com/webhooks/kofi/<guild_id>
+```
+
+Meta requests require `X-Hub-Signature-256`; Ko-fi events require the guild's
+verification token. The gateway limits bodies to 1 MiB, rate-limits clients,
+rejects duplicate events, disables Discord mentions, and routes only to the
+configured guild destination.
+
+### Social publishing commands
+
+Posting commands require Manage Server. Text posts use the configured guild
+mod channel. Enabling Twitter/X, Facebook, or Bluesky prompts the moderator to
+create a private `#socialmedia_sources` channel, select an existing channel
+already hidden from `@everyone`, or skip setup. EyeBot needs **Manage Channels**
+to create the channel. The invoking command is deleted and a durable job is written under
+`data/guilds/.platform_jobs/`. Only the enabled platform child consumes its
+queue, and failed jobs retry three times before becoming `.failed` files.
+
+```text
+!socialpost bluesky Text to publish
+!socialpost twitter Text to publish
+!socialpost facebook Text to publish
+!socialpost all Text for every enabled posting connector
+!socialmedia twitter Caption for attached images
+!socialmedia facebook Caption for attached images
+!socialmedia bluesky Caption for attached images
+!socialmedia all Caption for every enabled image connector
+!socialurl instagram https://cdn.example.com/image.jpg Caption
+!socialurl tiktok https://cdn.example.com/video.mp4 Caption
+```
+
+Run `!socialmedia` in the configured source channel and either attach one to
+four images to the command or reply to an existing message containing the
+images. EyeBot immediately validates and privately stages JPEG, PNG, GIF, or
+WebP files so expiring Discord attachment URLs are not placed in the queue.
+Each file may be at most 5 MB; Bluesky's current upload path applies a stricter
+2 MB per-image limit. The source channel setting and platform connection are
+per guild. Platform credentials are never read from channel messages.
+
+TikTok initially requests `SELF_ONLY` visibility. Production public posting
+requires TikTok application review and compliance with its Content Posting UX
+requirements. Instagram media URLs must be publicly retrievable HTTPS URLs.
 
 ## Configuration reference
 
@@ -360,6 +462,9 @@ files to existing cogs as one guild mapping.
 | Key | Meaning | Default |
 | --- | --- | --- |
 | `prefix` | Prefix used to recognize commands | `!` |
+| `private_install` | Restrict Twitch to host-configured channels; set `false` only for a shared multi-guild bot | `true` |
+| `gateway.enabled` | Start the OAuth/webhook child | `false` |
+| `gateway.public_base_url` | Externally reachable HTTPS origin | `https://bot.example.com` |
 | `logging.level` | Configured logging level | `DEBUG` |
 | `logging.output` | Log filename or `syslog` | `output.log` |
 
@@ -396,11 +501,13 @@ dm_role: "UNSET"
 aliases: {}
 user_channels: {}
 mod_channel: "UNSET"
+socialmedia_sources_channel: "UNSET"
 timers: {}
 ```
 
 These entries are normally maintained by `!setprefix`, `!set_dm`, `!alias`,
-`!privateroll`, `!setmodchannel`, and `!settimer`; manual editing is optional.
+`!privateroll`, `!setmodchannel`, `!platform ... enable`, and `!settimer`;
+manual editing is optional.
 Only numeric Discord snowflake IDs are accepted as filenames.
 
 ### Twitch
@@ -415,6 +522,7 @@ twitch:
   nick: your_bot_name
   channels:
     - your_channel_name
+  destination_channel:
 ```
 
 | Key | Required | Meaning |
@@ -424,9 +532,34 @@ twitch:
 | `twitch.client_id` | Legacy only | Plaintext fallback; prefer the encrypted store |
 | `twitch.nick` | Recommended | Bot account name |
 | `twitch.channels` | When enabled | YAML list of channel names to join |
+| `twitch.destination_channel` | Optional | Default Discord channel ID for go-live posts; guilds can override it |
 
 The Twitch entrypoint validates the token and channel list before connecting.
 Use the YAML list shown above; do not provide a numeric channel ID.
+
+For a bot operated only by its owner, leave `private_install: true` in
+`config.yaml`; guild Twitch channel overrides are then ignored. For a hosted
+bot shared by multiple Discord servers, set `private_install: false`. A server
+moderator can then select that server's Twitch destination in its configured
+mod channel or by bot DM:
+
+```text
+!platform twitch set channel target_channel
+!platform twitch set destination_channel #stream-alerts
+!platform twitch enable
+```
+
+On its next start, the Twitch child joins the connector-wide `channels` plus
+each enabled guild's `channel`, with duplicates removed. Restart Twitch after
+changing a channel: `!restart twitch` (or restart the container). The shared
+bot account's OAuth token and application credentials remain host-managed;
+guild moderators do not enter them through Discord.
+
+Each enabled platform child owns its live detector. Twitch polls Helix while
+its chat bot is connected; the other live-capable entrypoints run their own
+poll loop. New event IDs are persisted under `data/guilds/.live_state/`, so
+normal polls and process restarts do not duplicate an announcement. Going
+offline clears the state and permits the next live event to post.
 
 Twitch supports the shared gameplay commands and the native `!hello`
 connectivity check. Discord-only administration is not exposed on Twitch.
@@ -451,11 +584,19 @@ google_sheets:
 `GOOGLE_SERVICE_ACCOUNT_FILE` can supply the credential path when
 `credentials_file` is omitted.
 
-### Placeholder platforms
+### Live-event notifications and remaining placeholders
 
-Every placeholder section defaults to `enabled: false`. Its other blank
-credentials and feature toggles document the intended integration contract.
-They do not currently create API connections or implement posting:
+Twitch, YouTube, Facebook, Kick, X Spaces, and Instagram entrypoints detect
+live transitions while their platform child is enabled and post to each
+guild's validated `destination_channel`. The Discord bot requires View Channel,
+Send Messages, and Embed Links in every destination. Poll intervals are
+host-controlled with `live_poll_seconds` in `platforms.yaml` and are bounded to
+30–3600 seconds. YouTube defaults to 900 seconds because `search.list` consumes
+100 API quota units per request.
+
+TikTok can store a future destination, but its supported public developer APIs
+do not expose creator LIVE status. EyeBot does not scrape TikTok or store an
+interactive browser session. Remaining placeholder capabilities are:
 
 - YouTube: videos, community posts, and livestream chat commands
 - Facebook: publishing and livestream chat commands
@@ -676,6 +817,11 @@ Roll delivery flags must appear at the end of the command:
 | `!platform <name> default <parameter\|all>` | Remove overrides and inherit `platforms.yaml` values |
 | `!platform <name> enable` | Enable that platform's service for this server only |
 | `!platform <name> disable` | Disable that platform's service for this server only |
+| `!platform <name> connect` | DM a signed per-guild OAuth link to the moderator |
+| `!platform <name> disconnect` | Remove that guild's OAuth tokens and connection metadata |
+| `!socialpost <name\|all> <text>` | Queue a text post for enabled social connectors |
+| `!socialmedia <twitter\|facebook\|bluesky\|all> [caption]` | Queue one to four attached/replied images from the private source channel |
+| `!socialurl <instagram\|tiktok> <https-url> [caption]` | Queue an approved public media URL |
 | `!leave <exact guild name>` | Make EyeBot leave a server |
 | `!servers` | DM the owner a list of connected servers |
 | `!shutdown` | Close the Discord child; aliases: `sd`, `_shutdown` |
@@ -692,7 +838,8 @@ Platform names are `discord`, `twitch`, `youtube`, `facebook`, `kick`,
 ```text
 !platform youtube set videos_enabled true
 !platform youtube set destination_channel #announcements
-!platform twitch set channels first_channel, second_channel
+!platform twitch set channel server_channel
+!platform twitch set destination_channel #stream-alerts
 !platform substack set publication_url https://example.substack.com
 !platform youtube disable
 !platform youtube enable
@@ -734,14 +881,14 @@ Accepted guild parameters:
 | Platform | Parameters |
 | --- | --- |
 | Discord | `enabled`, `mod_channel_name` |
-| Twitch | `enabled`, `nick`, `channels` |
+| Twitch | `enabled`, `nick`, `channel`, `destination_channel` |
 | YouTube | `enabled`, `channel_id`, `destination_channel`, `videos_enabled`, `community_posts_enabled`, `livestream_chat_commands_enabled` |
 | Facebook | `enabled`, `page_id`, `destination_channel`, `posting_enabled`, `livestream_chat_commands_enabled` |
-| Kick | `enabled`, `channel`, `livestream_chat_commands_enabled` |
-| Twitter/X | `enabled`, `posting_enabled` |
+| Kick | `enabled`, `channel`, `destination_channel`, `livestream_chat_commands_enabled` |
+| Twitter/X | `enabled`, `user_id`, `destination_channel`, `posting_enabled` |
 | Bluesky | `enabled`, `handle`, `posting_enabled` |
-| TikTok | `enabled`, `posting_enabled` |
-| Instagram | `enabled`, `account_id`, `posting_enabled` |
+| TikTok | `enabled`, `destination_channel`, `posting_enabled` |
+| Instagram | `enabled`, `account_id`, `destination_channel`, `posting_enabled` |
 | Substack | `enabled`, `publication_url`, `destination_channel`, `newsletters_enabled`, `podcasts_enabled` |
 | Ko-fi | `enabled`, `page_url`, `destination_channel`, `donations_enabled`, `memberships_enabled`, `shop_orders_enabled`, `webhooks_enabled` |
 
@@ -946,7 +1093,7 @@ the matching key or neither encrypted copy can be authenticated.
 - Never pass secret values as command-line arguments or Discord commands.
 - Back up the master key separately; losing it makes encrypted stores
   unrecoverable, while exposing it together with ciphertext exposes secrets.
-- Keep placeholder connectors disabled until implemented and reviewed.
+- Keep unconfigured connectors disabled until their credentials, scopes, and account mappings are reviewed.
 - Do not expose the supervisor's loopback control port.
 - Grant the Discord bot only the permissions required by enabled commands.
 - Run the container as the included non-root `eyebot` user.

@@ -12,23 +12,12 @@ from adapters.substack_adapter import SUBSTACK_ADAPTER
 from adapters.tiktok_adapter import TIKTOK_ADAPTER
 from adapters.twitter_adapter import TWITTER_ADAPTER
 from adapters.youtube_adapter import YOUTUBE_ADAPTER
-import eyebot_bluesky
-import eyebot_facebook
-import eyebot_instagram
-import eyebot_kick
-import eyebot_kofi
-import eyebot_substack
-import eyebot_tiktok
-import eyebot_twitter
-import eyebot_youtube
-
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
-class PlatformPlaceholderTests(unittest.TestCase):
-    def test_every_requested_platform_has_a_disabled_placeholder(self):
-        placeholders = (
+class PlatformConnectorTests(unittest.TestCase):
+    def test_every_requested_platform_has_an_implemented_adapter_contract(self):
+        adapters = (
             YOUTUBE_ADAPTER,
             FACEBOOK_ADAPTER,
             KICK_ADAPTER,
@@ -39,29 +28,12 @@ class PlatformPlaceholderTests(unittest.TestCase):
             SUBSTACK_ADAPTER,
             KOFI_ADAPTER,
         )
-        self.assertEqual(len(placeholders), 9)
-        self.assertTrue(all(not item.implemented for item in placeholders))
+        self.assertEqual(len(adapters), 9)
+        self.assertTrue(all(item.implemented for item in adapters))
+        self.assertTrue(all(item.capabilities for item in adapters))
 
-    def test_placeholders_fail_explicitly_if_used(self):
-        with self.assertRaisesRegex(NotImplementedError, "youtube"):
-            YOUTUBE_ADAPTER.require_implementation()
-
-    def test_placeholder_bot_entrypoints_fail_explicitly(self):
-        entrypoints = (
-            eyebot_youtube,
-            eyebot_facebook,
-            eyebot_kick,
-            eyebot_twitter,
-            eyebot_bluesky,
-            eyebot_tiktok,
-            eyebot_instagram,
-            eyebot_substack,
-            eyebot_kofi,
-        )
-        for entrypoint in entrypoints:
-            with self.subTest(entrypoint=entrypoint.__name__):
-                with self.assertRaises(NotImplementedError):
-                    entrypoint.main()
+    def test_kick_chat_remains_explicitly_unavailable(self):
+        self.assertNotIn("livestream_chat", KICK_ADAPTER.capabilities)
 
     def test_distribution_config_contains_disabled_blank_sections(self):
         with (PROJECT_ROOT / "platforms.yaml.dist").open(encoding="utf-8") as file:
@@ -92,3 +64,15 @@ class PlatformPlaceholderTests(unittest.TestCase):
         self.assertIsNone(config["substack"]["credential"])
         self.assertIsNone(config["kofi"]["verification_token"])
         self.assertFalse(config["twitch"]["enabled"])
+
+        for platform in (
+            "twitch",
+            "youtube",
+            "facebook",
+            "kick",
+            "twitter",
+            "tiktok",
+            "instagram",
+        ):
+            with self.subTest(live_destination=platform):
+                self.assertIn("destination_channel", config[platform])

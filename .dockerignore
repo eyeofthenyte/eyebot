@@ -3,6 +3,10 @@
 .github
 config.yaml
 platforms.yaml
+data/guilds
+data/secrets
+secrets
+*.secrets
 .pytest_cache
 .venv
 __pycache__
@@ -13,7 +17,3 @@ experimental
 runtime
 tests
 cogs/namegen/originals/
-data/guilds/
-data/secrets/
-secrets/
-*.secrets

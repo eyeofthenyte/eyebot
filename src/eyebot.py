@@ -28,6 +28,7 @@ CONTROL_HOST = "127.0.0.1"
 CONTROL_PORT = int(os.getenv("EYEBOT_CONTROL_PORT", "8765"))
 
 PLATFORM_ENTRYPOINTS = {
+    "gateway": "src/eyebot_gateway.py",
     "discord": "src/eyebot_discord.py",
     "twitch": "src/eyebot_twitch.py",
     "youtube": "src/eyebot_youtube.py",

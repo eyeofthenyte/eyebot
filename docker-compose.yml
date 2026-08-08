@@ -2,11 +2,12 @@ name: eyebot
 
 services:
   eyebot:
-    container_name: EyeBot
-    image: ${IMAGE_NAME:-eyebot}:${EYEBOT_VERSION:-latest}
+    image: ${IMAGE_NAME:-eyebot}:${EYEBOT_VERSION:-2.0.0}
     build:
       context: .
       dockerfile: dockerfile
+      args:
+        EYEBOT_VERSION: ${EYEBOT_VERSION:-2.0.0}
     init: true
     restart: unless-stopped
     stop_grace_period: 30s
@@ -15,6 +16,8 @@ services:
       EYEBOT_GUILD_CONFIG_DIR: /app/data/guilds
       EYEBOT_SECRET_DIR: /app/data/secrets
       EYEBOT_MASTER_KEY_FILE: /run/secrets/eyebot_master_key
+    ports:
+      - "${EYEBOT_GATEWAY_BIND:-127.0.0.1:8080}:8080"
     secrets:
       - eyebot_master_key
     volumes:

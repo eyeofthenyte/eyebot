@@ -1,10 +1,21 @@
-"""Placeholder entrypoint for the future EyeBot Substack integration."""
+"""Substack RSS notification child."""
 
-from adapters.substack_adapter import SUBSTACK_ADAPTER
+import asyncio
+
+from services.feedNotificationService import FeedNotificationService
+from services.liveNotificationService import load_platform_runtime
+from services.logService import LogService
+
+
+async def run():
+    config, service = load_platform_runtime("substack")
+    await FeedNotificationService(
+        config, service, LogService("substack", config["logging"])
+    ).run_forever()
 
 
 def main():
-    SUBSTACK_ADAPTER.require_implementation()
+    asyncio.run(run())
 
 
 if __name__ == "__main__":

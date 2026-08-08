@@ -1,9 +1,16 @@
-FROM python:3.12.13-slim-bookworm
+FROM python:3.11.9-slim-bookworm
+
+ARG EYEBOT_VERSION=2.0.0
+
+LABEL org.opencontainers.image.title="EyeBot" \
+      org.opencontainers.image.version="${EYEBOT_VERSION}" \
+      org.opencontainers.image.source="https://github.com/eyeofthenyte/eyebot"
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    EYEBOT_VERSION=${EYEBOT_VERSION}
 
 WORKDIR /app
 

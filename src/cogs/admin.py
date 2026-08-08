@@ -155,14 +155,14 @@ class Admin (commands.Cog):
             )
 
     #Check connected servers BOT OWNER ONLY
-    @commands.command()
+    @commands.command(name="servers", aliases=["server"])
     @commands.is_owner()
     async def servers(self, ctx):
         """
         📋 Lists all servers the bot is currently connected to via DM.\n"
 
         Usage:
-        `!servers`
+        `!servers` or `!server`
 
         Access: Bot Owner Only
         """
@@ -173,14 +173,65 @@ class Admin (commands.Cog):
             self.logger.info("End of Server Listing - no connected servers.")
             return
 
+        platform_names = (
+            "discord",
+            "twitch",
+            "youtube",
+            "facebook",
+            "kick",
+            "twitter",
+            "bluesky",
+            "tiktok",
+            "instagram",
+            "substack",
+            "kofi",
+        )
+        platform_service = getattr(
+            self.bot,
+            "platform_config_service",
+            None,
+        )
         lines = ["📋 **Connected Servers**"]
         for guild in guilds:
             line = f"• {guild.name} (id: {guild.id})"
             lines.append(line)
             self.logger.info(line)
 
+            statuses = []
+            for platform_name in platform_names:
+                if platform_service is not None:
+                    platform_config = platform_service.effective_guild_platform(
+                        guild.id,
+                        platform_name,
+                    )
+                else:
+                    platform_config = getattr(self, "config", {}).get(
+                        platform_name,
+                        {},
+                    )
+                enabled = (
+                    isinstance(platform_config, dict)
+                    and platform_config.get("enabled") is True
+                )
+                statuses.append(
+                    f"{platform_name}: {'enabled' if enabled else 'disabled'}"
+                )
+            lines.append("  Platforms: " + " | ".join(statuses))
+
         try:
-            await ctx.author.send("\n".join(lines))
+            pages = []
+            page = ""
+            for line in lines:
+                candidate = f"{page}\n{line}" if page else line
+                if len(candidate) > 1900:
+                    pages.append(page)
+                    page = line
+                else:
+                    page = candidate
+            if page:
+                pages.append(page)
+            for page in pages:
+                await ctx.author.send(page)
         except discord.Forbidden:
             await ctx.send(
                 "I couldn't send you the server list. Please enable direct "
