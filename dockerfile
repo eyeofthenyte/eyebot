@@ -1,4 +1,4 @@
-FROM python:3.11.9-slim-bookworm
+FROM python:3.12.13-slim-bookworm
 
 ARG EYEBOT_VERSION=2.0.0
 
@@ -20,9 +20,9 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
-RUN python -m pip install --requirement requirements.txt \
-    && python -m pip check \
-    && python -c "import aiohttp, atproto, cryptography, discord, facebook, feedparser, googleapiclient, google_auth_oauthlib, gspread, instagrapi, kickapi, requests, substack_api, TikTokApi, tweepy, twitchio, yaml"
+RUN python -m pip install --requirement requirements.txt
+RUN python -m pip check
+RUN python -c "import aiohttp, atproto, cryptography, discord, facebook, feedparser, googleapiclient, google_auth_oauthlib, gspread, instagrapi, kickapi, requests, substack_api, TikTokApi, tweepy, twitchio, yaml"
 
 COPY . .
 

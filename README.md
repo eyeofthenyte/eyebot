@@ -75,12 +75,12 @@ configuration.
 - Git
 - Docker Engine or Docker Desktop with Docker Compose v2
 
-The image supplies Python 3.11, Node.js, and the pinned Python dependencies.
+The image supplies Python 3.12, Node.js, and the pinned Python dependencies.
 
 ### Local installation
 
 - Git
-- Python 3.11
+- Python 3.12 or newer (`substack-api==1.3.0` requires Python 3.12)
 - Node.js, required by `!namegen`
 
 Pinned Python packages are listed in `requirements.txt`:
