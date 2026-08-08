@@ -88,6 +88,7 @@ intents.message_content = True  # <- REQUIRED to read messages in servers
 intents.messages = True
 intents.guilds = True
 intents.members = True  # If needed
+intents.reactions = True  # Required for social-media approval reactions
 
 bot = commands.Bot(
     command_prefix=discord_command_prefix,

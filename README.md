@@ -442,6 +442,29 @@ Each file may be at most 5 MB; Bluesky's current upload path applies a stricter
 2 MB per-image limit. The source channel setting and platform connection are
 per guild. Platform credentials are never read from channel messages.
 
+Moderators can also approve source messages by reaction. Put the caption in
+the message body, attach one to four images for Twitter/X, Facebook, or
+Bluesky, and add the appropriate reaction. Instagram and TikTok instead
+require a public HTTPS media URL in the message body. EyeBot records the
+guild, source-message ID, and destination so repeated reactions cannot create
+duplicate posts across restarts.
+
+| Reaction | Action |
+|---|---|
+| 🐦 | Queue attached images for Twitter/X |
+| 🦋 | Queue attached images for Bluesky |
+| 📘 | Queue attached images for Facebook |
+| 📸 | Queue an HTTPS image URL for Instagram |
+| 🎵 | Queue an HTTPS video URL for TikTok |
+| 📣 | Queue the message for every compatible enabled platform |
+| ❌ | Cancel jobs that have not yet been claimed |
+
+Only members with **Manage Server** can approve or cancel. EyeBot adds ✅ when
+a job is queued, ⚠️ when validation fails, and keeps `!socialpost`,
+`!socialmedia`, and `!socialurl` as manual alternatives. Ko-fi is intentionally
+excluded because its supported integration is inbound payment webhooks, not
+outbound publishing.
+
 TikTok initially requests `SELF_ONLY` visibility. Production public posting
 requires TikTok application review and compliance with its Content Posting UX
 requirements. Instagram media URLs must be publicly retrievable HTTPS URLs.

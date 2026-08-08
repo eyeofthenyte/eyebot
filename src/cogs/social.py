@@ -1,77 +1,62 @@
-"""Queue guild-authorized outbound social posts."""
+"""Discord commands and moderator reaction approvals for social posts."""
 
 from __future__ import annotations
 
+import re
+
 import discord
 from discord.ext import commands
-from urllib.parse import urlparse
 
-from services.platformJobService import PlatformJobService
-from services.mediaStagingService import MediaStagingService
+from services.platformJobService import DuplicateJobError
+from services.socialPostingService import SocialPostRequest, SocialPostingService
 
 
-TEXT_POSTING_PLATFORMS = ("facebook", "twitter", "bluesky")
-IMAGE_POSTING_PLATFORMS = ("twitter", "facebook", "bluesky")
+REACTION_PLATFORMS = {
+    "🐦": "twitter",
+    "🦋": "bluesky",
+    "📘": "facebook",
+    "📸": "instagram",
+    "🎵": "tiktok",
+    "📣": "all",
+}
+CANCEL_REACTION = "❌"
+SUCCESS_REACTION = "✅"
+FAILURE_REACTION = "⚠️"
+HTTPS_URL = re.compile(r"https://[^\s<>]+", re.IGNORECASE)
 
 
 class Social(commands.Cog):
+    """Queue guild-authorized outbound social posts."""
+
     def __init__(self, bot):
         self.bot = bot
-        service = bot.platform_config_service
-        self.jobs = PlatformJobService(service.guild_config_dir / ".platform_jobs")
-        self.media = MediaStagingService(
-            service.guild_config_dir / ".platform_media"
-        )
+        self.posting = SocialPostingService(bot.platform_config_service)
 
     @commands.command(name="socialpost")
     @commands.has_permissions(manage_guild=True)
     async def social_post(self, ctx, platform: str, *, text: str):
         """Queue a text post: !socialpost <platform|all> <text>."""
-        if ctx.guild is None:
-            return await ctx.send("❌ Run this command in the server's mod channel.")
-        service = self.bot.platform_config_service
-        guild_config = service.discord_guilds().get(str(ctx.guild.id), {})
-        if getattr(ctx.channel, "id", None) != guild_config.get("mod_channel"):
-            return await ctx.send("❌ Social posts must be queued in the configured mod channel.")
-        selected = platform.casefold()
-        platforms = TEXT_POSTING_PLATFORMS if selected == "all" else (selected,)
-        if any(item not in TEXT_POSTING_PLATFORMS for item in platforms):
-            return await ctx.send("❌ Select facebook, twitter, bluesky, or all. Use `socialurl` for Instagram/TikTok.")
-        if not 1 <= len(text) <= 2000:
-            return await ctx.send("❌ Post text must contain 1-2000 characters.")
-        queued = []
-        for item in platforms:
-            settings = service.effective_guild_platform(ctx.guild.id, item)
-            if settings.get("enabled") is True and settings.get("posting_enabled") is True:
-                queued.append(self.jobs.enqueue(ctx.guild.id, item, "post", {"text": text}))
-        try:
-            await ctx.message.delete()
-        except (discord.Forbidden, discord.HTTPException):
-            pass
-        if not queued:
-            return await ctx.send("❌ None of the selected platforms has posting enabled.")
-        await ctx.send(f"✅ Queued {len(queued)} social post job(s).")
+        if not self._is_mod_channel(ctx):
+            return await ctx.send(
+                "❌ Social posts must be queued in the configured mod channel."
+            )
+        request = SocialPostRequest(
+            guild_id=str(ctx.guild.id),
+            platform=platform,
+            text=text,
+            source_message_id=str(ctx.message.id),
+            requested_by=str(ctx.author.id),
+        )
+        await self._queue_command(ctx, request)
 
     @commands.command(name="socialmedia")
     @commands.has_permissions(manage_guild=True)
     async def social_media(self, ctx, platform: str, *, text: str = ""):
         """Post attached/replied images: !socialmedia <platform|all> [caption]."""
-        if ctx.guild is None:
-            return await ctx.send("❌ Run this command in the server's mod channel.")
-        service = self.bot.platform_config_service
-        guild_config = service.discord_guilds().get(str(ctx.guild.id), {})
-        source_channel = guild_config.get("socialmedia_sources_channel")
-        if getattr(ctx.channel, "id", None) != source_channel:
+        if not self._is_source_channel(ctx):
             return await ctx.send(
                 "❌ Image posts must be queued in the configured "
                 "`socialmedia_sources` channel."
-            )
-        selected = platform.casefold()
-        supported = IMAGE_POSTING_PLATFORMS
-        selected_platforms = IMAGE_POSTING_PLATFORMS if selected == "all" else (selected,)
-        if any(item not in supported for item in selected_platforms):
-            return await ctx.send(
-                "❌ Select twitter, facebook, bluesky, or all."
             )
         attachments = list(getattr(ctx.message, "attachments", ()) or ())
         reference = getattr(ctx.message, "reference", None)
@@ -82,32 +67,15 @@ class Social(commands.Cog):
             return await ctx.send(
                 "❌ Attach images to this command or reply to a message containing images."
             )
-        queued = []
-        for item in selected_platforms:
-            settings = service.effective_guild_platform(ctx.guild.id, item)
-            if settings.get("enabled") is not True or settings.get("posting_enabled") is not True:
-                continue
-            try:
-                staged = await self.media.stage_images(
-                    item, attachments, alt_text=text
-                )
-            except (OSError, ValueError) as error:
-                return await ctx.send(f"❌ Unable to stage images: {error}")
-            queued.append(
-                self.jobs.enqueue(
-                    ctx.guild.id,
-                    item,
-                    "image_post",
-                    {"text": text[:2000], "media": staged},
-                )
-            )
-        try:
-            await ctx.message.delete()
-        except (discord.Forbidden, discord.HTTPException):
-            pass
-        if not queued:
-            return await ctx.send("❌ None of the selected platforms has image posting enabled.")
-        await ctx.send(f"✅ Queued {len(queued)} image post job(s).")
+        request = SocialPostRequest(
+            guild_id=str(ctx.guild.id),
+            platform=platform,
+            text=text,
+            source_message_id=str(ctx.message.id),
+            requested_by=str(ctx.author.id),
+            attachments=tuple(attachments),
+        )
+        await self._queue_command(ctx, request)
 
     @commands.command(name="socialurl")
     @commands.has_permissions(manage_guild=True)
@@ -120,43 +88,146 @@ class Social(commands.Cog):
         text: str = "",
     ):
         """Queue URL media: !socialurl <instagram|tiktok> <https-url> [caption]."""
-        if ctx.guild is None:
-            return await ctx.send("❌ Run this command in the social-media source channel.")
-        service = self.bot.platform_config_service
-        guild_config = service.discord_guilds().get(str(ctx.guild.id), {})
-        if getattr(ctx.channel, "id", None) not in {
-            guild_config.get("socialmedia_sources_channel"),
-            guild_config.get("mod_channel"),
-        }:
+        if not (self._is_source_channel(ctx) or self._is_mod_channel(ctx)):
             return await ctx.send(
                 "❌ Run this command in the configured social-media source or mod channel."
             )
-        selected = platform.casefold()
-        parsed = urlparse(media_url)
-        if (
-            selected not in {"instagram", "tiktok"}
-            or parsed.scheme != "https"
-            or not parsed.hostname
-            or parsed.username
-            or parsed.password
-        ):
-            return await ctx.send(
-                "❌ Select Instagram/TikTok and provide a public HTTPS media URL."
+        request = SocialPostRequest(
+            guild_id=str(ctx.guild.id),
+            platform=platform,
+            text=text,
+            source_message_id=str(ctx.message.id),
+            requested_by=str(ctx.author.id),
+            media_url=media_url,
+        )
+        await self._queue_command(ctx, request)
+
+    @commands.Cog.listener()
+    async def on_raw_reaction_add(self, payload):
+        """Treat moderator reactions in the source channel as posting approval."""
+        bot_user = getattr(self.bot, "user", None)
+        if payload.guild_id is None or payload.user_id == getattr(bot_user, "id", None):
+            return
+        emoji = str(payload.emoji)
+        if emoji not in {*REACTION_PLATFORMS, CANCEL_REACTION}:
+            return
+        guild = self.bot.get_guild(payload.guild_id)
+        if guild is None:
+            return
+        service = self.bot.platform_config_service
+        guild_config = service.discord_guilds().get(str(guild.id), {})
+        if str(payload.channel_id) != str(guild_config.get("socialmedia_sources_channel")):
+            return
+        member = guild.get_member(payload.user_id)
+        if member is None:
+            try:
+                member = await guild.fetch_member(payload.user_id)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                return
+        if not getattr(member.guild_permissions, "manage_guild", False):
+            return
+        channel = guild.get_channel(payload.channel_id)
+        if channel is None:
+            return
+        try:
+            message = await channel.fetch_message(payload.message_id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            return
+        if emoji == CANCEL_REACTION:
+            removed = self.posting.cancel(str(guild.id), str(message.id))
+            await self._mark(message, SUCCESS_REACTION if removed else FAILURE_REACTION)
+            if removed:
+                await channel.send(
+                    f"🛑 Cancelled {removed} pending social post job(s).",
+                    reference=message,
+                    mention_author=False,
+                )
+            return
+
+        platform = REACTION_PLATFORMS[emoji]
+        attachments = tuple(getattr(message, "attachments", ()) or ())
+        text = str(getattr(message, "content", "") or "").strip()
+        media_url = None
+        if platform in {"twitter", "facebook", "bluesky", "all"} and not attachments:
+            await self._mark(message, FAILURE_REACTION)
+            await channel.send(
+                "❌ This approval reaction requires one to four attached images.",
+                reference=message,
+                mention_author=False,
             )
-        settings = service.effective_guild_platform(ctx.guild.id, selected)
-        if settings.get("enabled") is not True or settings.get("posting_enabled") is not True:
-            return await ctx.send(f"❌ {selected} posting is disabled for this server.")
-        self.jobs.enqueue(
-            ctx.guild.id,
-            selected,
-            "post",
-            {"text": text[:2000], "media_url": media_url},
+            return
+        if platform in {"instagram", "tiktok"}:
+            match = HTTPS_URL.search(text)
+            if match:
+                media_url = match.group(0).rstrip(".,);]")
+                text = (text[: match.start()] + text[match.end() :]).strip()
+            attachments = ()
+        request = SocialPostRequest(
+            guild_id=str(guild.id),
+            platform=platform,
+            text=text,
+            source_message_id=str(message.id),
+            requested_by=str(member.id),
+            attachments=attachments,
+            media_url=media_url,
         )
         try:
-            await ctx.message.delete()
+            result = await self.posting.queue(request)
+        except (DuplicateJobError, OSError, ValueError) as error:
+            await self._mark(message, FAILURE_REACTION)
+            await channel.send(
+                f"❌ Social post was not queued: {error}.",
+                reference=message,
+                mention_author=False,
+            )
+            return
+        await self._mark(message, SUCCESS_REACTION)
+        await channel.send(
+            "✅ Queued social post for " + ", ".join(result.queued) + ".",
+            reference=message,
+            mention_author=False,
+        )
+
+    async def _queue_command(self, ctx, request):
+        try:
+            result = await self.posting.queue(request)
+        except (DuplicateJobError, OSError, ValueError) as error:
+            return await ctx.send(f"❌ Social post was not queued: {error}.")
+        await self._delete_invocation(ctx)
+        await ctx.send(f"✅ Queued {len(result.queued)} social post job(s).")
+
+    def _guild_config(self, ctx):
+        if ctx.guild is None:
+            return None
+        return self.bot.platform_config_service.discord_guilds().get(
+            str(ctx.guild.id), {}
+        )
+
+    def _is_mod_channel(self, ctx):
+        config = self._guild_config(ctx)
+        return config is not None and str(getattr(ctx.channel, "id", "")) == str(
+            config.get("mod_channel")
+        )
+
+    def _is_source_channel(self, ctx):
+        config = self._guild_config(ctx)
+        return config is not None and str(getattr(ctx.channel, "id", "")) == str(
+            config.get("socialmedia_sources_channel")
+        )
+
+    @staticmethod
+    async def _mark(message, emoji):
+        try:
+            await message.add_reaction(emoji)
         except (discord.Forbidden, discord.HTTPException):
             pass
-        await ctx.send(f"✅ Queued a `{selected}` media URL job.")
+
+    @staticmethod
+    async def _delete_invocation(ctx):
+        try:
+            await ctx.message.delete()
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+            pass
 
 
 async def setup(bot):
