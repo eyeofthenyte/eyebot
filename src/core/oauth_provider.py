@@ -17,6 +17,11 @@ class OAuthProvider:
     authorize_client_field: str = "client_id"
     token_client_field: str = "client_id"
 
+    # Confidential OAuth clients such as X authenticate to the token
+    # endpoint with HTTP Basic authentication instead of putting the
+    # client secret in the form body.
+    uses_basic_token_auth: bool = False
+
 
 OAUTH_PROVIDERS = {
     "youtube": OAuthProvider(
@@ -60,14 +65,21 @@ OAUTH_PROVIDERS = {
         "client_secret",
         ("user:read", "channel:read", "chat:write"),
     ),
-    "twitter": OAuthProvider(
-        "twitter",
-        "https://x.com/i/oauth2/authorize",
-        "https://api.x.com/2/oauth2/token",
-        "client_id",
-        "client_secret",
-        ("tweet.read", "tweet.write", "users.read", "offline.access"),
-    ),
+	"twitter": OAuthProvider(
+		"twitter",
+		"https://x.com/i/oauth2/authorize",
+		"https://api.x.com/2/oauth2/token",
+		"client_id",
+		"client_secret",
+		(
+			"tweet.read",
+			"tweet.write",
+			"users.read",
+			"media.write",
+			"offline.access",
+		),
+		uses_basic_token_auth=True,
+	),
     "tiktok": OAuthProvider(
         "tiktok",
         "https://www.tiktok.com/v2/auth/authorize/",

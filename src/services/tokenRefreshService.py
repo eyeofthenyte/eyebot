@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+from aiohttp import BasicAuth
+
 from core.oauth_provider import get_oauth_provider
 from services.platformConnectionService import PlatformConnectionService
 
@@ -59,13 +61,26 @@ class TokenRefreshService:
             return True
         if not refresh_token:
             raise ValueError(f"{platform} refresh token is missing")
-        payload = {
-            "grant_type": "refresh_token",
-            "refresh_token": refresh_token,
-            provider.token_client_field: client_id,
-            "client_secret": client_secret,
-        }
-        async with session.post(provider.token_url, data=payload) as response:
+		payload = {
+			"grant_type": "refresh_token",
+			"refresh_token": refresh_token,
+		}
+		request_options = {}
+
+		if provider.uses_basic_token_auth:
+			request_options["auth"] = BasicAuth(
+				client_id,
+				client_secret,
+			)
+		else:
+			payload[provider.token_client_field] = client_id
+			payload["client_secret"] = client_secret
+
+		async with session.post(
+			provider.token_url,
+			data=payload,
+			**request_options,
+		) as response:
             body = await response.json(content_type=None)
             if not 200 <= response.status < 300:
                 raise ValueError(
