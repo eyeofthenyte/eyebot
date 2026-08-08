@@ -1,4 +1,4 @@
-"""OAuth provider contracts for guild-scoped social connections."""
+﻿"""OAuth provider contracts for guild-scoped social connections."""
 
 from __future__ import annotations
 
@@ -65,21 +65,21 @@ OAUTH_PROVIDERS = {
         "client_secret",
         ("user:read", "channel:read", "chat:write"),
     ),
-	"twitter": OAuthProvider(
-		"twitter",
-		"https://x.com/i/oauth2/authorize",
-		"https://api.x.com/2/oauth2/token",
-		"client_id",
-		"client_secret",
-		(
-			"tweet.read",
-			"tweet.write",
-			"users.read",
-			"media.write",
-			"offline.access",
-		),
-		uses_basic_token_auth=True,
-	),
+    "twitter": OAuthProvider(
+        "twitter",
+        "https://x.com/i/oauth2/authorize",
+        "https://api.x.com/2/oauth2/token",
+        "client_id",
+        "client_secret",
+        (
+            "tweet.read",
+            "tweet.write",
+            "users.read",
+            "media.write",
+            "offline.access",
+        ),
+        uses_basic_token_auth=True,
+    ),
     "tiktok": OAuthProvider(
         "tiktok",
         "https://www.tiktok.com/v2/auth/authorize/",
@@ -98,3 +98,4 @@ def get_oauth_provider(platform: str) -> OAuthProvider:
         return OAUTH_PROVIDERS[platform.strip().casefold()]
     except KeyError as error:
         raise ValueError(f"OAuth is not configured for platform: {platform}") from error
+
