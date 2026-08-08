@@ -1,4 +1,4 @@
-"""Short-lived, signed, single-use OAuth state and PKCE management."""
+"""Short-lived, signed OAuth requests and single-use PKCE state management."""
 
 from __future__ import annotations
 
@@ -63,7 +63,6 @@ class OAuthStateService:
         self.key = key
         self.max_age = max_age
         self._pending: dict[str, OAuthState] = {}
-        self._used_start_nonces: set[str] = set()
 
     def issue(self, guild_id: str, platform: str, moderator_id: str) -> tuple[str, OAuthState]:
         state = OAuthState(
@@ -113,17 +112,23 @@ class OAuthStateService:
         try:
             encoded, supplied = token.split(".", 1)
             expected = _b64encode(
-                hmac.new(self.key, encoded.encode("ascii"), hashlib.sha256).digest()
+                hmac.new(
+                    self.key,
+                    encoded.encode("ascii"),
+                    hashlib.sha256,
+                ).digest()
             )
             if not hmac.compare_digest(supplied, expected):
                 raise ValueError("signature mismatch")
+
             payload = json.loads(_b64decode(encoded))
-            if int(time.time()) - int(payload["iat"]) > self.max_age:
+            issued_at = int(payload["iat"])
+            age = int(time.time()) - issued_at
+            if age < -60:
+                raise ValueError("request timestamp is in the future")
+            if age > self.max_age:
                 raise ValueError("request expired")
-            nonce = str(payload["n"])
-            if nonce in self._used_start_nonces:
-                raise ValueError("request already used")
-            self._used_start_nonces.add(nonce)
+
             return {
                 "guild_id": str(payload["g"]),
                 "platform": str(payload["p"]),

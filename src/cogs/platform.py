@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import asyncio
 import re
 from dataclasses import dataclass
-from urllib.parse import quote
 from urllib.parse import urlparse
 
 import discord
@@ -15,9 +13,6 @@ from core.platform_setup_instructions import (
     render_setup_instructions,
     split_markdown_messages,
 )
-from core.oauth_provider import OAUTH_PROVIDERS
-from services.oauthStateService import OAuthStateService, resolve_oauth_state_key
-from services.platformConnectionService import PlatformConnectionService
 
 
 MAX_VALUE_LENGTH = 500
@@ -35,7 +30,6 @@ PLATFORM_NAMES = (
     "substack",
     "kofi",
 )
-SOCIAL_SOURCE_PLATFORMS = frozenset({"twitter", "facebook", "bluesky"})
 SECRET_PARAMETERS = frozenset(
     {
         "access_token",
@@ -98,11 +92,7 @@ PLATFORM_RULES = {
     "twitch": {
         "enabled": ParameterRule("bool", "true or false"),
         "nick": ParameterRule("twitch_name", "Twitch login name"),
-        "channel": ParameterRule("twitch_name", "Twitch channel login name"),
-        "destination_channel": ParameterRule(
-            "discord_channel",
-            "Discord channel ID or mention for Twitch go-live posts",
-        ),
+        "channels": ParameterRule("twitch_list", "comma-separated Twitch channels"),
     },
     "youtube": {
         **_rules(
@@ -123,26 +113,17 @@ PLATFORM_RULES = {
     ),
     "kick": _rules(
         booleans=("enabled", "livestream_chat_commands_enabled"),
-        channels=("destination_channel",),
         names=("channel",),
     ),
-    "twitter": _rules(
-        ids=("user_id",),
-        booleans=("enabled", "posting_enabled"),
-        channels=("destination_channel",),
-    ),
+    "twitter": _rules(booleans=("enabled", "posting_enabled")),
     "bluesky": {
         **_rules(booleans=("enabled", "posting_enabled")),
         "handle": ParameterRule("bluesky_handle", "DNS-style Bluesky handle"),
     },
-    "tiktok": _rules(
-        booleans=("enabled", "posting_enabled"),
-        channels=("destination_channel",),
-    ),
+    "tiktok": _rules(booleans=("enabled", "posting_enabled")),
     "instagram": _rules(
         ids=("account_id",),
         booleans=("enabled", "posting_enabled"),
-        channels=("destination_channel",),
     ),
     "substack": _rules(
         booleans=("enabled", "newsletters_enabled", "podcasts_enabled"),
@@ -268,7 +249,6 @@ class Platform(commands.Cog):
             "**Usage:** `!platform <platform> set <parameter> <value>`\n"
             "`!platform <platform> default <parameter|all>`\n\n"
             "`!platform <platform> <enable|disable>`\n\n"
-            "`!platform <platform> <connect|disconnect>`\n\n"
             "`!platform <platform|all> instructions`\n\n"
             "In a DM with multiple managed servers, prefix the command with "
             "the guild ID: `!platform <guild_id> <platform> ...`\n\n"
@@ -292,7 +272,6 @@ class Platform(commands.Cog):
         Usage: !platform <platform> set <parameter> <value>
                !platform <platform> default <parameter|all>
                !platform <platform> <enable|disable>
-               !platform <platform> <connect|disconnect>
                !platform <platform|all> instructions
         DM:    !platform <guild_id> <platform> <action> ...
 
@@ -354,61 +333,9 @@ class Platform(commands.Cog):
                 "❌ Select a platform: " + ", ".join(PLATFORM_NAMES) + "."
             )
 
-        if selected_action in {"connect", "disconnect"}:
-            if parameter is not None or value is not None:
-                return await ctx.send(
-                    f"❌ `{selected_action}` does not accept a parameter or value."
-                )
-            if selected_platform not in OAUTH_PROVIDERS:
-                return await ctx.send(
-                    f"❌ `{selected_platform}` does not use the OAuth connection flow. "
-                    "Use its setup instructions instead."
-                )
-            if selected_action == "disconnect":
-                PlatformConnectionService(service).disconnect(
-                    target_guild.id, selected_platform
-                )
-                return await ctx.send(
-                    f"✅ `{selected_platform}` authorization was removed for this server."
-                )
-            gateway = getattr(self.bot, "config", {}).get("gateway", {})
-            public_url = str(gateway.get("public_base_url") or "").rstrip("/")
-            if gateway.get("enabled") is not True or not public_url.startswith("https://"):
-                return await ctx.send(
-                    "❌ The host must enable the HTTPS OAuth gateway and configure "
-                    "`gateway.public_base_url` first."
-                )
-            try:
-                states = OAuthStateService(resolve_oauth_state_key())
-                request_token = states.sign_start_request(
-                    target_guild.id, selected_platform, ctx.author.id
-                )
-                connection_url = (
-                    f"{public_url}/oauth/{selected_platform}/start?request="
-                    f"{quote(request_token, safe='')}"
-                )
-                await ctx.author.send(
-                    f"Connect `{selected_platform}` to **{target_guild.name}**:\n"
-                    f"{connection_url}\n\nThis single-use request expires in 10 minutes. "
-                    "Confirm the platform account carefully before authorizing."
-                )
-            except (OSError, RuntimeError, ValueError, discord.Forbidden) as error:
-                return await ctx.send(f"❌ Unable to create a private connection link: {error}")
-            if ctx.guild is not None:
-                return await ctx.send("✅ A time-limited connection link was sent to your DM.")
-            return
-
-        if selected_action not in {
-            "set",
-            "default",
-            "enable",
-            "disable",
-            "connect",
-            "disconnect",
-        }:
+        if selected_action not in {"set", "default", "enable", "disable"}:
             return await ctx.send(
-                "❌ Action must be `set`, `default`, `enable`, `disable`, "
-                "`connect`, or `disconnect`. Use "
+                "❌ Action must be `set`, `default`, `enable`, or `disable`. Use "
                 f"`!help platform` for syntax. Available {selected_platform} "
                 f"parameters: {available_parameters(selected_platform)}."
             )
@@ -426,15 +353,10 @@ class Platform(commands.Cog):
                 enabled,
             )
             state = "enabled" if enabled else "disabled"
-            await ctx.send(
+            return await ctx.send(
                 f"✅ `{selected_platform}` is now {state} for this server. "
                 "Other platform settings were not changed."
             )
-            if enabled and selected_platform in SOCIAL_SOURCE_PLATFORMS:
-                await self._ensure_socialmedia_source_channel(
-                    ctx, service, target_guild
-                )
-            return
 
         selected_parameter = (parameter or "").casefold()
         if selected_parameter in SECRET_PARAMETERS:
@@ -499,120 +421,6 @@ class Platform(commands.Cog):
 
     def _service(self):
         return getattr(self.bot, "platform_config_service", None)
-
-    async def _ensure_socialmedia_source_channel(self, ctx, service, guild):
-        guild_config = service.ensure_discord_guild(str(guild.id), guild.name)
-        current = guild_config.get("socialmedia_sources_channel")
-        if str(current).isdigit() and guild.get_channel(int(current)) is not None:
-            return guild.get_channel(int(current))
-
-        await ctx.send(
-            "🖼️ No moderator-only social-media source channel is configured. "
-            "Reply with `1` to create `#socialmedia_sources`, `2` to select an "
-            "existing private channel, or `3` to skip for now."
-        )
-
-        def reply_check(message):
-            return (
-                getattr(message.author, "id", None) == ctx.author.id
-                and message.channel == ctx.channel
-                and message.content.strip() in {"1", "2", "3"}
-            )
-
-        try:
-            reply = await self.bot.wait_for("message", timeout=120, check=reply_check)
-        except asyncio.TimeoutError:
-            return await ctx.send("⌛ Social-media source channel setup timed out.")
-
-        choice = reply.content.strip()
-        if ctx.guild is not None:
-            try:
-                await reply.delete()
-            except (discord.Forbidden, discord.HTTPException):
-                pass
-        if choice == "3":
-            return await ctx.send(
-                "ℹ️ Image posting remains unavailable until a source channel is configured."
-            )
-        if choice == "1":
-            overwrites = {
-                guild.default_role: discord.PermissionOverwrite(view_channel=False),
-                guild.me: discord.PermissionOverwrite(
-                    view_channel=True,
-                    send_messages=True,
-                    read_message_history=True,
-                ),
-            }
-            member = guild.get_member(ctx.author.id)
-            if member is not None:
-                overwrites[member] = discord.PermissionOverwrite(
-                    view_channel=True,
-                    send_messages=True,
-                    read_message_history=True,
-                )
-            for role in guild.roles:
-                permissions = role.permissions
-                if permissions.manage_guild or permissions.manage_channels:
-                    overwrites[role] = discord.PermissionOverwrite(
-                        view_channel=True,
-                        send_messages=True,
-                        read_message_history=True,
-                    )
-            try:
-                channel = await guild.create_text_channel(
-                    "socialmedia_sources",
-                    overwrites=overwrites,
-                    reason="EyeBot moderator social-media source channel",
-                )
-            except (discord.Forbidden, discord.HTTPException) as error:
-                return await ctx.send(f"❌ Unable to create the source channel: {error}")
-        else:
-            private_channels = [
-                channel
-                for channel in guild.text_channels
-                if not channel.permissions_for(guild.default_role).view_channel
-            ]
-            if not private_channels:
-                return await ctx.send(
-                    "❌ No existing text channel hidden from `@everyone` is available. "
-                    "Enable the platform again and choose channel creation."
-                )
-            visible = private_channels[:25]
-            choices = "\n".join(
-                f"{index}. {channel.mention}"
-                for index, channel in enumerate(visible, 1)
-            )
-            await ctx.send(
-                "Reply with the number of the existing private channel:\n" + choices
-            )
-
-            def channel_check(message):
-                return (
-                    getattr(message.author, "id", None) == ctx.author.id
-                    and message.channel == ctx.channel
-                    and message.content.strip().isdigit()
-                )
-
-            try:
-                selection = await self.bot.wait_for(
-                    "message", timeout=120, check=channel_check
-                )
-            except asyncio.TimeoutError:
-                return await ctx.send("⌛ Channel selection timed out.")
-            index = int(selection.content.strip())
-            if not 1 <= index <= len(visible):
-                return await ctx.send("❌ That channel number is not valid.")
-            channel = visible[index - 1]
-            if ctx.guild is not None:
-                try:
-                    await selection.delete()
-                except (discord.Forbidden, discord.HTTPException):
-                    pass
-
-        guild_config["socialmedia_sources_channel"] = channel.id
-        service.save_discord_guild(guild.id)
-        await ctx.send(f"✅ Social-media image sources will use {channel.mention}.")
-        return channel
 
     def _can_manage(self, guild, author) -> bool:
         member = guild.get_member(author.id)

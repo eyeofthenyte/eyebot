@@ -26,11 +26,29 @@ class OAuthStateTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.states.consume("x" + token)
 
-    def test_start_request_is_single_use(self):
+    def test_start_request_remains_valid_during_expiration_window(self):
         token = self.states.sign_start_request("42", "youtube", "7")
-        self.assertEqual(self.states.verify_start_request(token)["guild_id"], "42")
-        with self.assertRaises(ValueError):
-            self.states.verify_start_request(token)
+        first = self.states.verify_start_request(token)
+        second = self.states.verify_start_request(token)
+        self.assertEqual(first["guild_id"], "42")
+        self.assertEqual(first["platform"], "youtube")
+        self.assertEqual(first, second)
+
+    def test_expired_start_request_is_rejected(self):
+        states = OAuthStateService(b"x" * 32, max_age=10)
+        with patch("services.oauthStateService.time.time", return_value=1_000):
+            token = states.sign_start_request("42", "twitter", "7")
+        with patch("services.oauthStateService.time.time", return_value=1_011):
+            with self.assertRaisesRegex(ValueError, "invalid or expired"):
+                states.verify_start_request(token)
+
+    def test_future_start_request_is_rejected(self):
+        states = OAuthStateService(b"x" * 32)
+        with patch("services.oauthStateService.time.time", return_value=1_000):
+            token = states.sign_start_request("42", "twitter", "7")
+        with patch("services.oauthStateService.time.time", return_value=939):
+            with self.assertRaisesRegex(ValueError, "invalid or expired"):
+                states.verify_start_request(token)
 
 
 class ConnectionStorageTests(unittest.TestCase):
