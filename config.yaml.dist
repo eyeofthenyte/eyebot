@@ -1,0 +1,45 @@
+---
+# Global EyeBot runtime configuration.
+# Platform settings belong in platforms.yaml. Credentials belong in the
+# encrypted secret store managed by src/manage_secrets.py.
+
+# Default command prefix. Individual Discord guilds may override this value.
+prefix: "!"
+
+# Keep true for a single-owner installation. Set false only when one hosted
+# EyeBot instance intentionally serves multiple Discord guilds and may join
+# their independently configured Twitch channels.
+private_install: true
+
+# OAuth callbacks, webhooks, health checks, and temporary public media.
+# Enable this only behind an externally reachable HTTPS reverse proxy.
+gateway:
+  enabled: false
+  host: 0.0.0.0
+  port: 8080
+  public_base_url: https://bot.example.com
+
+# Temporary HTTPS media hosting for Instagram and TikTok pull-from-URL posts.
+# local_caddy is currently the only implemented provider. Caddy should proxy
+# /media/* to the EyeBot gateway; files remain isolated by Discord guild ID.
+public_media:
+  enabled: false
+  provider: local_caddy
+  public_base_url: https://bot.example.com/media
+  storage_path: /app/data/public_media
+  retention_hours: 72
+  cleanup_interval_seconds: 3600
+  max_bytes_per_guild: 1073741824
+
+  # Reserved provider names; their storage adapters are not implemented yet:
+  # cloudflare_r2, amazon_s3, azure_blob, google_cloud_storage
+  # Cloud credentials must eventually be stored in the encrypted secret store.
+
+logging:
+  level: DEBUG
+  output: output.log # Use syslog for container stdout logging.
+
+google_sheets:
+  # Can also be set with GOOGLE_SERVICE_ACCOUNT_FILE.
+  credentials_file: service_account.json
+  cache_ttl: 300
