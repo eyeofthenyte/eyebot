@@ -14,6 +14,24 @@ async def _get_json(session, url, *, token, params=None):
         return body
 
 
+async def _get_meta_page(session, token, page_id):
+    """Load one authorized Page directly by its Graph API object ID."""
+    if not page_id:
+        return None
+    body = await _get_json(
+        session,
+        f"https://graph.facebook.com/v26.0/{page_id}",
+        token=token,
+        params={
+            "fields": (
+                "id,name,access_token,"
+                "instagram_business_account{id,username}"
+            )
+        },
+    )
+    return body if str(body.get("id") or "") == str(page_id) else None
+
+
 async def discover_oauth_account(
     platform,
     guild_id,
@@ -47,29 +65,62 @@ async def discover_oauth_account(
             session,
             "https://graph.facebook.com/v26.0/me/accounts",
             token=token,
-            params={"fields": "id,name,access_token,instagram_business_account"},
+            params={
+                "fields": (
+                    "id,name,access_token,"
+                    "instagram_business_account{id,username}"
+                )
+            },
         )
+        pages = body.get("data", [])
         selected = None
         if platform == "facebook":
             expected = str(settings.get("page_id") or "")
-            selected = next((row for row in body.get("data", []) if str(row.get("id")) == expected), None)
+            selected = next(
+                (row for row in pages if str(row.get("id")) == expected),
+                None,
+            )
+            if not selected and expected:
+                selected = await _get_meta_page(session, token, expected)
         else:
             expected = str(settings.get("account_id") or "")
             selected = next(
                 (
                     row
-                    for row in body.get("data", [])
+                    for row in pages
                     if str((row.get("instagram_business_account") or {}).get("id")) == expected
                 ),
                 None,
             )
+            if not selected:
+                facebook_settings = platform_service.effective_guild_platform(
+                    guild_id, "facebook"
+                )
+                page_id = str(facebook_settings.get("page_id") or "")
+                page = await _get_meta_page(session, token, page_id)
+                instagram = (page or {}).get("instagram_business_account") or {}
+                if str(instagram.get("id") or "") == expected:
+                    selected = page
         if not selected:
+            if platform == "instagram" and not str(
+                platform_service.effective_guild_platform(guild_id, "facebook").get(
+                    "page_id"
+                )
+                or ""
+            ):
+                raise ValueError(
+                    "Configure facebook page_id before connecting Instagram"
+                )
             raise ValueError(
                 f"Authorized Meta account does not contain configured {platform} account"
             )
         token_response["access_token"] = selected.get("access_token") or token
+        account_name = selected.get("name", "")
+        if platform == "instagram":
+            instagram = selected.get("instagram_business_account") or {}
+            account_name = instagram.get("username") or account_name
         platform_service.set_guild_platform_override(
-            guild_id, platform, "account_name", selected.get("name", "")
+            guild_id, platform, "account_name", account_name
         )
     elif platform == "twitter":
         body = await _get_json(
