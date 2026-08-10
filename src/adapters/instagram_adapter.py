@@ -13,14 +13,51 @@ class InstagramAdapter(PlatformApiAdapter):
         token = settings.get("access_token")
         if not account_id or not token:
             raise ValueError("Instagram account_id and access_token are required")
-        if not str(image_url).startswith("https://"):
-            raise ValueError("Instagram image URL must use HTTPS")
-        container = await json_request(
-            session,
-            "POST",
-            f"https://graph.facebook.com/v26.0/{account_id}/media",
-            data={"image_url": image_url, "caption": caption, "access_token": token},
+        image_urls = (
+            [str(value) for value in image_url]
+            if isinstance(image_url, (list, tuple))
+            else [str(image_url)]
         )
+        if not 1 <= len(image_urls) <= 10:
+            raise ValueError("Instagram requires 1-10 image URLs")
+        if any(not value.startswith("https://") for value in image_urls):
+            raise ValueError("Instagram image URLs must use HTTPS")
+        if len(image_urls) > 1:
+            child_ids = []
+            for value in image_urls:
+                child = await json_request(
+                    session,
+                    "POST",
+                    f"https://graph.facebook.com/v26.0/{account_id}/media",
+                    data={
+                        "image_url": value,
+                        "is_carousel_item": "true",
+                        "access_token": token,
+                    },
+                )
+                child_ids.append(str(child["id"]))
+            container = await json_request(
+                session,
+                "POST",
+                f"https://graph.facebook.com/v26.0/{account_id}/media",
+                data={
+                    "media_type": "CAROUSEL",
+                    "children": ",".join(child_ids),
+                    "caption": caption,
+                    "access_token": token,
+                },
+            )
+        else:
+            container = await json_request(
+                session,
+                "POST",
+                f"https://graph.facebook.com/v26.0/{account_id}/media",
+                data={
+                    "image_url": image_urls[0],
+                    "caption": caption,
+                    "access_token": token,
+                },
+            )
         return await json_request(
             session,
             "POST",

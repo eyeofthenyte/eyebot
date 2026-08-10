@@ -48,6 +48,31 @@ class PlatformWorkerService:
             raise RuntimeError(f"{self.platform} posting is disabled for this guild")
         payload = job.get("payload", {})
         adapter = ADAPTERS[self.platform]
+        if job.get("operation") == "hosted_media_post":
+            media_urls = [
+                str(item.get("url") or "")
+                for item in payload.get("media", ())
+                if item.get("url")
+            ]
+            if not media_urls:
+                raise RuntimeError("Hosted-media job does not contain public URLs")
+            if self.platform == "instagram":
+                return await adapter.create_image_post(
+                    settings,
+                    str(payload.get("text") or ""),
+                    media_urls,
+                    session,
+                )
+            if self.platform == "tiktok":
+                return await adapter.initialize_photo_post(
+                    settings,
+                    str(payload.get("text") or ""),
+                    media_urls,
+                    session,
+                )
+            raise RuntimeError(
+                f"{self.platform} does not accept hosted-media jobs"
+            )
         if job.get("operation") == "image_post":
             if self.platform not in {"twitter", "facebook", "bluesky"}:
                 raise RuntimeError(

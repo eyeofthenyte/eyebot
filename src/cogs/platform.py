@@ -35,7 +35,9 @@ PLATFORM_NAMES = (
     "substack",
     "kofi",
 )
-SOCIAL_SOURCE_PLATFORMS = frozenset({"twitter", "facebook", "bluesky"})
+SOCIAL_SOURCE_PLATFORMS = frozenset(
+    {"twitter", "facebook", "bluesky", "instagram", "tiktok"}
+)
 SECRET_PARAMETERS = frozenset(
     {
         "access_token",

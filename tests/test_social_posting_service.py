@@ -9,6 +9,17 @@ from services.platformJobService import DuplicateJobError
 from services.socialPostingService import SocialPostRequest, SocialPostingService
 
 
+class Attachment:
+    def __init__(self, payload, content_type="image/png", filename="image.png"):
+        self.payload = payload
+        self.content_type = content_type
+        self.filename = filename
+        self.size = len(payload)
+
+    async def read(self):
+        return self.payload
+
+
 class SocialPostingServiceTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -81,6 +92,83 @@ kofi: {enabled: true}
             )
         )
         self.assertEqual(result.queued, ("tiktok",))
+
+    async def test_instagram_attachment_is_hosted_under_guild_prefix(self):
+        self.service = SocialPostingService(
+            self.config,
+            {
+                "gateway": {"enabled": True},
+                "public_media": {
+                    "enabled": True,
+                    "public_base_url": "https://media.example.test/media",
+                    "storage_path": str(Path(self.temporary.name) / "public-media"),
+                }
+            },
+        )
+        payload = b"\xff\xd8\xff" + b"x" * 20
+        result = await self.service.queue(
+            SocialPostRequest(
+                "42",
+                "instagram",
+                "caption",
+                "hosted-100",
+                "7",
+                attachments=(
+                    Attachment(
+                        payload,
+                        content_type="image/jpeg",
+                        filename="image.jpg",
+                    ),
+                ),
+            )
+        )
+
+        self.assertEqual(result.queued, ("instagram",))
+        _claimed, job = self.service.jobs.claim_next("instagram")
+        self.assertEqual(job["operation"], "hosted_media_post")
+        self.assertIn("/media/42/", job["payload"]["media"][0]["url"])
+
+    async def test_instagram_rejects_non_jpeg_hosted_image(self):
+        self.service = SocialPostingService(
+            self.config,
+            {
+                "gateway": {"enabled": True},
+                "public_media": {
+                    "enabled": True,
+                    "public_base_url": "https://media.example.test/media",
+                    "storage_path": str(Path(self.temporary.name) / "public-media"),
+                },
+            },
+        )
+        payload = b"\x89PNG\r\n\x1a\n" + b"x" * 20
+        with self.assertRaisesRegex(ValueError, "image/jpeg"):
+            await self.service.queue(
+                SocialPostRequest(
+                    "42",
+                    "instagram",
+                    "caption",
+                    "hosted-png",
+                    "7",
+                    attachments=(Attachment(payload),),
+                )
+            )
+
+    async def test_all_attachments_exclude_url_platforms_when_hosting_is_disabled(self):
+        payload = b"\x89PNG\r\n\x1a\n" + b"x" * 20
+        result = await self.service.queue(
+            SocialPostRequest(
+                "42",
+                "all",
+                "caption",
+                "all-100",
+                "7",
+                attachments=(Attachment(payload),),
+            )
+        )
+
+        self.assertEqual(result.queued, ("twitter", "facebook", "bluesky"))
+        self.assertIsNone(self.service.jobs.claim_next("instagram"))
+        self.assertIsNone(self.service.jobs.claim_next("tiktok"))
 
     async def test_kofi_is_not_a_posting_destination(self):
         with self.assertRaisesRegex(ValueError, "Unsupported"):

@@ -7,6 +7,7 @@ import re
 import discord
 from discord.ext import commands
 
+from core.social_reactions import enabled_reaction_emojis
 from services.platformJobService import DuplicateJobError
 from services.socialPostingService import SocialPostRequest, SocialPostingService
 
@@ -23,6 +24,26 @@ CANCEL_REACTION = "❌"
 SUCCESS_REACTION = "✅"
 FAILURE_REACTION = "⚠️"
 HTTPS_URL = re.compile(r"https://[^\s<>]+", re.IGNORECASE)
+SOCIAL_REACTION_HELP = """**Approval reactions in `socialmedia_sources`:**
+🐦 **Twitter/X** — queue the attached images and caption for Twitter/X.
+🦋 **Bluesky** — queue the attached images and caption for Bluesky.
+📘 **Facebook** — queue the attached images and caption for Facebook.
+📸 **Instagram** — host attached images temporarily, or use a public HTTPS image URL.
+🎵 **TikTok** — host attached photos temporarily, or use a verified public HTTPS media URL.
+📣 **All compatible** — queue attached images for every compatible ready account.
+❌ **Cancel** — cancel pending jobs created from that source message.
+✅ **Success** — EyeBot queued or cancelled the requested jobs.
+⚠️ **Failed** — EyeBot could not queue or cancel the requested jobs.
+
+EyeBot only adds platform placeholders for accounts that are enabled, connected, and have posting enabled. Only moderators can approve them."""
+PUBLIC_MEDIA_PROVIDER_HELP = """**Public-media provider notation:**
+🏠 `local_caddy` — **implemented**; stores temporary files in EyeBot's Docker volume and serves them through the gateway behind Caddy.
+☁️ `cloudflare_r2` — placeholder for an R2 bucket, S3 endpoint, custom media domain, access-key ID, and secret key.
+🪣 `amazon_s3` — placeholder for an S3 bucket, AWS region, public/signed URL base, access-key ID, and secret key.
+🔷 `azure_blob` — placeholder for an Azure storage account, container, public URL base, and SAS or service credential.
+🌐 `google_cloud_storage` — placeholder for a GCS project, bucket, public URL base, and service-account credential.
+
+Select with `public_media.provider`. Cloud credentials must use EyeBot's encrypted secret store, never guild YAML or Discord. Cloud providers are documented placeholders and are not active until their storage adapters are implemented."""
 
 
 class Social(commands.Cog):
@@ -30,9 +51,20 @@ class Social(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.posting = SocialPostingService(bot.platform_config_service)
+        self.posting = SocialPostingService(
+            bot.platform_config_service,
+            getattr(bot, "config", {}),
+        )
 
-    @commands.command(name="socialpost")
+    @commands.command(
+        name="socialpost",
+        extras=[
+            "📣 **Social Post**",
+            "**Usage:** `!socialpost <twitter|facebook|bluesky|all> <text>`\n\n"
+            + SOCIAL_REACTION_HELP,
+            PUBLIC_MEDIA_PROVIDER_HELP,
+        ],
+    )
     @commands.has_permissions(manage_guild=True)
     async def social_post(self, ctx, platform: str, *, text: str):
         """Queue a text post: !socialpost <platform|all> <text>."""
@@ -49,7 +81,16 @@ class Social(commands.Cog):
         )
         await self._queue_command(ctx, request)
 
-    @commands.command(name="socialmedia")
+    @commands.command(
+        name="socialmedia",
+        extras=[
+            "🖼️ **Social Media**",
+            "**Usage:** `!socialmedia <twitter|facebook|bluesky|instagram|tiktok|all> [caption]` "
+            "with one to four attached images, or reply to a message containing images.\n\n"
+            + SOCIAL_REACTION_HELP,
+            PUBLIC_MEDIA_PROVIDER_HELP,
+        ],
+    )
     @commands.has_permissions(manage_guild=True)
     async def social_media(self, ctx, platform: str, *, text: str = ""):
         """Post attached/replied images: !socialmedia <platform|all> [caption]."""
@@ -77,7 +118,15 @@ class Social(commands.Cog):
         )
         await self._queue_command(ctx, request)
 
-    @commands.command(name="socialurl")
+    @commands.command(
+        name="socialurl",
+        extras=[
+            "🔗 **Social URL**",
+            "**Usage:** `!socialurl <instagram|tiktok> <https-media-url> [caption]`\n\n"
+            + SOCIAL_REACTION_HELP,
+            PUBLIC_MEDIA_PROVIDER_HELP,
+        ],
+    )
     @commands.has_permissions(manage_guild=True)
     async def social_url(
         self,
@@ -101,6 +150,39 @@ class Social(commands.Cog):
             media_url=media_url,
         )
         await self._queue_command(ctx, request)
+
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        """Seed posting reactions on media placed in the guild source channel."""
+        guild = getattr(message, "guild", None)
+        author = getattr(message, "author", None)
+        if guild is None or getattr(author, "bot", False):
+            return
+        service = self.bot.platform_config_service
+        guild_config = service.discord_guilds().get(str(guild.id), {})
+        if str(getattr(message.channel, "id", "")) != str(
+            guild_config.get("socialmedia_sources_channel")
+        ):
+            return
+        context = await self.bot.get_context(message)
+        if getattr(context, "valid", False):
+            return
+        attachments = tuple(getattr(message, "attachments", ()) or ())
+        has_media_url = HTTPS_URL.search(str(getattr(message, "content", "") or "")) is not None
+        emojis = enabled_reaction_emojis(
+            service,
+            str(guild.id),
+            REACTION_PLATFORMS,
+            has_attachments=bool(attachments),
+            has_media_url=has_media_url,
+            attachments_can_be_hosted=self.posting.public_media.enabled,
+            attachment_content_types=tuple(
+                str(getattr(item, "content_type", "") or "").casefold()
+                for item in attachments
+            ),
+        )
+        for emoji in emojis:
+            await self._mark(message, emoji)
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
@@ -158,10 +240,9 @@ class Social(commands.Cog):
             return
         if platform in {"instagram", "tiktok"}:
             match = HTTPS_URL.search(text)
-            if match:
+            if match and not attachments:
                 media_url = match.group(0).rstrip(".,);]")
                 text = (text[: match.start()] + text[match.end() :]).strip()
-            attachments = ()
         request = SocialPostRequest(
             guild_id=str(guild.id),
             platform=platform,

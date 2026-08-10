@@ -1,0 +1,41 @@
+---
+# Global EyeBot runtime configuration.
+# Platform settings belong in platforms.yaml; credentials belong in the
+# encrypted secret store managed by src/manage_secrets.py.
+
+# Default command prefix. Individual Discord guilds may override this value.
+prefix: "!"
+
+# This installation currently uses one owner-managed Twitch channel.
+# Change to false only when this EyeBot installation intentionally serves
+# multiple Discord guilds that may select separate Twitch channels.
+private_install: false
+
+# Public OAuth callback, webhook, health, and temporary-media gateway.
+# Caddy terminates HTTPS and proxies the supported paths to port 8080.
+gateway:
+  enabled: true
+  host: 0.0.0.0
+  port: 8080
+  public_base_url: https://eyebot.ddns.net
+
+# Temporary public media used when Instagram or TikTok pulls an attachment.
+# The implemented local_caddy provider stores files in the Docker volume and
+# exposes them through the EyeBot gateway. Files are isolated by Discord guild.
+public_media:
+  enabled: true
+  provider: local_caddy
+  public_base_url: https://eyebot.ddns.net/media
+  storage_path: /app/data/public_media
+  retention_hours: 72
+  cleanup_interval_seconds: 3600
+  max_bytes_per_guild: 1073741824
+
+logging:
+  level: DEBUG
+  output: syslog
+
+google_sheets:
+  # Can also be set with GOOGLE_SERVICE_ACCOUNT_FILE.
+  credentials_file: service_account.json
+  cache_ttl: 300

@@ -1,0 +1,44 @@
+# Caddy runs on the Docker host and terminates public HTTPS.
+# Docker publishes the EyeBot gateway on 127.0.0.1:8080.
+eyebot.example.com {
+	encode zstd gzip
+
+	# EyeBot health endpoint.
+	handle /health {
+		reverse_proxy 127.0.0.1:8080
+	}
+
+	# EyeBot OAuth authorization and callback routes.
+	handle /oauth/* {
+		reverse_proxy 127.0.0.1:8080
+	}
+
+	# EyeBot platform webhook routes.
+	handle /webhooks/* {
+		reverse_proxy 127.0.0.1:8080
+	}
+
+	# EyeBot platform media routes.
+	handle /media/* {
+		reverse_proxy 127.0.0.1:8080
+	}
+
+	# Reject every route not explicitly listed above.
+	handle {
+		respond "Not Found" 404
+	}
+
+	# -----------------------------------------------------------------
+	# FUTURE DOCKERIZED CADDY CONFIGURATION
+	# -----------------------------------------------------------------
+	#
+	# If Caddy is moved into the same Docker Compose network as EyeBot,
+	# replace each active 127.0.0.1:8080 destination above with:
+	#
+	#     eyebot:8080
+	#
+	# If Caddy runs in Docker but connects through the Windows host,
+	# replace each active destination with:
+	#
+	#     host.docker.internal:8080
+}

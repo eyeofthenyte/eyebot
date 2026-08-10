@@ -3,74 +3,48 @@ name: eyebot
 services:
   eyebot:
     image: ${IMAGE_NAME:-eyebot}:${EYEBOT_VERSION:-2.0.0}
-
     build:
       context: .
       dockerfile: dockerfile
       args:
         EYEBOT_VERSION: ${EYEBOT_VERSION:-2.0.0}
-
     init: true
     restart: unless-stopped
     stop_grace_period: 30s
-
     environment:
       EYEBOT_PROCESS: src/eyebot.py
       EYEBOT_GUILD_CONFIG_DIR: /app/data/guilds
       EYEBOT_SECRET_DIR: /app/data/secrets
       EYEBOT_MASTER_KEY_FILE: /run/secrets/eyebot_master_key
-
+      EYEBOT_PUBLIC_MEDIA_DIR: /app/data/public_media
+      # Optional .env override; otherwise config.yaml supplies the URL.
+      EYEBOT_PUBLIC_MEDIA_BASE_URL: ${EYEBOT_PUBLIC_MEDIA_BASE_URL:-}
     ports:
-      # ACTIVE CONFIGURATION:
-      # Exposes EyeBot's HTTP gateway only on the Windows host's loopback
-      # interface. Native Windows Caddy connects to:
-      #
-      #   http://127.0.0.1:8080
-      #
-      # Port 8080 is not exposed directly to the public network.
       - "${EYEBOT_GATEWAY_BIND:-127.0.0.1:8080}:8080"
-
-    # This expose declaration is unnecessary when native Windows Caddy is
-    # being used. It is retained as a reference for a future Dockerized
-    # reverse proxy.
-    #
-    # Uncomment it if Caddy, Nginx, or another reverse proxy is moved into
-    # the same Docker Compose network.
-    #
-    # expose:
-    #   - "8080"
-
     secrets:
       - eyebot_master_key
-
     volumes:
       # Set EYEBOT_CONFIG_PATH to select another host-side config file.
       - type: bind
         source: ${EYEBOT_CONFIG_PATH:-./config.yaml}
         target: /app/config.yaml
         bind:
-          # Fail instead of silently creating a directory when the file
-          # is absent.
+          # Fail instead of silently creating a directory when the file is absent.
           create_host_path: false
-
-      # Set EYEBOT_PLATFORM_CONFIG_PATH to select another host-side
-      # platform configuration file.
       - type: bind
         source: ${EYEBOT_PLATFORM_CONFIG_PATH:-./platforms.yaml}
         target: /app/platforms.yaml
         bind:
           create_host_path: false
-
-      # Persistent mutable guild configuration.
       - type: volume
         source: guild-data
         target: /app/data/guilds
-
-      # Persistent encrypted platform and guild secrets.
       - type: volume
         source: secret-data
         target: /app/data/secrets
-
+      - type: volume
+        source: public-media
+        target: /app/data/public_media
     healthcheck:
       test:
         - CMD
@@ -81,92 +55,11 @@ services:
       retries: 3
       start_period: 20s
 
-  # --------------------------------------------------------------------
-  # OPTIONAL DOCKERIZED CADDY REVERSE PROXY
-  # --------------------------------------------------------------------
-  #
-  # Leave this entire section commented while Caddy runs directly on
-  # Windows. Native Windows Caddy already owns host ports 80 and 443.
-  #
-  # Uncomment this service only if you stop and disable native Windows
-  # Caddy and want Caddy to run as a Docker container instead.
-  #
-  # When this service is enabled:
-  #
-  #   1. Stop native Windows Caddy so ports 80 and 443 are available.
-  #   2. Uncomment the "expose" section under the eyebot service.
-  #   3. Use this destination in the Docker Caddyfile:
-  #
-  #          reverse_proxy @eyebot_gateway eyebot:8080
-  #
-  #      Do not use 127.0.0.1:8080 inside the Caddy container.
-  #      Inside a container, 127.0.0.1 points back to that container.
-  #
-  #   4. Uncomment the caddy-data and caddy-config named volumes near
-  #      the bottom of this file.
-  #
-  # gateway:
-  #   image: caddy:2-alpine
-  #   restart: unless-stopped
-  #
-  #   environment:
-  #     # The Compose service name "eyebot" resolves through Docker's
-  #     # internal network.
-  #     EYEBOT_UPSTREAM: ${EYEBOT_UPSTREAM:-eyebot:8080}
-  #
-  #   depends_on:
-  #     eyebot:
-  #       condition: service_healthy
-  #
-  #   ports:
-  #     # Public HTTP is used for certificate validation and redirects.
-  #     - "80:80"
-  #
-  #     # Public HTTPS endpoint for OAuth callbacks and webhooks.
-  #     - "443:443"
-  #
-  #     # Optional HTTP/3 support. Uncomment if UDP 443 is forwarded
-  #     # through the router and allowed through the firewall.
-  #     # - "443:443/udp"
-  #
-  #   volumes:
-  #     # Docker Caddy configuration.
-  #     - type: bind
-  #       source: ./Caddyfile
-  #       target: /etc/caddy/Caddyfile
-  #       read_only: true
-  #
-  #     # Persistent TLS certificates and Caddy application data.
-  #     - type: volume
-  #       source: caddy-data
-  #       target: /data
-  #
-  #     # Persistent Caddy runtime configuration.
-  #     - type: volume
-  #       source: caddy-config
-  #       target: /config
-
-
 volumes:
-  # Persistent per-guild configuration.
   guild-data:
-
-  # Persistent encrypted platform and guild secret stores.
   secret-data:
-
-  # --------------------------------------------------------------------
-  # OPTIONAL DOCKERIZED CADDY VOLUMES
-  # --------------------------------------------------------------------
-  #
-  # Leave these commented while Caddy runs directly on Windows.
-  # Uncomment them only when the Dockerized gateway service above is
-  # enabled.
-  #
-  # caddy-data:
-  # caddy-config:
-
+  public-media:
 
 secrets:
   eyebot_master_key:
-    # Host-side master-key file used for encrypted EyeBot secret stores.
     file: ${EYEBOT_MASTER_KEY_SOURCE:-./secrets/eyebot_master_key}

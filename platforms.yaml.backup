@@ -1,0 +1,125 @@
+---
+# Platform credentials and connector-wide options.
+discord:
+  enabled: true
+  bot_token:
+  mod_channel_name: mod-logs
+
+twitch:
+  enabled: true
+  tmi_token:
+  client_id: zh9dg490vtrlu0wgqiotf5gfxnnw2e
+  nick: frankthewhelp
+  channels:
+    - eyeofthenyte
+    - tanisjr93
+  # In shared mode, each guild can override this with:
+  # !platform twitch set channel <twitch_login>
+  channel:
+  # Discord destination for go-live posts. Guilds should override this with:
+  # !platform twitch set destination_channel <#channel>
+  destination_channel:
+  live_poll_seconds: 60                                                      
+
+youtube:
+  enabled: true
+  api_key:
+  client_id:
+  client_secret:
+  refresh_token:
+  access_token:
+  channel_id:
+  destination_channel:
+  # Search.list costs 100 quota units; 900 seconds stays near the default
+  # 10,000-unit daily quota for one monitored channel.
+  live_poll_seconds: 900
+  videos_enabled: true
+  community_posts_enabled: true
+  livestream_chat_commands_enabled: true
+
+facebook:
+  enabled: false
+  app_id:
+  app_secret:
+  access_token:
+  refresh_token:
+  webhook_verify_token:
+  page_id:
+  destination_channel:
+  live_poll_seconds: 60
+  posting_enabled: false
+  livestream_chat_commands_enabled: false
+
+kick:
+  enabled: false
+  client_id:
+  client_secret:
+  access_token:
+  refresh_token:
+  channel:
+  destination_channel:
+  live_poll_seconds: 60
+  livestream_chat_commands_enabled: false
+
+twitter:
+  enabled: false
+  api_key:
+  api_secret:
+  bearer_token:
+  access_token:
+  access_token_secret:
+  client_id:
+  client_secret:
+  refresh_token:
+  user_id:
+  destination_channel:
+  live_poll_seconds: 60
+  posting_enabled: false
+
+bluesky:
+  enabled: true
+  handle:
+  app_password:
+  posting_enabled: true
+
+tiktok:
+  enabled: false
+  client_key:
+  client_secret:
+  access_token:
+  refresh_token:
+  open_id:
+  destination_channel:
+  live_poll_seconds: 60
+  posting_enabled: false
+
+instagram:
+  enabled: false
+  app_id:
+  app_secret:
+  access_token:
+  refresh_token:
+  webhook_verify_token:
+  account_id:
+  destination_channel:
+  live_poll_seconds: 60
+  posting_enabled: false
+
+substack:
+  enabled: false
+  publication_url:
+  email:
+  credential:
+  destination_channel:
+  newsletters_enabled: false
+  podcasts_enabled: false
+
+kofi:
+  enabled: false
+  page_url:
+  verification_token:
+  destination_channel:
+  donations_enabled: false
+  memberships_enabled: false
+  shop_orders_enabled: false
+  webhooks_enabled: false

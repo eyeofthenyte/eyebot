@@ -439,13 +439,16 @@ four images to the command or reply to an existing message containing the
 images. EyeBot immediately validates and privately stages JPEG, PNG, GIF, or
 WebP files so expiring Discord attachment URLs are not placed in the queue.
 Each file may be at most 5 MB; Bluesky's current upload path applies a stricter
-2 MB per-image limit. The source channel setting and platform connection are
-per guild. Platform credentials are never read from channel messages.
+2 MB per-image limit. Hosted Instagram images must be JPEG; hosted TikTok
+photos may be JPEG or WebP. Other formats remain available to attachment
+platforms that accept them. The source channel setting and platform connection
+are per guild. Platform credentials are never read from channel messages.
 
 Moderators can also approve source messages by reaction. Put the caption in
-the message body, attach one to four images for Twitter/X, Facebook, or
-Bluesky, and add the appropriate reaction. Instagram and TikTok instead
-require a public HTTPS media URL in the message body. EyeBot records the
+the message body and attach one to four images. When public media hosting is
+enabled, EyeBot temporarily publishes validated attachments through its HTTPS
+gateway for Instagram and TikTok; an explicit stable HTTPS URL remains
+available through `!socialurl`. EyeBot records the
 guild, source-message ID, and destination so repeated reactions cannot create
 duplicate posts across restarts.
 
@@ -454,8 +457,8 @@ duplicate posts across restarts.
 | 🐦 | Queue attached images for Twitter/X |
 | 🦋 | Queue attached images for Bluesky |
 | 📘 | Queue attached images for Facebook |
-| 📸 | Queue an HTTPS image URL for Instagram |
-| 🎵 | Queue an HTTPS video URL for TikTok |
+| 📸 | Temporarily host attached images and queue them for Instagram |
+| 🎵 | Temporarily host attached photos and queue them for TikTok |
 | 📣 | Queue the message for every compatible enabled platform |
 | ❌ | Cancel jobs that have not yet been claimed |
 
@@ -467,7 +470,99 @@ outbound publishing.
 
 TikTok initially requests `SELF_ONLY` visibility. Production public posting
 requires TikTok application review and compliance with its Content Posting UX
-requirements. Instagram media URLs must be publicly retrievable HTTPS URLs.
+requirements. TikTok `PULL_FROM_URL` also requires ownership verification for
+the configured media domain or URL prefix. Instagram media URLs must be
+publicly retrievable HTTPS URLs.
+
+### Temporary public media with Caddy
+
+EyeBot's local public-media provider works for both a private standalone bot
+and one installation serving multiple Discord guilds. It stores media under
+separate guild prefixes, applies a per-guild quota, uses random batch names,
+and deletes expired objects in the gateway process. The default Compose file
+persists these files in the `public-media` Docker volume.
+
+Enable the gateway and media provider in `config.yaml`:
+
+```yaml
+gateway:
+  enabled: true
+  host: 0.0.0.0
+  port: 8080
+  public_base_url: https://eyebot.example.com
+
+public_media:
+  enabled: true
+  provider: local_caddy
+  public_base_url: https://eyebot.example.com/media
+  storage_path: /app/data/public_media
+  retention_hours: 72
+  cleanup_interval_seconds: 3600
+  max_bytes_per_guild: 1073741824
+```
+
+When Caddy runs on the same Windows host as Docker Desktop, keep Compose bound
+to localhost and reverse-proxy the gateway. Caddy does not need direct access
+to the Docker media volume:
+
+```caddyfile
+eyebot.example.com {
+	encode zstd gzip
+
+	@eyebot_paths path /health /oauth/* /webhooks/* /media/*
+	handle @eyebot_paths {
+		reverse_proxy 127.0.0.1:8080
+	}
+
+	handle {
+		respond "Not found" 404
+	}
+}
+```
+
+Format, validate, and reload Caddy:
+
+```powershell
+caddy fmt --overwrite .\Caddyfile
+caddy validate --config .\Caddyfile
+caddy reload --config .\Caddyfile
+```
+
+Recreate EyeBot after changing Compose or `config.yaml`:
+
+```powershell
+docker compose up --detach --build --force-recreate eyebot
+curl.exe https://eyebot.example.com/health
+```
+
+The health response reports whether public media is enabled. A generated URL
+has this form:
+
+```text
+https://eyebot.example.com/media/<guild-id>/<random-batch>/<safe-filename>
+```
+
+For a multi-guild installation, keep one shared volume and one gateway. Do not
+create a public directory per server manually. EyeBot validates the Discord
+guild ID, partitions storage automatically, and enforces
+`max_bytes_per_guild` independently. The public URL is intentionally
+unguessable but must remain anonymously readable while Meta or TikTok fetches
+it. Do not place private or sensitive media in the source channel.
+
+`local_caddy` is the implemented provider. The configuration and command help
+reserve the following provider names for future storage adapters:
+
+| Provider notation | Intended backend | Status |
+| --- | --- | --- |
+| `cloudflare_r2` | Cloudflare R2 bucket with an S3 endpoint and custom domain | Placeholder |
+| `amazon_s3` | Amazon S3 bucket with a public or signed URL base | Placeholder |
+| `azure_blob` | Azure Blob Storage account and container | Placeholder |
+| `google_cloud_storage` | Google Cloud project and Cloud Storage bucket | Placeholder |
+
+Cloud access keys, SAS values, and service-account credentials must eventually
+be stored through EyeBot's encrypted secret service. The placeholder names do
+not activate cloud storage in the current build; selecting one produces a
+clear configuration error instead of silently writing to local storage.
 
 ## Configuration reference
 
@@ -488,6 +583,13 @@ files to existing cogs as one guild mapping.
 | `private_install` | Restrict Twitch to host-configured channels; set `false` only for a shared multi-guild bot | `true` |
 | `gateway.enabled` | Start the OAuth/webhook child | `false` |
 | `gateway.public_base_url` | Externally reachable HTTPS origin | `https://bot.example.com` |
+| `public_media.enabled` | Host temporary Instagram/TikTok media through the gateway | `false` |
+| `public_media.provider` | Media adapter; currently only `local_caddy` is implemented | `local_caddy` |
+| `public_media.public_base_url` | Public HTTPS media prefix ending in `/media` | `https://bot.example.com/media` |
+| `public_media.storage_path` | Persistent media directory inside EyeBot | `/app/data/public_media` |
+| `public_media.retention_hours` | Maximum temporary-media lifetime | `72` |
+| `public_media.cleanup_interval_seconds` | Expiration scan interval | `3600` |
+| `public_media.max_bytes_per_guild` | Independent storage quota for each guild | `1073741824` |
 | `logging.level` | Configured logging level | `DEBUG` |
 | `logging.output` | Log filename or `syslog` | `output.log` |
 
@@ -843,7 +945,7 @@ Roll delivery flags must appear at the end of the command:
 | `!platform <name> connect` | DM a signed per-guild OAuth link to the moderator |
 | `!platform <name> disconnect` | Remove that guild's OAuth tokens and connection metadata |
 | `!socialpost <name\|all> <text>` | Queue a text post for enabled social connectors |
-| `!socialmedia <twitter\|facebook\|bluesky\|all> [caption]` | Queue one to four attached/replied images from the private source channel |
+| `!socialmedia <twitter\|facebook\|bluesky\|instagram\|tiktok\|all> [caption]` | Queue one to four attached/replied images from the private source channel |
 | `!socialurl <instagram\|tiktok> <https-url> [caption]` | Queue an approved public media URL |
 | `!leave <exact guild name>` | Make EyeBot leave a server |
 | `!servers` | DM the owner a list of connected servers |

@@ -26,7 +26,7 @@ RUN python -c "import aiohttp, atproto, cryptography, discord, facebook, feedpar
 
 COPY . .
 
-RUN mkdir -p /app/data/guilds /app/data/secrets \
+RUN mkdir -p /app/data/guilds /app/data/secrets /app/data/public_media \
     && groupadd --system --gid 10001 eyebot \
     && useradd --system --uid 10001 --gid eyebot --home-dir /app eyebot \
     && chown --recursive eyebot:eyebot /app

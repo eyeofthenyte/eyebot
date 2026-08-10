@@ -25,5 +25,40 @@ class TikTokAdapter(PlatformApiAdapter):
             },
         )
 
+    async def initialize_photo_post(self, settings, title, image_urls, session):
+        token = settings.get("access_token")
+        if not token:
+            raise ValueError("TikTok access_token is required")
+        selected = [str(value) for value in image_urls]
+        if not 1 <= len(selected) <= 35:
+            raise ValueError("TikTok requires 1-35 photo URLs")
+        if any(not value.startswith("https://") for value in selected):
+            raise ValueError("TikTok photo URLs must use HTTPS")
+        return await json_request(
+            session,
+            "POST",
+            "https://open.tiktokapis.com/v2/post/publish/content/init/",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json; charset=UTF-8",
+            },
+            json={
+                "post_info": {
+                    "title": title,
+                    "description": title,
+                    "privacy_level": "SELF_ONLY",
+                    "disable_comment": False,
+                    "auto_add_music": True,
+                },
+                "source_info": {
+                    "source": "PULL_FROM_URL",
+                    "photo_cover_index": 0,
+                    "photo_images": selected,
+                },
+                "post_mode": "DIRECT_POST",
+                "media_type": "PHOTO",
+            },
+        )
+
 
 TIKTOK_ADAPTER = TikTokAdapter()

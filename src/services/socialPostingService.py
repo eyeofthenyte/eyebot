@@ -7,12 +7,17 @@ from urllib.parse import urlparse
 
 from services.mediaStagingService import MediaStagingService
 from services.platformJobService import DuplicateJobError, PlatformJobService
+from services.publicMediaService import PublicMediaService
 
 
 TEXT_PLATFORMS = ("twitter", "facebook", "bluesky")
 IMAGE_ATTACHMENT_PLATFORMS = ("twitter", "facebook", "bluesky")
 URL_MEDIA_PLATFORMS = ("instagram", "tiktok")
 ALL_POSTING_PLATFORMS = TEXT_PLATFORMS + URL_MEDIA_PLATFORMS
+HOSTED_IMAGE_TYPES = {
+    "instagram": frozenset({"image/jpeg"}),
+    "tiktok": frozenset({"image/jpeg", "image/webp"}),
+}
 TEXT_LIMITS = {"twitter": 280, "facebook": 2000, "bluesky": 300, "instagram": 2000, "tiktok": 2000}
 
 
@@ -33,14 +38,19 @@ class SocialPostResult:
 
 
 class SocialPostingService:
-    def __init__(self, platform_service):
+    def __init__(self, platform_service, global_config=None):
         self.platforms = platform_service
         self.jobs = PlatformJobService(platform_service.guild_config_dir / ".platform_jobs")
         self.media = MediaStagingService(platform_service.guild_config_dir / ".platform_media")
+        self.public_media = PublicMediaService(
+            global_config or {},
+            platform_service.guild_config_dir,
+        )
 
     async def queue(self, request: SocialPostRequest) -> SocialPostResult:
         selected = self._select_platforms(request)
         queued = []
+        hosted_media = None
         for platform in selected:
             settings = self.platforms.effective_guild_platform(request.guild_id, platform)
             if settings.get("enabled") is not True or settings.get("posting_enabled") is not True:
@@ -54,7 +64,32 @@ class SocialPostingService:
             )
             key = f"{request.guild_id}:{request.source_message_id}:{platform}"
             if request.attachments:
-                staged = await self.media.stage_images(platform, request.attachments, alt_text=request.text)
+                if platform in URL_MEDIA_PLATFORMS:
+                    if hosted_media is None:
+                        hosted_media = await self.public_media.host_images(
+                            request.guild_id,
+                            request.attachments,
+                            alt_text=request.text,
+                        )
+                    self.jobs.enqueue(
+                        request.guild_id,
+                        platform,
+                        "hosted_media_post",
+                        {
+                            "text": request.text,
+                            "media": hosted_media,
+                            "requested_by": request.requested_by,
+                        },
+                        idempotency_key=key,
+                        source_message_id=request.source_message_id,
+                    )
+                    queued.append(platform)
+                    continue
+                staged = await self.media.stage_images(
+                    platform,
+                    request.attachments,
+                    alt_text=request.text,
+                )
                 try:
                     self.jobs.enqueue(
                         request.guild_id,
@@ -93,7 +128,9 @@ class SocialPostingService:
     def cancel(self, guild_id: str, source_message_id: str) -> int:
         removed = self.jobs.cancel_pending(guild_id, source_message_id)
         for job in removed:
-            self.media.remove(job.get("payload", {}).get("media"))
+            media = job.get("payload", {}).get("media")
+            self.media.remove(media)
+            self.public_media.remove(media)
         return len(removed)
 
     @staticmethod
@@ -107,10 +144,29 @@ class SocialPostingService:
         if selected != "all" and selected not in ALL_POSTING_PLATFORMS:
             raise ValueError("Unsupported social posting platform")
         if request.attachments:
+            content_types = {
+                str(getattr(item, "content_type", "") or "").casefold()
+                for item in request.attachments
+            }
             if selected == "all":
-                return IMAGE_ATTACHMENT_PLATFORMS
-            if selected not in IMAGE_ATTACHMENT_PLATFORMS:
+                selected_platforms = list(IMAGE_ATTACHMENT_PLATFORMS)
+                if self.public_media.enabled:
+                    selected_platforms.extend(
+                        platform
+                        for platform in URL_MEDIA_PLATFORMS
+                        if content_types <= HOSTED_IMAGE_TYPES[platform]
+                    )
+                return tuple(selected_platforms)
+            if selected not in ALL_POSTING_PLATFORMS:
                 raise ValueError(f"{selected} cannot publish Discord image attachments")
+            if (
+                selected in URL_MEDIA_PLATFORMS
+                and content_types - HOSTED_IMAGE_TYPES[selected]
+            ):
+                allowed = ", ".join(sorted(HOSTED_IMAGE_TYPES[selected]))
+                raise ValueError(
+                    f"{selected} hosted images require these content types: {allowed}"
+                )
             return (selected,)
         if request.media_url:
             self._validate_url(request.media_url)

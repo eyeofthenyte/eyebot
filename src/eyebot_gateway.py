@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import time
 
@@ -11,6 +12,7 @@ from services.logService import LogService
 from services.oauthService import OAuthService
 from services.oauthStateService import OAuthStateService, resolve_oauth_state_key
 from services.platformConnectionService import PlatformConnectionService
+from services.publicMediaService import PublicMediaService
 from services.webhookService import WebhookService
 
 
@@ -27,6 +29,7 @@ def create_app(config=None, platform_service=None):
     oauth = OAuthService(config, platform_service, states, public_url)
     connections = PlatformConnectionService(platform_service)
     webhooks = WebhookService(config, platform_service, logger)
+    public_media = PublicMediaService(config, platform_service.guild_config_dir)
 
     request_windows = {}
 
@@ -53,7 +56,32 @@ def create_app(config=None, platform_service=None):
     )
 
     async def health(request):
-        return web.json_response({"status": "ok"})
+        return web.json_response(
+            {
+                "status": "ok",
+                "public_media": "enabled" if public_media.enabled else "disabled",
+            }
+        )
+
+    async def serve_public_media(request):
+        if not public_media.enabled:
+            raise web.HTTPNotFound()
+        try:
+            path = public_media.resolve(
+                request.match_info["guild_id"],
+                request.match_info["batch"],
+                request.match_info["filename"],
+            )
+        except (FileNotFoundError, ValueError):
+            raise web.HTTPNotFound() from None
+        return web.FileResponse(
+            path,
+            headers={
+                "Cache-Control": "public, max-age=3600",
+                "X-Content-Type-Options": "nosniff",
+                "Content-Security-Policy": "default-src 'none'; sandbox",
+            },
+        )
 
     async def oauth_start(request):
         platform = request.match_info["platform"].casefold()
@@ -121,9 +149,30 @@ def create_app(config=None, platform_service=None):
     async def close_session(app):
         await app["client_session"].close()
 
+    async def public_media_cleanup(app):
+        if not public_media.enabled:
+            yield
+            return
+        public_media.cleanup_expired()
+        task = asyncio.create_task(public_media.cleanup_forever())
+        app["public_media_cleanup_task"] = task
+        try:
+            yield
+        finally:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
     app.on_startup.append(start_session)
     app.on_cleanup.append(close_session)
+    app.cleanup_ctx.append(public_media_cleanup)
     app.router.add_get("/health", health)
+    app.router.add_get(
+        "/media/{guild_id}/{batch}/{filename}",
+        serve_public_media,
+    )
     app.router.add_get("/oauth/{platform}/start", oauth_start)
     app.router.add_get("/oauth/{platform}/callback", oauth_callback)
     app.router.add_get("/webhooks/{platform:facebook|instagram}/{guild_id}", meta_verify)
