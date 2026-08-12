@@ -1,6 +1,9 @@
 import tempfile
 import unittest
+from io import BytesIO
 from pathlib import Path
+
+from PIL import Image
 
 from services.mediaStagingService import MediaStagingService
 
@@ -36,6 +39,31 @@ class MediaStagingTests(unittest.IsolatedAsyncioTestCase):
                 await service.stage_images(
                     "twitter", [Attachment(b"not a png")]
                 )
+
+    async def test_png_gif_and_webp_can_be_normalized_to_jpeg(self):
+        formats = (
+            ("PNG", "image/png", "image.png"),
+            ("GIF", "image/gif", "image.gif"),
+            ("WEBP", "image/webp", "image.webp"),
+        )
+        for image_format, content_type, filename in formats:
+            with self.subTest(image_format=image_format), tempfile.TemporaryDirectory() as root:
+                source = BytesIO()
+                Image.new("RGBA", (2, 2), (0, 128, 255, 128)).save(
+                    source,
+                    format=image_format,
+                )
+                service = MediaStagingService(root)
+                staged = await service.stage_images(
+                    "instagram",
+                    [Attachment(source.getvalue(), content_type, filename)],
+                    output_content_type="image/jpeg",
+                )
+
+                path = Path(staged[0]["path"])
+                self.assertEqual(staged[0]["content_type"], "image/jpeg")
+                self.assertEqual(path.suffix, ".jpg")
+                self.assertTrue(path.read_bytes().startswith(b"\xff\xd8\xff"))
 
 
 if __name__ == "__main__":

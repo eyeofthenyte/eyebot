@@ -1,8 +1,10 @@
 import tempfile
 import unittest
+from io import BytesIO
 from pathlib import Path
 
 from cryptography.fernet import Fernet
+from PIL import Image
 
 from services.platformConfigService import PlatformConfigService
 from services.platformJobService import DuplicateJobError
@@ -128,7 +130,7 @@ kofi: {enabled: true}
         self.assertEqual(job["operation"], "hosted_media_post")
         self.assertIn("/media/42/", job["payload"]["media"][0]["url"])
 
-    async def test_instagram_rejects_non_jpeg_hosted_image(self):
+    async def test_instagram_converts_png_upload_to_hosted_jpeg(self):
         self.service = SocialPostingService(
             self.config,
             {
@@ -140,18 +142,25 @@ kofi: {enabled: true}
                 },
             },
         )
-        payload = b"\x89PNG\r\n\x1a\n" + b"x" * 20
-        with self.assertRaisesRegex(ValueError, "image/jpeg"):
-            await self.service.queue(
-                SocialPostRequest(
-                    "42",
-                    "instagram",
-                    "caption",
-                    "hosted-png",
-                    "7",
-                    attachments=(Attachment(payload),),
-                )
+        source = BytesIO()
+        Image.new("RGBA", (2, 2), (255, 0, 0, 128)).save(source, format="PNG")
+        result = await self.service.queue(
+            SocialPostRequest(
+                "42",
+                "instagram",
+                "caption",
+                "hosted-png",
+                "7",
+                attachments=(Attachment(source.getvalue()),),
             )
+        )
+
+        self.assertEqual(result.queued, ("instagram",))
+        _claimed, job = self.service.jobs.claim_next("instagram")
+        media = job["payload"]["media"][0]
+        self.assertEqual(media["content_type"], "image/jpeg")
+        self.assertEqual(Path(media["path"]).suffix, ".jpg")
+        self.assertTrue(Path(media["path"]).read_bytes().startswith(b"\xff\xd8\xff"))
 
     async def test_all_attachments_exclude_url_platforms_when_hosting_is_disabled(self):
         payload = b"\x89PNG\r\n\x1a\n" + b"x" * 20

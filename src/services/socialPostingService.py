@@ -14,10 +14,9 @@ TEXT_PLATFORMS = ("twitter", "facebook", "bluesky")
 IMAGE_ATTACHMENT_PLATFORMS = ("twitter", "facebook", "bluesky")
 URL_MEDIA_PLATFORMS = ("instagram", "tiktok")
 ALL_POSTING_PLATFORMS = TEXT_PLATFORMS + URL_MEDIA_PLATFORMS
-HOSTED_IMAGE_TYPES = {
-    "instagram": frozenset({"image/jpeg"}),
-    "tiktok": frozenset({"image/jpeg", "image/webp"}),
-}
+HOSTABLE_IMAGE_TYPES = frozenset(
+    {"image/jpeg", "image/png", "image/gif", "image/webp"}
+)
 TEXT_LIMITS = {"twitter": 280, "facebook": 2000, "bluesky": 300, "instagram": 2000, "tiktok": 2000}
 
 
@@ -70,6 +69,9 @@ class SocialPostingService:
                             request.guild_id,
                             request.attachments,
                             alt_text=request.text,
+                            # Instagram accepts JPEG URLs, while TikTok accepts
+                            # JPEG and WebP. JPEG is the safe common output.
+                            output_content_type="image/jpeg",
                         )
                     self.jobs.enqueue(
                         request.guild_id,
@@ -154,18 +156,18 @@ class SocialPostingService:
                     selected_platforms.extend(
                         platform
                         for platform in URL_MEDIA_PLATFORMS
-                        if content_types <= HOSTED_IMAGE_TYPES[platform]
+                        if content_types <= HOSTABLE_IMAGE_TYPES
                     )
                 return tuple(selected_platforms)
             if selected not in ALL_POSTING_PLATFORMS:
                 raise ValueError(f"{selected} cannot publish Discord image attachments")
             if (
                 selected in URL_MEDIA_PLATFORMS
-                and content_types - HOSTED_IMAGE_TYPES[selected]
+                and content_types - HOSTABLE_IMAGE_TYPES
             ):
-                allowed = ", ".join(sorted(HOSTED_IMAGE_TYPES[selected]))
+                allowed = ", ".join(sorted(HOSTABLE_IMAGE_TYPES))
                 raise ValueError(
-                    f"{selected} hosted images require these content types: {allowed}"
+                    f"{selected} hosted images accept these upload types: {allowed}"
                 )
             return (selected,)
         if request.media_url:

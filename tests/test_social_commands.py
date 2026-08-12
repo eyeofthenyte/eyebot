@@ -168,6 +168,30 @@ class SocialReactionPlaceholderTests(unittest.TestCase):
             ("📸", "🎵", "📣"),
         )
 
+    def test_hosting_adds_all_ready_placeholders_for_png_uploads(self):
+        service = _PlatformService(
+            {
+                platform: {
+                    "enabled": True,
+                    "connected": True,
+                    "posting_enabled": True,
+                }
+                for platform in ("twitter", "facebook", "bluesky", "instagram", "tiktok")
+            }
+        )
+
+        self.assertEqual(
+            enabled_reaction_emojis(
+                service,
+                "42",
+                self.reactions,
+                has_attachments=True,
+                attachments_can_be_hosted=True,
+                attachment_content_types=("image/png",),
+            ),
+            ("🐦", "🦋", "📘", "📸", "🎵", "📣"),
+        )
+
     def test_disabled_or_non_posting_accounts_have_no_placeholder(self):
         service = _PlatformService(
             {

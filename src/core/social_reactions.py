@@ -5,10 +5,9 @@ from __future__ import annotations
 
 ATTACHMENT_PLATFORMS = frozenset({"twitter", "facebook", "bluesky"})
 URL_MEDIA_PLATFORMS = frozenset({"instagram", "tiktok"})
-HOSTED_IMAGE_TYPES = {
-    "instagram": frozenset({"image/jpeg"}),
-    "tiktok": frozenset({"image/jpeg", "image/webp"}),
-}
+HOSTABLE_IMAGE_TYPES = frozenset(
+    {"image/jpeg", "image/png", "image/gif", "image/webp"}
+)
 
 
 def enabled_reaction_emojis(
@@ -41,7 +40,7 @@ def enabled_reaction_emojis(
                 has_attachments
                 and attachments_can_be_hosted
                 and content_types
-                and content_types <= HOSTED_IMAGE_TYPES[platform]
+                and content_types <= HOSTABLE_IMAGE_TYPES
             )
             if has_media_url or compatible_attachments:
                 emojis.append(emoji)
@@ -54,7 +53,7 @@ def enabled_reaction_emojis(
             attachments_can_be_hosted
             and platform in URL_MEDIA_PLATFORMS
             and {str(value).casefold() for value in attachment_content_types}
-            <= HOSTED_IMAGE_TYPES[platform]
+            <= HOSTABLE_IMAGE_TYPES
         )
     }
     if has_attachments and len(compatible_attachment_emojis.intersection(emojis)) > 1:

@@ -1,4 +1,5 @@
 aiohttp==3.14.3
+Pillow==12.2.0
 atproto==0.0.69
 cryptography==46.0.7
 discord.py==2.7.1

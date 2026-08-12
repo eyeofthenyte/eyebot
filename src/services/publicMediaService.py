@@ -100,7 +100,14 @@ class PublicMediaService:
                     continue
         return total
 
-    async def host_images(self, guild_id, attachments, *, alt_text=""):
+    async def host_images(
+        self,
+        guild_id,
+        attachments,
+        *,
+        alt_text="",
+        output_content_type=None,
+    ):
         if not self.enabled:
             raise ValueError(
                 "Public media hosting is disabled; provide a stable public HTTPS media URL"
@@ -113,6 +120,7 @@ class PublicMediaService:
             safe_guild_id,
             attachments,
             alt_text=alt_text,
+            output_content_type=output_content_type,
         )
         if self._guild_usage(safe_guild_id) > self.guild_quota_bytes:
             self.remove(staged)
