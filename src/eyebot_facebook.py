@@ -5,6 +5,7 @@ import asyncio
 from services.liveNotificationService import LiveEvent, LiveNotificationService, load_platform_runtime
 from services.logService import LogService
 from services.platformWorkerService import PlatformWorkerService
+from services.facebookPageService import FacebookPageMonitorService
 
 
 async def detect_facebook_live(settings, session):
@@ -31,9 +32,16 @@ async def detect_facebook_live(settings, session):
 async def run():
     config, service = load_platform_runtime("facebook")
     logger = LogService("facebook", config["logging"])
+    page_monitor = FacebookPageMonitorService(
+        config,
+        service,
+        logger,
+        poll_seconds=config.get("facebook", {}).get("posts_poll_seconds", 60),
+    )
     await asyncio.gather(
         LiveNotificationService("facebook", config, service, detect_facebook_live, logger).run_forever(),
         PlatformWorkerService("facebook", service, logger).run_forever(),
+        page_monitor.run_forever(),
     )
 
 

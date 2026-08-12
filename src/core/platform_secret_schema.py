@@ -7,7 +7,14 @@ PLATFORM_SECRET_PARAMETERS = {
         {"api_key", "client_id", "client_secret", "access_token", "refresh_token"}
     ),
     "facebook": frozenset(
-        {"app_id", "app_secret", "access_token", "refresh_token", "webhook_verify_token"}
+        {
+            "app_id",
+            "app_secret",
+            "access_token",
+            "user_access_token",
+            "refresh_token",
+            "webhook_verify_token",
+        }
     ),
     "kick": frozenset(
         {"client_id", "client_secret", "access_token", "refresh_token"}

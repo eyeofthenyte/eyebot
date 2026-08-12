@@ -74,6 +74,7 @@ SECRET_PARAMETERS = frozenset(
         "email",
         "refresh_token",
         "tmi_token",
+        "user_access_token",
         "verification_token",
     }
 )
@@ -293,7 +294,12 @@ class Platform(commands.Cog):
             "**Guild status:** `!platform <platform>`\n"
             "**All guild platforms:** `!platform <guild_id>`\n"
             "**Guild settings:** `!platform <platform> set <parameter> <value>`\n"
-            "**Twitch channels:** `!platform twitch channel <add|remove|list> [name]`\n"
+            "**Twitch channels:** `!platform twitch channel add <name> [<#destination>]`\n"
+            "`!platform twitch channel <remove|list> [name]`\n"
+            "**Facebook pages:** `!platform facebook page add <url> [<#destination>]`\n"
+            "`!platform facebook page <remove|list> [url|page_id]`\n"
+            "**Instagram accounts:** `!platform instagram account add <username|url> [<#destination>]`\n"
+            "`!platform instagram account <remove|list> [username]`\n"
             "`!platform <platform> default <parameter|all>`\n"
             "`!platform <platform> <enable|disable>`\n"
             "`!platform <platform> <connect|disconnect>`\n"
@@ -406,6 +412,20 @@ class Platform(commands.Cog):
                 target_guild,
                 parameter,
                 value,
+            )
+
+        if selected_platform == "facebook" and selected_action == "page":
+            return await self._manage_facebook_pages(
+                ctx,
+                service,
+                target_guild,
+                parameter,
+                value,
+            )
+
+        if selected_platform == "instagram" and selected_action == "account":
+            return await self._manage_instagram_accounts(
+                ctx, service, target_guild, parameter, value
             )
 
         if not selected_action:
@@ -745,7 +765,7 @@ class Platform(commands.Cog):
         selected_operation = str(operation or "").casefold()
         if selected_operation not in {"add", "remove", "list"}:
             return await ctx.send(
-                "❌ Use `!platform twitch channel add <name>`, "
+                "❌ Use `!platform twitch channel add <name> [<#destination>]`, "
                 "`remove <name>`, or `list`."
             )
         if selected_operation == "list":
@@ -754,13 +774,22 @@ class Platform(commands.Cog):
             channels = self._guild_twitch_channels(service, guild.id)
             if not channels:
                 return await ctx.send("ℹ️ No Twitch channels are configured for this server.")
-            formatted = "\n".join(f"- `{name}`" for name in channels)
+            formatted = "\n".join(
+                f"- `{item['channel']}` → "
+                + (
+                    f"<#{item['destination_channel']}>"
+                    if item.get("destination_channel")
+                    else "platform default"
+                )
+                for item in channels
+            )
             return await ctx.send(
                 f"**Twitch channels for {guild.name}**\n{formatted}"
             )
 
         try:
-            supplied_name = str(value or "").strip().removeprefix("#")
+            supplied = str(value or "").split()
+            supplied_name = (supplied[0] if supplied else "").removeprefix("#")
             channel_name = validate_parameter_value(
                 PLATFORM_RULES["twitch"]["channel"],
                 supplied_name,
@@ -770,18 +799,42 @@ class Platform(commands.Cog):
 
         channels = list(self._guild_twitch_channels(service, guild.id))
         if selected_operation == "add":
-            if channel_name in channels:
+            if len(supplied) > 2:
+                return await ctx.send(
+                    "❌ Use `!platform twitch channel add <name> [<#destination>]`."
+                )
+            destination = None
+            if len(supplied) == 2:
+                try:
+                    destination = validate_parameter_value(
+                        ParameterRule("discord_channel", "Discord channel ID or mention"),
+                        supplied[1],
+                    )
+                except PlatformValueError as error:
+                    return await ctx.send(f"❌ Invalid Discord destination: {error}.")
+            if any(item["channel"] == channel_name for item in channels):
                 return await ctx.send(f"ℹ️ `{channel_name}` is already configured.")
             if len(channels) >= MAX_LIST_ITEMS:
                 return await ctx.send(
                     f"❌ A server can configure at most {MAX_LIST_ITEMS} Twitch channels."
                 )
-            channels.append(channel_name)
-            result = f"✅ Added `{channel_name}` to this server's Twitch channels."
+            channels.append(
+                {
+                    "channel": channel_name,
+                    "destination_channel": destination,
+                }
+            )
+            route = f"<#{destination}>" if destination else "the platform default"
+            result = (
+                f"✅ Added `{channel_name}` to this server's Twitch channels; "
+                f"live alerts will use {route}."
+            )
         else:
-            if channel_name not in channels:
+            if len(supplied) != 1:
+                return await ctx.send("❌ `channel remove` accepts one channel name.")
+            if not any(item["channel"] == channel_name for item in channels):
                 return await ctx.send(f"ℹ️ `{channel_name}` is not configured.")
-            channels.remove(channel_name)
+            channels = [item for item in channels if item["channel"] != channel_name]
             result = f"✅ Removed `{channel_name}` from this server's Twitch channels."
 
         service.set_guild_platform_override(guild.id, "twitch", "channels", channels)
@@ -805,9 +858,20 @@ class Platform(commands.Cog):
             values = (*values, legacy)
         normalized = []
         for item in values:
-            name = str(item).strip().casefold().removeprefix("#")
-            if CHANNEL_NAME_PATTERN.fullmatch(name) and name not in normalized:
-                normalized.append(name)
+            if isinstance(item, dict):
+                name = str(item.get("channel") or "").strip().casefold().removeprefix("#")
+                destination = str(item.get("destination_channel") or "") or None
+                if destination and not destination.isdigit():
+                    destination = None
+            else:
+                name = str(item).strip().casefold().removeprefix("#")
+                destination = None
+            if CHANNEL_NAME_PATTERN.fullmatch(name) and not any(
+                existing["channel"] == name for existing in normalized
+            ):
+                normalized.append(
+                    {"channel": name, "destination_channel": destination}
+                )
         return tuple(normalized)
 
     async def _restart_twitch_worker(self):
@@ -820,6 +884,262 @@ class Platform(commands.Cog):
             logger = getattr(self.bot, "logger", None)
             if logger is not None:
                 logger.warning(f"Twitch worker restart after channel change failed: {error}")
+
+    async def _manage_facebook_pages(self, ctx, service, guild, operation, value):
+        selected_operation = str(operation or "").casefold()
+        if selected_operation not in {"add", "remove", "list"}:
+            return await ctx.send(
+                "❌ Use `!platform facebook page add <url> [<#destination>]`, "
+                "`remove <url|page_id>`, or `list`."
+            )
+
+        settings = service.effective_guild_platform(guild.id, "facebook")
+        pages = settings.get("monitored_pages", ())
+        pages = [dict(item) for item in pages if isinstance(item, dict)] if isinstance(
+            pages, (list, tuple)
+        ) else []
+
+        if selected_operation == "list":
+            if value is not None:
+                return await ctx.send("❌ `page list` does not accept another value.")
+            if not pages:
+                return await ctx.send("ℹ️ No Facebook Pages are monitored by this server.")
+            output = [f"**Monitored Facebook Pages for {guild.name}**"]
+            for page in pages:
+                output.append(
+                    f"- **{page.get('name') or page.get('page_id')}** "
+                    f"(`{page.get('page_id')}`) → <#{page.get('destination_channel')}>"
+                )
+            return await ctx.send("\n".join(output))
+
+        supplied = str(value or "").split()
+        if not supplied:
+            return await ctx.send(
+                f"❌ `page {selected_operation}` requires a Facebook Page URL"
+                + (" or Page ID." if selected_operation == "remove" else ".")
+            )
+        if selected_operation == "remove":
+            if len(supplied) != 1:
+                return await ctx.send("❌ `page remove` accepts one URL or Page ID.")
+            from services.facebookPageService import facebook_page_reference
+
+            try:
+                reference = facebook_page_reference(supplied[0])
+            except ValueError as error:
+                return await ctx.send(f"❌ Invalid Facebook Page reference: {error}.")
+            retained = [
+                page for page in pages
+                if str(page.get("page_id")) != reference
+                and str(page.get("url", "")).rstrip("/").casefold()
+                != supplied[0].rstrip("/").casefold()
+            ]
+            if len(retained) == len(pages):
+                return await ctx.send("ℹ️ That Facebook Page is not monitored.")
+            service.set_guild_platform_override(
+                guild.id, "facebook", "monitored_pages", retained
+            )
+            await self._restart_platform_worker("facebook")
+            return await ctx.send("✅ Removed the Facebook Page from monitoring.")
+
+        if len(supplied) > 2:
+            return await ctx.send(
+                "❌ Use `!platform facebook page add <url> [<#destination>]`."
+            )
+        page_url = supplied[0]
+        destination = supplied[1] if len(supplied) == 2 else settings.get(
+            "destination_channel"
+        )
+        try:
+            destination = validate_parameter_value(
+                ParameterRule("discord_channel", "Discord channel ID or mention"),
+                str(destination or ""),
+            )
+        except PlatformValueError:
+            return await ctx.send(
+                "❌ Supply a destination channel or configure "
+                "`facebook.destination_channel` first."
+            )
+        token = str(
+            settings.get("user_access_token") or settings.get("access_token") or ""
+        )
+        if settings.get("connected") is not True or not token:
+            return await ctx.send(
+                "❌ Facebook must be connected for this server before adding Pages."
+            )
+
+        from services.facebookPageService import resolve_facebook_page
+
+        resolver = getattr(self.bot, "facebook_page_resolver", resolve_facebook_page)
+        try:
+            if resolver is resolve_facebook_page:
+                import aiohttp
+
+                async with aiohttp.ClientSession(
+                    timeout=aiohttp.ClientTimeout(total=30)
+                ) as session:
+                    page = await resolver(page_url, token, session)
+            else:
+                page = await resolver(page_url, token, None)
+        except (OSError, RuntimeError, ValueError) as error:
+            return await ctx.send(f"❌ Unable to add Facebook Page: {error}")
+
+        if any(str(item.get("page_id")) == page["page_id"] for item in pages):
+            return await ctx.send(
+                f"ℹ️ **{page['name']}** is already monitored by this server."
+            )
+        if len(pages) >= MAX_LIST_ITEMS:
+            return await ctx.send(
+                f"❌ A server can monitor at most {MAX_LIST_ITEMS} Facebook Pages."
+            )
+        pages.append(
+            {
+                "page_id": page["page_id"],
+                "name": page["name"],
+                "url": page["url"],
+                "destination_channel": destination,
+            }
+        )
+        service.set_guild_platform_override(
+            guild.id, "facebook", "monitored_pages", pages
+        )
+        await self._restart_platform_worker("facebook")
+        return await ctx.send(
+            f"✅ Monitoring **{page['name']}** in <#{destination}>."
+        )
+
+    async def _manage_instagram_accounts(self, ctx, service, guild, operation, value):
+        selected_operation = str(operation or "").casefold()
+        if selected_operation not in {"add", "remove", "list"}:
+            return await ctx.send(
+                "❌ Use `!platform instagram account add <username|url> "
+                "[<#destination>]`, `remove <username|url>`, or `list`."
+            )
+        settings = service.effective_guild_platform(guild.id, "instagram")
+        accounts = settings.get("monitored_accounts", ())
+        accounts = [dict(item) for item in accounts if isinstance(item, dict)] if isinstance(
+            accounts, (list, tuple)
+        ) else []
+        from services.instagramAccountService import instagram_username
+
+        if selected_operation == "list":
+            if value is not None:
+                return await ctx.send("❌ `account list` does not accept another value.")
+            if not accounts:
+                return await ctx.send(
+                    "ℹ️ No Instagram professional accounts are monitored by this server."
+                )
+            lines = [f"**Monitored Instagram Accounts for {guild.name}**"]
+            lines.extend(
+                f"- **@{item.get('username')}** (`{item.get('account_id')}`) "
+                f"→ <#{item.get('destination_channel')}>"
+                for item in accounts
+            )
+            return await ctx.send("\n".join(lines))
+
+        supplied = str(value or "").split()
+        if not supplied:
+            return await ctx.send(
+                f"❌ `account {selected_operation}` requires an Instagram username or URL."
+            )
+        try:
+            username = instagram_username(supplied[0])
+        except ValueError as error:
+            return await ctx.send(f"❌ Invalid Instagram account: {error}.")
+
+        if selected_operation == "remove":
+            if len(supplied) != 1:
+                return await ctx.send("❌ `account remove` accepts one username or URL.")
+            retained = [
+                item for item in accounts
+                if str(item.get("username") or "").casefold() != username
+            ]
+            if len(retained) == len(accounts):
+                return await ctx.send("ℹ️ That Instagram account is not monitored.")
+            service.set_guild_platform_override(
+                guild.id, "instagram", "monitored_accounts", retained
+            )
+            await self._restart_platform_worker("instagram")
+            return await ctx.send("✅ Removed the Instagram account from monitoring.")
+
+        if len(supplied) > 2:
+            return await ctx.send(
+                "❌ Use `!platform instagram account add <username|url> "
+                "[<#destination>]`."
+            )
+        destination = supplied[1] if len(supplied) == 2 else settings.get(
+            "destination_channel"
+        )
+        try:
+            destination = validate_parameter_value(
+                ParameterRule("discord_channel", "Discord channel ID or mention"),
+                str(destination or ""),
+            )
+        except PlatformValueError:
+            return await ctx.send(
+                "❌ Supply a destination channel or configure "
+                "`instagram.destination_channel` first."
+            )
+        token = str(settings.get("access_token") or "")
+        owner_id = str(settings.get("account_id") or "")
+        if settings.get("connected") is not True or not token or not owner_id:
+            return await ctx.send(
+                "❌ Instagram must be connected to a professional account for this server first."
+            )
+        from services.instagramAccountService import resolve_instagram_account
+
+        resolver = getattr(
+            self.bot, "instagram_account_resolver", resolve_instagram_account
+        )
+        try:
+            if resolver is resolve_instagram_account:
+                import aiohttp
+
+                async with aiohttp.ClientSession(
+                    timeout=aiohttp.ClientTimeout(total=30)
+                ) as session:
+                    account = await resolver(username, owner_id, token, session)
+            else:
+                account = await resolver(username, owner_id, token, None)
+        except (OSError, RuntimeError, ValueError) as error:
+            return await ctx.send(f"❌ Unable to add Instagram account: {error}")
+        if any(
+            str(item.get("account_id")) == account["account_id"] for item in accounts
+        ):
+            return await ctx.send(
+                f"ℹ️ **@{account['username']}** is already monitored by this server."
+            )
+        if len(accounts) >= MAX_LIST_ITEMS:
+            return await ctx.send(
+                f"❌ A server can monitor at most {MAX_LIST_ITEMS} Instagram accounts."
+            )
+        accounts.append(
+            {
+                "account_id": account["account_id"],
+                "username": account["username"],
+                "destination_channel": destination,
+            }
+        )
+        service.set_guild_platform_override(
+            guild.id, "instagram", "monitored_accounts", accounts
+        )
+        await self._restart_platform_worker("instagram")
+        return await ctx.send(
+            f"✅ Monitoring **@{account['username']}** in <#{destination}>."
+        )
+
+    async def _restart_platform_worker(self, platform_name):
+        restart = getattr(self.bot, "platform_restarter", None)
+        if restart is None:
+            return
+        try:
+            await asyncio.to_thread(restart, platform_name)
+        except (OSError, RuntimeError, ValueError) as error:
+            logger = getattr(self.bot, "logger", None)
+            if logger is not None:
+                logger.warning(
+                    f"{platform_name.title()} worker restart after source change "
+                    f"failed: {error}"
+                )
 
     async def _reconcile_platform_workers(self):
         reconcile = getattr(self.bot, "platform_reconciler", None)

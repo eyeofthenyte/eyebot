@@ -75,6 +75,9 @@ async def discover_oauth_account(
         pages = body.get("data", [])
         selected = None
         if platform == "facebook":
+            # Retain the user token for discovering and reading additional
+            # Pages while access_token remains the selected publishing Page token.
+            token_response["user_access_token"] = token
             expected = str(settings.get("page_id") or "")
             selected = next(
                 (row for row in pages if str(row.get("id")) == expected),

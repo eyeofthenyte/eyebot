@@ -15,9 +15,10 @@ twitch:
   channels:
     - your_channel_name
   # In shared mode, each guild can override this with:
-  # !platform twitch channel add <twitch_login>
-  # A guild may add multiple channels. The singular channel setting remains
-  # available for compatibility with existing installations.
+  # !platform twitch channel add <twitch_login> [<#discord_destination>]
+  # A guild may add multiple channels. Each may have its own Discord go-live
+  # destination; entries without one inherit twitch.destination_channel. The
+  # singular channel setting remains available for compatibility.
   channel:
   # Discord destination for go-live posts. Guilds should override this with:
   # !platform twitch set destination_channel <#channel>
@@ -52,6 +53,8 @@ facebook:
   page_id:
   destination_channel:
   live_poll_seconds: 60
+  # Poll interval for ordinary posts from guild-monitored Facebook Pages.
+  posts_poll_seconds: 60
   posting_enabled: false
   livestream_chat_commands_enabled: false
 
@@ -113,6 +116,8 @@ instagram:
   account_id:
   destination_channel:
   live_poll_seconds: 60
+  # Poll interval for guild-monitored professional Instagram accounts.
+  posts_poll_seconds: 60
   posting_enabled: false
 
 substack:

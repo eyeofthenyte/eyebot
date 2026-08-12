@@ -50,7 +50,7 @@ References: [Discord applications](https://discord.com/developers/applications) 
    `docker compose run --rm --no-deps eyebot python src/manage_secrets.py set twitch tmi_token`
    `docker compose run --rm --no-deps eyebot python src/manage_secrets.py set twitch client_id`
 5. For a private installation, set connector-wide `nick` and `channels` in `platforms.yaml`.
-6. For a shared installation, the host must set `private_install: false` in `config.yaml`; then add this server's Twitch channels with `!platform twitch channel add <channel_login>`. Use `channel remove <channel_login>` or `channel list` to manage the guild-owned list. The legacy `set channel` command remains compatible.
+6. For a shared installation, the host must set `private_install: false` in `config.yaml`; then add this server's Twitch channels with `!platform twitch channel add <channel_login> [<#destination>]`. If destination is omitted, the guild's Twitch `destination_channel` is used for live alerts. Use `channel remove <channel_login>` or `channel list` to manage the guild-owned list. The legacy `set channel` command remains compatible.
 7. Select the Discord channel for Twitch go-live posts with `!platform twitch set destination_channel <#channel>`. EyeBot polls the official Helix Get Streams endpoint and posts once when a new stream becomes live.
 8. The host must also set connector-wide `twitch.enabled: true` in `platforms.yaml`. Enable this guild with `!platform twitch enable`, then restart the Twitch child so it joins the newly configured channel. The shared bot account must be permitted to join and speak in that Twitch channel.
 
@@ -83,6 +83,7 @@ References: [YouTube authentication](https://developers.google.com/youtube/v3/gu
 5. Set `page_id` and `destination_channel` with `!platform facebook set ...`.
 6. Enable the OAuth gateway, register the callback/webhook URLs, and run `!platform facebook connect`. Enable only after Meta grants the requested Page permissions.
 7. When `!platform facebook enable` prompts, create or select the private social-media source channel. Attach one to four images there (or reply to an image message) and run `!socialmedia facebook [caption]`.
+8. To monitor ordinary posts from another accessible Page, use `!platform facebook page add <page_url> [<#destination>]`. When destination is omitted, the configured Facebook `destination_channel` is used. Manage entries with `page list` and `page remove <url|page_id>`.
 
 References: [Meta apps](https://developers.facebook.com/apps/) · [Facebook Login](https://developers.facebook.com/documentation/facebook-login) · [Access tokens](https://developers.facebook.com/documentation/facebook-login/guides/access-tokens) · [Graph API](https://developers.facebook.com/docs/graph-api/get-started/)
 """,
@@ -151,6 +152,7 @@ References: [TikTok Developer Portal](https://developers.tiktok.com/) · [Login 
    `docker compose run --rm --no-deps eyebot python src/manage_secrets.py set instagram app_secret --guild {guild_id}`
 5. Set `account_id` and `destination_channel` with `!platform instagram set ...`.
 6. Enable the OAuth gateway and run `!platform instagram connect`. After Meta approval, queue public HTTPS images with `!socialurl instagram <url> [caption]`.
+7. Monitor another professional account available through Business Discovery with `!platform instagram account add <username|profile_url> [<#destination>]`. Use `account list` and `account remove <username|profile_url>` to manage it. Personal and private accounts are not supported.
 
 References: [Meta apps](https://developers.facebook.com/apps/) · [Instagram Platform](https://developers.facebook.com/docs/instagram-platform/) · [Instagram API setup](https://developers.facebook.com/docs/instagram-platform/get-started/)
 """,

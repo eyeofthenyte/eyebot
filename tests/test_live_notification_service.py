@@ -104,7 +104,16 @@ class LiveNotificationTests(unittest.IsolatedAsyncioTestCase):
             }
             guild = {
                 "platforms": {
-                    "twitch": {"channels": ["First", "#second", "first"]}
+                    "twitch": {
+                        "channels": [
+                            {
+                                "channel": "First",
+                                "destination_channel": "987654321098765432",
+                            },
+                            {"channel": "#second"},
+                            "first",
+                        ]
+                    }
                 }
             }
             service = PlatformService(root, settings, guild)
@@ -115,6 +124,35 @@ class LiveNotificationTests(unittest.IsolatedAsyncioTestCase):
             await notifier.poll_once(object())
 
             self.assertEqual(seen, ["first", "second"])
+
+    async def test_twitch_channel_destination_overrides_guild_default(self):
+        with tempfile.TemporaryDirectory() as root:
+            settings = {
+                "enabled": True,
+                "destination_channel": "123456789012345678",
+            }
+            guild = {
+                "platforms": {
+                    "twitch": {
+                        "channels": [
+                            {
+                                "channel": "creator",
+                                "destination_channel": "987654321098765432",
+                            }
+                        ]
+                    }
+                }
+            }
+            service = PlatformService(root, settings, guild)
+            notifier = RecordingNotifier(
+                "twitch", {"twitch": {}}, service, lambda *_: None, Logger()
+            )
+
+            targets = list(notifier._targets())
+
+            self.assertEqual(targets[0][0], "42")
+            self.assertEqual(targets[0][1], "987654321098765432")
+            self.assertEqual(targets[0][2]["channel"], "creator")
 
 
 if __name__ == "__main__":

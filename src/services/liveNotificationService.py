@@ -120,8 +120,6 @@ class LiveNotificationService:
             if effective.get("enabled") is not True:
                 continue
             destination = effective.get("destination_channel")
-            if not str(destination or "").isdigit():
-                continue
             if self.platform_name == "twitch":
                 guild = self.platform_service.discord_guilds().get(str(guild_id), {})
                 platforms = guild.get("platforms", {}) if isinstance(guild, Mapping) else {}
@@ -138,13 +136,22 @@ class LiveNotificationService:
                     configured = (effective.get("channel"),)
                 seen = set()
                 for channel in configured:
-                    normalized = str(channel).strip().casefold().removeprefix("#")
+                    if isinstance(channel, Mapping):
+                        normalized = str(channel.get("channel") or "").strip().casefold().removeprefix("#")
+                        selected_destination = channel.get("destination_channel") or destination
+                    else:
+                        normalized = str(channel).strip().casefold().removeprefix("#")
+                        selected_destination = destination
                     if not normalized or normalized in seen:
+                        continue
+                    if not str(selected_destination or "").isdigit():
                         continue
                     seen.add(normalized)
                     selected = dict(effective)
                     selected["channel"] = normalized
-                    yield str(guild_id), str(destination), selected
+                    yield str(guild_id), str(selected_destination), selected
+                continue
+            if not str(destination or "").isdigit():
                 continue
             yield str(guild_id), str(destination), effective
 

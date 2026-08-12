@@ -5,6 +5,7 @@ import asyncio
 from services.liveNotificationService import LiveEvent, LiveNotificationService, load_platform_runtime
 from services.logService import LogService
 from services.platformWorkerService import PlatformWorkerService
+from services.instagramAccountService import InstagramAccountMonitorService
 
 
 async def detect_instagram_live(settings, session):
@@ -29,9 +30,16 @@ async def detect_instagram_live(settings, session):
 async def run():
     config, service = load_platform_runtime("instagram")
     logger = LogService("instagram", config["logging"])
+    account_monitor = InstagramAccountMonitorService(
+        config,
+        service,
+        logger,
+        poll_seconds=config.get("instagram", {}).get("posts_poll_seconds", 60),
+    )
     await asyncio.gather(
         LiveNotificationService("instagram", config, service, detect_instagram_live, logger).run_forever(),
         PlatformWorkerService("instagram", service, logger).run_forever(),
+        account_monitor.run_forever(),
     )
 
 

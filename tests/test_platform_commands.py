@@ -35,6 +35,9 @@ for node in TREE.body:
                 "_manage_twitch_channels",
                 "_guild_twitch_channels",
                 "_restart_twitch_worker",
+                "_manage_facebook_pages",
+                "_manage_instagram_accounts",
+                "_restart_platform_worker",
                 "_delete_invocation",
                 "_can_manage",
                 "_resolve_target",
@@ -341,22 +344,44 @@ class PlatformCommandTests(unittest.IsolatedAsyncioTestCase):
             self.context, "twitch", "channel", "add", value="First_Channel"
         )
         await self.cog.platform_command(
-            self.context, "twitch", "channel", "add", value="#second_channel"
+            self.context,
+            "twitch",
+            "channel",
+            "add",
+            value="#second_channel <#987654321098765432>",
         )
         await self.cog.platform_command(
             self.context, "twitch", "channel", "list"
         )
 
         saved = self.service.discord_guilds()["42"]["platforms"]["twitch"]
-        self.assertEqual(saved["channels"], ["first_channel", "second_channel"])
+        self.assertEqual(
+            saved["channels"],
+            [
+                {"channel": "first_channel", "destination_channel": None},
+                {
+                    "channel": "second_channel",
+                    "destination_channel": "987654321098765432",
+                },
+            ],
+        )
         self.assertIn("`first_channel`", self.context.messages[-1])
         self.assertIn("`second_channel`", self.context.messages[-1])
+        self.assertIn("<#987654321098765432>", self.context.messages[-1])
         self.assertEqual(restarts, ["twitch", "twitch"])
 
         await self.cog.platform_command(
             self.context, "twitch", "channel", "remove", value="first_channel"
         )
-        self.assertEqual(saved["channels"], ["second_channel"])
+        self.assertEqual(
+            saved["channels"],
+            [
+                {
+                    "channel": "second_channel",
+                    "destination_channel": "987654321098765432",
+                }
+            ],
+        )
 
     async def test_twitch_channel_add_migrates_legacy_singular_value(self):
         self.service.set_guild_platform_override(42, "twitch", "channel", "legacy")
@@ -366,8 +391,112 @@ class PlatformCommandTests(unittest.IsolatedAsyncioTestCase):
         )
 
         saved = self.service.discord_guilds()["42"]["platforms"]["twitch"]
-        self.assertEqual(saved["channels"], ["legacy", "new_channel"])
+        self.assertEqual(
+            saved["channels"],
+            [
+                {"channel": "legacy", "destination_channel": None},
+                {"channel": "new_channel", "destination_channel": None},
+            ],
+        )
         self.assertNotIn("channel", saved)
+
+    async def test_facebook_page_add_uses_default_destination(self):
+        self.service.set_guild_platform_override(42, "facebook", "connected", True)
+        self.service.set_guild_platform_override(
+            42, "facebook", "destination_channel", "123456789012345678"
+        )
+        self.service.platform("facebook")["access_token"] = "token"
+
+        async def resolve(url, token, session):
+            self.assertEqual(url, "https://www.facebook.com/examplepage")
+            self.assertEqual(token, "token")
+            return {
+                "page_id": "12345",
+                "name": "Example Page",
+                "url": "https://www.facebook.com/examplepage",
+            }
+
+        self.bot.facebook_page_resolver = resolve
+        await self.cog.platform_command(
+            self.context,
+            "facebook",
+            "page",
+            "add",
+            value="https://www.facebook.com/examplepage",
+        )
+
+        pages = self.service.discord_guilds()["42"]["platforms"]["facebook"][
+            "monitored_pages"
+        ]
+        self.assertEqual(pages[0]["page_id"], "12345")
+        self.assertEqual(pages[0]["destination_channel"], "123456789012345678")
+        self.assertIn("Monitoring **Example Page**", self.context.messages[-1])
+
+    async def test_facebook_page_add_accepts_explicit_destination(self):
+        self.service.set_guild_platform_override(42, "facebook", "connected", True)
+        self.service.platform("facebook")["access_token"] = "token"
+
+        async def resolve(url, token, session):
+            return {"page_id": "67890", "name": "Other Page", "url": url}
+
+        self.bot.facebook_page_resolver = resolve
+        await self.cog.platform_command(
+            self.context,
+            "facebook",
+            "page",
+            "add",
+            value=(
+                "https://facebook.com/otherpage "
+                "<#987654321098765432>"
+            ),
+        )
+
+        pages = self.service.discord_guilds()["42"]["platforms"]["facebook"][
+            "monitored_pages"
+        ]
+        self.assertEqual(pages[0]["destination_channel"], "987654321098765432")
+
+    async def test_facebook_page_add_requires_destination(self):
+        self.service.set_guild_platform_override(42, "facebook", "connected", True)
+        self.service.platform("facebook")["access_token"] = "token"
+
+        await self.cog.platform_command(
+            self.context,
+            "facebook",
+            "page",
+            "add",
+            value="https://facebook.com/examplepage",
+        )
+
+        self.assertIn("destination_channel", self.context.messages[-1])
+
+    async def test_instagram_account_add_uses_default_destination(self):
+        self.service.set_guild_platform_override(42, "instagram", "connected", True)
+        self.service.set_guild_platform_override(42, "instagram", "account_id", "owner-1")
+        self.service.set_guild_platform_override(
+            42, "instagram", "destination_channel", "123456789012345678"
+        )
+        self.service.platform("instagram")["access_token"] = "token"
+
+        async def resolve(username, owner_id, token, session):
+            self.assertEqual((username, owner_id, token), ("example.pro", "owner-1", "token"))
+            return {"account_id": "ig-2", "username": "example.pro"}
+
+        self.bot.instagram_account_resolver = resolve
+        await self.cog.platform_command(
+            self.context,
+            "instagram",
+            "account",
+            "add",
+            value="https://www.instagram.com/example.pro/",
+        )
+
+        accounts = self.service.discord_guilds()["42"]["platforms"]["instagram"][
+            "monitored_accounts"
+        ]
+        self.assertEqual(accounts[0]["account_id"], "ig-2")
+        self.assertEqual(accounts[0]["destination_channel"], "123456789012345678")
+        self.assertIn("Monitoring **@example.pro**", self.context.messages[-1])
 
     async def test_enable_and_disable_change_only_service_state(self):
         self.service.set_guild_platform_override(

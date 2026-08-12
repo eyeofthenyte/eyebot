@@ -940,9 +940,15 @@ Roll delivery flags must appear at the end of the command:
 | `!setprefix <prefix>` | Set this server's 1–5 character command prefix; use `reset` for the global default |
 | `!platform <name>` | Display effective guild parameters and masked secret presence |
 | `!platform <guild_id>` | Display every effective platform setting for a managed guild |
-| `!platform twitch channel add <name>` | Add a Twitch channel to the current guild |
+| `!platform twitch channel add <name> [<#destination>]` | Add a Twitch channel with an optional live-alert destination |
 | `!platform twitch channel remove <name>` | Remove a Twitch channel from the current guild |
 | `!platform twitch channel list` | List Twitch channels owned by the current guild |
+| `!platform facebook page add <url> [<#destination>]` | Monitor posts from an accessible Facebook Page |
+| `!platform facebook page remove <url|page_id>` | Stop monitoring a Facebook Page |
+| `!platform facebook page list` | List Facebook Pages monitored by the guild |
+| `!platform instagram account add <username\|url> [<#destination>]` | Monitor an accessible professional Instagram account |
+| `!platform instagram account remove <username\|url>` | Stop monitoring an Instagram account |
+| `!platform instagram account list` | List Instagram accounts monitored by the guild |
 | `!platform <name> set <parameter> <value>` | Set a validated guild override for one platform |
 | `!platform <name> default <parameter\|all>` | Remove overrides and inherit `platforms.yaml` values |
 | `!platform <name> enable` | Enable that platform's service for this server only |
@@ -1027,14 +1033,16 @@ A shared installation can associate multiple Twitch channels with one guild:
 
 ```text
 !platform twitch channel add first_channel
-!platform twitch channel add second_channel
+!platform twitch channel add second_channel #second-stream-alerts
 !platform twitch channel list
 !platform twitch channel remove first_channel
 ```
 
 Channel names are normalized, duplicates are ignored, and a guild can store up
-to 100 Twitch channels. EyeBot restarts the running Twitch child after a list
-change so its joined chats are refreshed. The existing singular `channel`
+to 100 Twitch channels. An optional destination routes that channel's go-live
+alerts to a specific Discord channel; otherwise the guild's Twitch
+`destination_channel` is inherited. EyeBot restarts the running Twitch child
+after a list change so its joined chats are refreshed. The existing singular `channel`
 setting is folded into the list the first time `channel add` or `channel remove`
 is used. All Twitch channels belonging to a guild share that guild's configured
 `destination_channel` for live notifications.

@@ -46,7 +46,11 @@ class TwitchChannelResolutionTests(unittest.TestCase):
                     "platforms": {
                         "twitch": {
                             "enabled": True,
-                            "channels": ["First", "#SECOND", "first"],
+                            "channels": [
+                                {"channel": "First", "destination_channel": "123"},
+                                {"channel": "#SECOND"},
+                                "first",
+                            ],
                         }
                     }
                 }

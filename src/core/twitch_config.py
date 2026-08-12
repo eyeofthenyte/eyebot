@@ -15,6 +15,8 @@ def _channel_names(value) -> tuple[str, ...]:
 
     normalized = []
     for item in values:
+        if isinstance(item, Mapping):
+            item = item.get("channel")
         if not isinstance(item, str):
             continue
         channel = item.strip().casefold().removeprefix("#")
