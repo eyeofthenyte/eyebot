@@ -56,7 +56,7 @@ class SocialPostingService:
                 if request.platform != "all":
                     raise ValueError(f"{platform} is disabled for this server")
                 continue
-            if settings.get("connected") is not True:
+            if not self._is_connected(platform, settings):
                 if request.platform != "all":
                     raise ValueError(
                         f"{platform} is enabled but not connected for this server"
@@ -146,6 +146,16 @@ class SocialPostingService:
             self.media.remove(media)
             self.public_media.remove(media)
         return len(removed)
+
+    @staticmethod
+    def _is_connected(platform: str, settings: dict) -> bool:
+        """Validate OAuth metadata or platform-specific credentials."""
+        if platform == "bluesky":
+            return bool(
+                str(settings.get("handle") or "").strip()
+                and str(settings.get("app_password") or "").strip()
+            )
+        return settings.get("connected") is True
 
     @staticmethod
     def _validate_url(value: str | None) -> None:

@@ -31,7 +31,7 @@ class SocialPostingServiceTests(unittest.IsolatedAsyncioTestCase):
             """
 twitter: {enabled: true, connected: true, posting_enabled: true}
 facebook: {enabled: true, connected: true, posting_enabled: true}
-bluesky: {enabled: true, connected: true, posting_enabled: true}
+bluesky: {enabled: true, posting_enabled: true}
 instagram: {enabled: true, connected: true, posting_enabled: true}
 tiktok: {enabled: true, connected: true, posting_enabled: true}
 kofi: {enabled: true}
@@ -64,6 +64,33 @@ kofi: {enabled: true}
         await self.service.queue(request)
         with self.assertRaises(DuplicateJobError):
             await self.service.queue(request)
+
+    async def test_bluesky_uses_handle_and_app_password_as_connection(self):
+        self.config.set_guild_platform_override(
+            "42", "bluesky", "handle", "example.bsky.social"
+        )
+        self.config.secret_service.set_secret(
+            "bluesky",
+            "app_password",
+            "abcd-efgh-ijkl-mnop",
+            guild_id="42",
+        )
+
+        result = await self.service.queue(
+            SocialPostRequest("42", "bluesky", "hello", "bluesky-100", "7")
+        )
+
+        self.assertEqual(result.queued, ("bluesky",))
+
+    async def test_bluesky_without_app_password_is_not_connected(self):
+        self.config.set_guild_platform_override(
+            "42", "bluesky", "handle", "example.bsky.social"
+        )
+
+        with self.assertRaisesRegex(ValueError, "enabled but not connected"):
+            await self.service.queue(
+                SocialPostRequest("42", "bluesky", "hello", "bluesky-101", "7")
+            )
 
     async def test_instagram_requires_public_https_media_url(self):
         with self.assertRaisesRegex(ValueError, "public HTTPS"):
@@ -177,6 +204,15 @@ kofi: {enabled: true}
         self.assertTrue(Path(media["path"]).read_bytes().startswith(b"\xff\xd8\xff"))
 
     async def test_all_attachments_exclude_url_platforms_when_hosting_is_disabled(self):
+        self.config.set_guild_platform_override(
+            "42", "bluesky", "handle", "example.bsky.social"
+        )
+        self.config.secret_service.set_secret(
+            "bluesky",
+            "app_password",
+            "abcd-efgh-ijkl-mnop",
+            guild_id="42",
+        )
         payload = b"\x89PNG\r\n\x1a\n" + b"x" * 20
         result = await self.service.queue(
             SocialPostRequest(
