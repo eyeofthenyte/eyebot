@@ -949,6 +949,18 @@ Roll delivery flags must appear at the end of the command:
 | `!platform instagram account add <username\|url> [<#destination>]` | Monitor an accessible professional Instagram account |
 | `!platform instagram account remove <username\|url>` | Stop monitoring an Instagram account |
 | `!platform instagram account list` | List Instagram accounts monitored by the guild |
+| `!platform twitter account add <username\|url> [<#destination>]` | Monitor posts from a public X account |
+| `!platform twitter account remove <username\|url>` | Stop monitoring an X account |
+| `!platform twitter account list` | List X accounts monitored by the guild |
+| `!platform bluesky account add <handle\|url> [<#destination>]` | Monitor posts from a public Bluesky account |
+| `!platform bluesky account remove <handle\|url>` | Stop monitoring a Bluesky account |
+| `!platform bluesky account list` | List Bluesky accounts monitored by the guild |
+| `!platform kick channel add <name> [<#destination>]` | Monitor a public Kick channel's go-live status |
+| `!platform kick channel remove <name>` | Stop monitoring a Kick channel |
+| `!platform kick channel list` | List monitored Kick channels |
+| `!platform substack publication add <url> [<#destination>]` | Monitor a public Substack RSS publication |
+| `!platform substack publication remove <url>` | Stop monitoring a Substack publication |
+| `!platform substack publication list` | List monitored Substack publications |
 | `!platform <name> set <parameter> <value>` | Set a validated guild override for one platform |
 | `!platform <name> default <parameter\|all>` | Remove overrides and inherit `platforms.yaml` values |
 | `!platform <name> enable` | Enable that platform's service for this server only |

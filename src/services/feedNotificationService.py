@@ -32,47 +32,77 @@ class FeedNotificationService:
         changed = False
         for guild_id in sorted(self.platforms.discord_guilds()):
             settings = self.platforms.effective_guild_platform(guild_id, "substack")
-            destination = settings.get("destination_channel")
-            if settings.get("enabled") is not True or not str(destination or "").isdigit():
+            if settings.get("enabled") is not True:
                 continue
-            entries = await SUBSTACK_ADAPTER.fetch_feed(settings)
-            recent = list(entries[:20])
-            last_seen = self.state.get(guild_id)
-            new_entries = []
-            for entry in recent:
-                event_id = str(entry.get("id") or entry.get("link") or "")
-                if not event_id:
+            publications = settings.get("publications", ())
+            if not isinstance(publications, (list, tuple)) or not publications:
+                publications = [
+                    {
+                        "publication_url": settings.get("publication_url"),
+                        "destination_channel": settings.get("destination_channel"),
+                    }
+                ]
+            for publication in publications:
+                if not isinstance(publication, dict):
                     continue
-                if event_id == last_seen:
-                    break
-                new_entries.append(entry)
-            # On a fresh connection announce at most the newest item.
-            if last_seen is None:
-                new_entries = new_entries[:1]
-            for entry in reversed(new_entries):
-                event_id = str(entry.get("id") or entry.get("link") or "")
-                enclosures = entry.get("enclosures") or []
-                is_podcast = any(
-                    str(item.get("type") or "").startswith("audio/")
-                    for item in enclosures
+                publication_url = publication.get("publication_url")
+                destination = publication.get("destination_channel") or settings.get("destination_channel")
+                if not publication_url or not str(destination or "").isdigit():
+                    continue
+                selected = dict(settings)
+                selected["publication_url"] = publication_url
+                await self._poll_publication(
+                    session, guild_id, str(destination), selected, str(publication_url)
                 )
-                enabled = settings.get(
-                    "podcasts_enabled" if is_podcast else "newsletters_enabled"
-                ) is True
-                if enabled:
-                    title = str(entry.get("title") or "New Substack post")
-                    link = str(entry.get("link") or "")
-                    await self.discord.send(
-                        session,
-                        destination,
-                        f"📰 **{title}**\n{link}"[:2000],
-                        title="New Substack podcast" if is_podcast else "New Substack newsletter",
-                        url=link,
-                    )
-                self.state[guild_id] = event_id
-                changed = True
-            if changed:
-                self.save()
+
+    async def _poll_publication(
+        self, session, guild_id, destination, settings, publication_url
+    ):
+        changed = False
+        entries = await SUBSTACK_ADAPTER.fetch_feed(settings)
+        recent = list(entries[:20])
+        state_key = f"{guild_id}:{publication_url}"
+        last_seen = self.state.get(state_key)
+        new_entries = []
+        for entry in recent:
+            event_id = str(entry.get("id") or entry.get("link") or "")
+            if not event_id:
+                continue
+            if event_id == last_seen:
+                break
+            new_entries.append(entry)
+        # Preserve the existing Substack behavior: announce at most the newest
+        # item when a publication is first configured.
+        if last_seen is None:
+            new_entries = new_entries[:1]
+        for entry in reversed(new_entries):
+            event_id = str(entry.get("id") or entry.get("link") or "")
+            enclosures = entry.get("enclosures") or []
+            is_podcast = any(
+                str(item.get("type") or "").startswith("audio/")
+                for item in enclosures
+            )
+            enabled = settings.get(
+                "podcasts_enabled" if is_podcast else "newsletters_enabled"
+            ) is True
+            if enabled:
+                title = str(entry.get("title") or "New Substack post")
+                link = str(entry.get("link") or "")
+                await self.discord.send(
+                    session,
+                    destination,
+                    f"📰 **{title}**\n{link}"[:2000],
+                    title=(
+                        "New Substack podcast"
+                        if is_podcast
+                        else "New Substack newsletter"
+                    ),
+                    url=link,
+                )
+            self.state[state_key] = event_id
+            changed = True
+        if changed:
+            self.save()
 
     async def run_forever(self):
         import aiohttp

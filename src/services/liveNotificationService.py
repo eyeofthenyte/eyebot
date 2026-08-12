@@ -151,6 +151,31 @@ class LiveNotificationService:
                     selected["channel"] = normalized
                     yield str(guild_id), str(selected_destination), selected
                 continue
+            if self.platform_name == "kick":
+                guild = self.platform_service.discord_guilds().get(str(guild_id), {})
+                platforms = guild.get("platforms", {}) if isinstance(guild, Mapping) else {}
+                kick = platforms.get("kick", {}) if isinstance(platforms, Mapping) else {}
+                configured = kick.get("channels", ()) if isinstance(kick, Mapping) else ()
+                if not configured:
+                    configured = effective.get("channels", ())
+                if isinstance(configured, (list, tuple)) and configured:
+                    seen = set()
+                    for item in configured:
+                        if not isinstance(item, Mapping):
+                            continue
+                        channel = str(item.get("channel") or "").casefold()
+                        selected_destination = item.get("destination_channel") or destination
+                        if (
+                            not channel
+                            or channel in seen
+                            or not str(selected_destination or "").isdigit()
+                        ):
+                            continue
+                        seen.add(channel)
+                        selected = dict(effective)
+                        selected["channel"] = channel
+                        yield str(guild_id), str(selected_destination), selected
+                    continue
             if not str(destination or "").isdigit():
                 continue
             yield str(guild_id), str(destination), effective

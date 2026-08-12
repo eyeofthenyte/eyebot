@@ -10,7 +10,6 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from services.discordPostingService import DiscordPostingService
-from services.tokenRefreshService import TokenRefreshService
 
 
 GRAPH_ROOT = "https://graph.facebook.com/v26.0"
@@ -107,6 +106,8 @@ class FacebookPageMonitorService:
     """Poll monitored Page feeds and deliver newly observed posts once."""
 
     def __init__(self, config, platform_service, logger, *, poll_seconds=60):
+        from services.tokenRefreshService import TokenRefreshService
+
         self.config = config
         self.platforms = platform_service
         self.logger = logger

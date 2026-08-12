@@ -98,6 +98,7 @@ References: [Meta apps](https://developers.facebook.com/apps/) · [Facebook Logi
    `docker compose run --rm --no-deps eyebot python src/manage_secrets.py set kick client_secret --guild {guild_id}`
 5. Set the source and destination with `!platform kick set channel <channel_name>` and `!platform kick set destination_channel <#channel>`.
 6. Enable after the application has access to Kick's public channels endpoint.
+7. Add multiple public Kick channels with `!platform kick channel add <channel_name> [<#destination>]`; manage them with `channel list` and `channel remove <channel_name>`. Each channel may route go-live alerts separately.
 
 References: [Kick Dev](https://dev.kick.com/) · [Kick documentation](https://docs.kick.com/) · [Kick developer settings](https://kick.com/settings/developer)
 """,
@@ -111,6 +112,7 @@ References: [Kick Dev](https://dev.kick.com/) · [Kick documentation](https://do
 5. Set the creator's numeric X user ID and Discord destination with `!platform twitter set user_id <id>` and `!platform twitter set destination_channel <#channel>`.
 6. Enable the OAuth gateway, run `!platform twitter connect`, then enable `posting_enabled` after the application tier permits posting and Spaces lookup.
 7. When `!platform twitter enable` prompts, create or select the private social-media source channel. Attach one to four images there (or reply to an image message) and run `!socialmedia twitter [caption]`.
+8. Monitor posts from another public X account with `!platform twitter account add <username|profile_url> [<#destination>]`. Use `account list` and `account remove <username|profile_url>` to manage sources. Replies and reposts are excluded. Timeline reads use X API credits and may incur charges.
 
 References: [X Developer Console](https://developer.x.com/) · [Authentication overview](https://docs.x.com/fundamentals/authentication/overview) · [API key and secret](https://docs.x.com/fundamentals/authentication/oauth-1-0a/api-key-and-secret)
 """,
@@ -124,6 +126,7 @@ References: [X Developer Console](https://developer.x.com/) · [Authentication o
 4. Set the handle with `!platform bluesky set handle <handle>`.
 5. Enable `posting_enabled`, then use `!socialpost bluesky <text>` from the guild mod channel.
 6. When `!platform bluesky enable` prompts, create or select the private social-media source channel. Attach one to four images there (or reply to an image message) and run `!socialmedia bluesky [caption]`.
+7. Monitor any accessible public Bluesky account with `!platform bluesky account add <handle|profile_url> [<#destination>]`. Use `account list` and `account remove <handle|profile_url>` to manage sources. Replies and repost feed reasons are excluded.
 
 References: [Bluesky API introduction](https://docs.bsky.app/docs/get-started) · [Posting guide](https://docs.bsky.app/blog/create-post) · [Bluesky account settings](https://bsky.app/settings/app-passwords)
 """,
@@ -138,6 +141,7 @@ References: [Bluesky API introduction](https://docs.bsky.app/docs/get-started) �
    `docker compose run --rm --no-deps eyebot python src/manage_secrets.py set tiktok client_secret --guild {guild_id}`
 5. You may store a future Discord route with `!platform tiktok set destination_channel <#channel>`.
 6. Enable the OAuth gateway and run `!platform tiktok connect`. After TikTok approval, queue HTTPS-hosted videos with `!socialurl tiktok <url> [caption]`. TikTok's supported public products do not currently expose creator LIVE status, so EyeBot does not scrape it.
+7. After TikTok approves `video.list` and the connected creator reauthorizes it, enable `videos_enabled` to deliver that connected account's new public videos to `destination_channel`. TikTok does not permit URL-only monitoring of arbitrary accounts through Display API.
 
 References: [TikTok Developer Portal](https://developers.tiktok.com/) · [Login Kit for Web](https://developers.tiktok.com/doc/login-kit-web/) · [Token management](https://developers.tiktok.com/doc/login-kit-manage-user-access-tokens/)
 """,
@@ -160,6 +164,7 @@ References: [Meta apps](https://developers.facebook.com/apps/) · [Instagram Pla
 **Connector status:** Public RSS newsletter and podcast polling with per-guild Discord delivery is implemented. Authenticated/private publication access is not used.
 
 1. Set the public publication URL with `!platform substack set publication_url https://name.substack.com`.
+   Multiple public publications can instead be added with `!platform substack publication add <url> [<#destination>]` and managed with `publication list` or `publication remove <url>`.
 2. Set the Discord destination and newsletter/podcast toggles with `!platform substack set ...`.
 3. If authenticated access is required, store only the allowed `email` and `credential` values through the EyeBot host:
    `docker compose run --rm --no-deps eyebot python src/manage_secrets.py set substack email --guild {guild_id}`

@@ -84,6 +84,8 @@ twitter:
   user_id:
   destination_channel:
   live_poll_seconds: 60
+  # X API timeline reads are billable; use a conservative polling interval.
+  posts_poll_seconds: 300
   posting_enabled: false
 
 bluesky:
@@ -91,6 +93,8 @@ bluesky:
   enabled: false
   handle:
   app_password:
+  destination_channel:
+  posts_poll_seconds: 120
   posting_enabled: false
 
 tiktok:
@@ -103,6 +107,8 @@ tiktok:
   open_id:
   destination_channel:
   live_poll_seconds: 60
+  videos_enabled: false
+  videos_poll_seconds: 300
   posting_enabled: false
 
 instagram:

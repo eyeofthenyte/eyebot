@@ -158,11 +158,14 @@ PLATFORM_RULES = {
         channels=("destination_channel",),
     ),
     "bluesky": {
-        **_rules(booleans=("enabled", "posting_enabled")),
+        **_rules(
+            booleans=("enabled", "posting_enabled"),
+            channels=("destination_channel",),
+        ),
         "handle": ParameterRule("bluesky_handle", "DNS-style Bluesky handle"),
     },
     "tiktok": _rules(
-        booleans=("enabled", "posting_enabled"),
+        booleans=("enabled", "posting_enabled", "videos_enabled"),
         channels=("destination_channel",),
     ),
     "instagram": _rules(
@@ -294,12 +297,6 @@ class Platform(commands.Cog):
             "**Guild status:** `!platform <platform>`\n"
             "**All guild platforms:** `!platform <guild_id>`\n"
             "**Guild settings:** `!platform <platform> set <parameter> <value>`\n"
-            "**Twitch channels:** `!platform twitch channel add <name> [<#destination>]`\n"
-            "`!platform twitch channel <remove|list> [name]`\n"
-            "**Facebook pages:** `!platform facebook page add <url> [<#destination>]`\n"
-            "`!platform facebook page <remove|list> [url|page_id]`\n"
-            "**Instagram accounts:** `!platform instagram account add <username|url> [<#destination>]`\n"
-            "`!platform instagram account <remove|list> [username]`\n"
             "`!platform <platform> default <parameter|all>`\n"
             "`!platform <platform> <enable|disable>`\n"
             "`!platform <platform> <connect|disconnect>`\n"
@@ -309,6 +306,22 @@ class Platform(commands.Cog):
             "`!platform <platform> post <enabled|disabled>`\n"
             "`!platform <platform> chat <on|off>`\n"
             "`!platform <platform> videos <on|off>`",
+            "**Monitored sources:**\n"
+            "`!platform twitch channel add <name> [<#destination>]`\n"
+            "`!platform twitch channel <remove|list> [name]`\n"
+            "`!platform facebook page add <url> [<#destination>]`\n"
+            "`!platform facebook page <remove|list> [url|page_id]`\n"
+            "`!platform instagram account add <username|url> [<#destination>]`\n"
+            "`!platform instagram account <remove|list> [username]`\n"
+            "`!platform twitter account add <username|url> [<#destination>]`\n"
+            "`!platform twitter account <remove|list> [username]`\n"
+            "`!platform bluesky account add <handle|url> [<#destination>]`\n"
+            "`!platform bluesky account <remove|list> [handle]`\n"
+            "`!platform kick channel add <name> [<#destination>]`\n"
+            "`!platform kick channel <remove|list> [name]`\n"
+            "`!platform substack publication add <url> [<#destination>]`\n"
+            "`!platform substack publication <remove|list> [url]`\n"
+            "TikTok: connected-account videos only (`videos_enabled`). Ko-fi: payment webhooks only.",
             "Guild commands require Manage Server and the configured mod channel, "
             "or a bot DM. With multiple managed servers in DM, use "
             "`!platform <guild_id> <platform> ...`. Status masks every configured "
@@ -426,6 +439,32 @@ class Platform(commands.Cog):
         if selected_platform == "instagram" and selected_action == "account":
             return await self._manage_instagram_accounts(
                 ctx, service, target_guild, parameter, value
+            )
+
+        if selected_platform == "twitter" and selected_action == "account":
+            return await self._manage_twitter_accounts(
+                ctx, service, target_guild, parameter, value
+            )
+
+        if selected_platform == "bluesky" and selected_action == "account":
+            return await self._manage_bluesky_accounts(
+                ctx, service, target_guild, parameter, value
+            )
+
+        if selected_platform == "kick" and selected_action == "channel":
+            return await self._manage_kick_channels(
+                ctx, service, target_guild, parameter, value
+            )
+
+        if selected_platform == "substack" and selected_action == "publication":
+            return await self._manage_substack_publications(
+                ctx, service, target_guild, parameter, value
+            )
+
+        if selected_platform == "kofi" and selected_action in {"page", "account"}:
+            return await ctx.send(
+                "❌ Ko-fi does not provide an official public-post feed API. "
+                "EyeBot supports guild-owned Ko-fi payment webhooks only."
             )
 
         if not selected_action:
@@ -1140,6 +1179,336 @@ class Platform(commands.Cog):
                     f"{platform_name.title()} worker restart after source change "
                     f"failed: {error}"
                 )
+
+    async def _manage_twitter_accounts(self, ctx, service, guild, operation, value):
+        selected_operation = str(operation or "").casefold()
+        if selected_operation not in {"add", "remove", "list"}:
+            return await ctx.send(
+                "❌ Use `!platform twitter account add <username|url> "
+                "[<#destination>]`, `remove <username|url>`, or `list`."
+            )
+        settings = service.effective_guild_platform(guild.id, "twitter")
+        accounts = settings.get("monitored_accounts", ())
+        accounts = [dict(item) for item in accounts if isinstance(item, dict)] if isinstance(
+            accounts, (list, tuple)
+        ) else []
+        from services.twitterAccountService import twitter_username
+
+        if selected_operation == "list":
+            if value is not None:
+                return await ctx.send("❌ `account list` does not accept another value.")
+            if not accounts:
+                return await ctx.send("ℹ️ No X accounts are monitored by this server.")
+            lines = [f"**Monitored X Accounts for {guild.name}**"]
+            lines.extend(
+                f"- **@{item.get('username')}** (`{item.get('user_id')}`) "
+                f"→ <#{item.get('destination_channel')}>"
+                for item in accounts
+            )
+            return await ctx.send("\n".join(lines))
+
+        supplied = str(value or "").split()
+        if not supplied:
+            return await ctx.send(
+                f"❌ `account {selected_operation}` requires an X username or URL."
+            )
+        try:
+            username = twitter_username(supplied[0])
+        except ValueError as error:
+            return await ctx.send(f"❌ Invalid X account: {error}.")
+
+        if selected_operation == "remove":
+            if len(supplied) != 1:
+                return await ctx.send("❌ `account remove` accepts one username or URL.")
+            retained = [
+                item for item in accounts
+                if str(item.get("username") or "").casefold() != username
+            ]
+            if len(retained) == len(accounts):
+                return await ctx.send("ℹ️ That X account is not monitored.")
+            service.set_guild_platform_override(
+                guild.id, "twitter", "monitored_accounts", retained
+            )
+            await self._restart_platform_worker("twitter")
+            return await ctx.send("✅ Removed the X account from monitoring.")
+
+        if len(supplied) > 2:
+            return await ctx.send(
+                "❌ Use `!platform twitter account add <username|url> "
+                "[<#destination>]`."
+            )
+        destination = supplied[1] if len(supplied) == 2 else settings.get(
+            "destination_channel"
+        )
+        try:
+            destination = validate_parameter_value(
+                ParameterRule("discord_channel", "Discord channel ID or mention"),
+                str(destination or ""),
+            )
+        except PlatformValueError:
+            return await ctx.send(
+                "❌ Supply a destination channel or configure "
+                "`twitter.destination_channel` first."
+            )
+        token = str(settings.get("bearer_token") or settings.get("access_token") or "")
+        if not token:
+            return await ctx.send(
+                "❌ X API credentials are unavailable for this server. Configure a "
+                "Bearer Token or connect X first."
+            )
+        from services.twitterAccountService import resolve_twitter_account
+
+        resolver = getattr(self.bot, "twitter_account_resolver", resolve_twitter_account)
+        try:
+            if resolver is resolve_twitter_account:
+                import aiohttp
+
+                async with aiohttp.ClientSession(
+                    timeout=aiohttp.ClientTimeout(total=30)
+                ) as session:
+                    account = await resolver(username, token, session)
+            else:
+                account = await resolver(username, token, None)
+        except (OSError, RuntimeError, ValueError) as error:
+            return await ctx.send(f"❌ Unable to add X account: {error}")
+        if any(str(item.get("user_id")) == account["user_id"] for item in accounts):
+            return await ctx.send(
+                f"ℹ️ **@{account['username']}** is already monitored by this server."
+            )
+        if len(accounts) >= MAX_LIST_ITEMS:
+            return await ctx.send(
+                f"❌ A server can monitor at most {MAX_LIST_ITEMS} X accounts."
+            )
+        accounts.append(
+            {
+                "user_id": account["user_id"],
+                "username": account["username"],
+                "name": account["name"],
+                "destination_channel": destination,
+            }
+        )
+        service.set_guild_platform_override(
+            guild.id, "twitter", "monitored_accounts", accounts
+        )
+        await self._restart_platform_worker("twitter")
+        return await ctx.send(
+            f"✅ Monitoring **@{account['username']}** in <#{destination}>. "
+            "X API usage charges may apply."
+        )
+
+    async def _manage_bluesky_accounts(self, ctx, service, guild, operation, value):
+        selected_operation = str(operation or "").casefold()
+        if selected_operation not in {"add", "remove", "list"}:
+            return await ctx.send(
+                "❌ Use `!platform bluesky account add <handle|url> "
+                "[<#destination>]`, `remove <handle|url>`, or `list`."
+            )
+        settings = service.effective_guild_platform(guild.id, "bluesky")
+        accounts = settings.get("monitored_accounts", ())
+        accounts = [dict(item) for item in accounts if isinstance(item, dict)] if isinstance(
+            accounts, (list, tuple)
+        ) else []
+        from services.blueskyAccountService import bluesky_handle
+
+        if selected_operation == "list":
+            if value is not None:
+                return await ctx.send("❌ `account list` does not accept another value.")
+            if not accounts:
+                return await ctx.send("ℹ️ No Bluesky accounts are monitored by this server.")
+            lines = [f"**Monitored Bluesky Accounts for {guild.name}**"]
+            lines.extend(
+                f"- **@{item.get('handle')}** (`{item.get('did')}`) "
+                f"→ <#{item.get('destination_channel')}>"
+                for item in accounts
+            )
+            return await ctx.send("\n".join(lines))
+
+        supplied = str(value or "").split()
+        if not supplied:
+            return await ctx.send(
+                f"❌ `account {selected_operation}` requires a Bluesky handle or URL."
+            )
+        try:
+            handle = bluesky_handle(supplied[0])
+        except ValueError as error:
+            return await ctx.send(f"❌ Invalid Bluesky account: {error}.")
+        if selected_operation == "remove":
+            if len(supplied) != 1:
+                return await ctx.send("❌ `account remove` accepts one handle or URL.")
+            retained = [
+                item for item in accounts
+                if str(item.get("handle") or "").casefold() != handle
+            ]
+            if len(retained) == len(accounts):
+                return await ctx.send("ℹ️ That Bluesky account is not monitored.")
+            service.set_guild_platform_override(
+                guild.id, "bluesky", "monitored_accounts", retained
+            )
+            await self._restart_platform_worker("bluesky")
+            return await ctx.send("✅ Removed the Bluesky account from monitoring.")
+
+        if len(supplied) > 2:
+            return await ctx.send(
+                "❌ Use `!platform bluesky account add <handle|url> "
+                "[<#destination>]`."
+            )
+        destination = supplied[1] if len(supplied) == 2 else settings.get(
+            "destination_channel"
+        )
+        try:
+            destination = validate_parameter_value(
+                ParameterRule("discord_channel", "Discord channel ID or mention"),
+                str(destination or ""),
+            )
+        except PlatformValueError:
+            return await ctx.send(
+                "❌ Supply a destination channel or configure "
+                "`bluesky.destination_channel` first."
+            )
+        from services.blueskyAccountService import resolve_bluesky_account
+
+        resolver = getattr(self.bot, "bluesky_account_resolver", resolve_bluesky_account)
+        try:
+            if resolver is resolve_bluesky_account:
+                import aiohttp
+
+                async with aiohttp.ClientSession(
+                    timeout=aiohttp.ClientTimeout(total=30)
+                ) as session:
+                    account = await resolver(handle, session)
+            else:
+                account = await resolver(handle, None)
+        except (OSError, RuntimeError, ValueError) as error:
+            return await ctx.send(f"❌ Unable to add Bluesky account: {error}")
+        if any(str(item.get("did")) == account["did"] for item in accounts):
+            return await ctx.send(
+                f"ℹ️ **@{account['handle']}** is already monitored by this server."
+            )
+        if len(accounts) >= MAX_LIST_ITEMS:
+            return await ctx.send(
+                f"❌ A server can monitor at most {MAX_LIST_ITEMS} Bluesky accounts."
+            )
+        accounts.append(
+            {
+                "did": account["did"],
+                "handle": account["handle"],
+                "display_name": account["display_name"],
+                "destination_channel": destination,
+            }
+        )
+        service.set_guild_platform_override(
+            guild.id, "bluesky", "monitored_accounts", accounts
+        )
+        await self._restart_platform_worker("bluesky")
+        return await ctx.send(
+            f"✅ Monitoring **@{account['handle']}** in <#{destination}>."
+        )
+
+    async def _manage_kick_channels(self, ctx, service, guild, operation, value):
+        return await self._manage_named_sources(
+            ctx,
+            service,
+            guild,
+            "kick",
+            "channels",
+            "channel",
+            operation,
+            value,
+            PLATFORM_RULES["kick"]["channel"],
+        )
+
+    async def _manage_substack_publications(self, ctx, service, guild, operation, value):
+        return await self._manage_named_sources(
+            ctx,
+            service,
+            guild,
+            "substack",
+            "publications",
+            "publication_url",
+            operation,
+            value,
+            PLATFORM_RULES["substack"]["publication_url"],
+        )
+
+    async def _manage_named_sources(
+        self,
+        ctx,
+        service,
+        guild,
+        platform_name,
+        collection_name,
+        identity_name,
+        operation,
+        value,
+        rule,
+    ):
+        selected_operation = str(operation or "").casefold()
+        singular = "channel" if platform_name == "kick" else "publication"
+        if selected_operation not in {"add", "remove", "list"}:
+            return await ctx.send(
+                f"❌ Use `!platform {platform_name} {singular} add <value> "
+                "[<#destination>]`, `remove <value>`, or `list`."
+            )
+        settings = service.effective_guild_platform(guild.id, platform_name)
+        sources = settings.get(collection_name, ())
+        sources = [dict(item) for item in sources if isinstance(item, dict)] if isinstance(
+            sources, (list, tuple)
+        ) else []
+        if selected_operation == "list":
+            if value is not None:
+                return await ctx.send(f"❌ `{singular} list` does not accept another value.")
+            if not sources:
+                return await ctx.send(f"ℹ️ No {platform_name.title()} {collection_name} are configured.")
+            lines = [f"**{platform_name.title()} {collection_name.title()} for {guild.name}**"]
+            lines.extend(
+                f"- `{item.get(identity_name)}` → <#{item.get('destination_channel')}>"
+                for item in sources
+            )
+            return await ctx.send("\n".join(lines))
+        supplied = str(value or "").split()
+        if not supplied:
+            return await ctx.send(f"❌ `{singular} {selected_operation}` requires a value.")
+        try:
+            identity = validate_parameter_value(rule, supplied[0])
+        except PlatformValueError as error:
+            return await ctx.send(f"❌ Invalid {singular}: {error}.")
+        if platform_name == "substack":
+            identity = identity.rstrip("/")
+        if selected_operation == "remove":
+            if len(supplied) != 1:
+                return await ctx.send(f"❌ `{singular} remove` accepts one value.")
+            retained = [item for item in sources if item.get(identity_name) != identity]
+            if len(retained) == len(sources):
+                return await ctx.send(f"ℹ️ That {singular} is not configured.")
+            service.set_guild_platform_override(
+                guild.id, platform_name, collection_name, retained
+            )
+            await self._restart_platform_worker(platform_name)
+            return await ctx.send(f"✅ Removed the {platform_name.title()} {singular}.")
+        if len(supplied) > 2:
+            return await ctx.send(f"❌ `{singular} add` accepts a value and optional destination.")
+        destination = supplied[1] if len(supplied) == 2 else settings.get("destination_channel")
+        try:
+            destination = validate_parameter_value(
+                ParameterRule("discord_channel", "Discord channel ID or mention"),
+                str(destination or ""),
+            )
+        except PlatformValueError:
+            return await ctx.send(
+                f"❌ Supply a destination or configure `{platform_name}.destination_channel` first."
+            )
+        if any(item.get(identity_name) == identity for item in sources):
+            return await ctx.send(f"ℹ️ That {singular} is already configured.")
+        if len(sources) >= MAX_LIST_ITEMS:
+            return await ctx.send(f"❌ A server can configure at most {MAX_LIST_ITEMS} entries.")
+        sources.append({identity_name: identity, "destination_channel": destination})
+        service.set_guild_platform_override(
+            guild.id, platform_name, collection_name, sources
+        )
+        await self._restart_platform_worker(platform_name)
+        return await ctx.send(
+            f"✅ Added `{identity}`; notifications will use <#{destination}>."
+        )
 
     async def _reconcile_platform_workers(self):
         reconcile = getattr(self.bot, "platform_reconciler", None)

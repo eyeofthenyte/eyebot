@@ -98,4 +98,3 @@ def get_oauth_provider(platform: str) -> OAuthProvider:
         return OAUTH_PROVIDERS[platform.strip().casefold()]
     except KeyError as error:
         raise ValueError(f"OAuth is not configured for platform: {platform}") from error
-

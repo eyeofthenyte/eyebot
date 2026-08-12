@@ -5,6 +5,7 @@ import asyncio
 from services.liveNotificationService import LiveEvent, LiveNotificationService, load_platform_runtime
 from services.logService import LogService
 from services.platformWorkerService import PlatformWorkerService
+from services.twitterAccountService import TwitterAccountMonitorService
 
 
 async def detect_twitter_live(settings, session):
@@ -29,9 +30,16 @@ async def detect_twitter_live(settings, session):
 async def run():
     config, service = load_platform_runtime("twitter")
     logger = LogService("twitter", config["logging"])
+    account_monitor = TwitterAccountMonitorService(
+        config,
+        service,
+        logger,
+        poll_seconds=config.get("twitter", {}).get("posts_poll_seconds", 300),
+    )
     await asyncio.gather(
         LiveNotificationService("twitter", config, service, detect_twitter_live, logger).run_forever(),
         PlatformWorkerService("twitter", service, logger).run_forever(),
+        account_monitor.run_forever(),
     )
 
 

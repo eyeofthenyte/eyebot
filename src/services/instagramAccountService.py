@@ -11,7 +11,6 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from services.discordPostingService import DiscordPostingService
-from services.tokenRefreshService import TokenRefreshService
 
 
 GRAPH_ROOT = "https://graph.facebook.com/v26.0"
@@ -66,6 +65,8 @@ async def resolve_instagram_account(username, owner_id, token, session):
 
 class InstagramAccountMonitorService:
     def __init__(self, config, platform_service, logger, *, poll_seconds=60):
+        from services.tokenRefreshService import TokenRefreshService
+
         self.config = config
         self.platforms = platform_service
         self.logger = logger

@@ -37,6 +37,11 @@ for node in TREE.body:
                 "_restart_twitch_worker",
                 "_manage_facebook_pages",
                 "_manage_instagram_accounts",
+                "_manage_twitter_accounts",
+                "_manage_bluesky_accounts",
+                "_manage_kick_channels",
+                "_manage_substack_publications",
+                "_manage_named_sources",
                 "_restart_platform_worker",
                 "_delete_invocation",
                 "_can_manage",
@@ -497,6 +502,110 @@ class PlatformCommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(accounts[0]["account_id"], "ig-2")
         self.assertEqual(accounts[0]["destination_channel"], "123456789012345678")
         self.assertIn("Monitoring **@example.pro**", self.context.messages[-1])
+
+    async def test_twitter_account_add_accepts_optional_destination(self):
+        self.service.platform("twitter")["bearer_token"] = "token"
+
+        async def resolve(username, token, session):
+            self.assertEqual((username, token), ("xdevelopers", "token"))
+            return {
+                "user_id": "2244994945",
+                "username": "xdevelopers",
+                "name": "Developers",
+            }
+
+        self.bot.twitter_account_resolver = resolve
+        await self.cog.platform_command(
+            self.context,
+            "twitter",
+            "account",
+            "add",
+            value="https://x.com/XDevelopers <#987654321098765432>",
+        )
+
+        accounts = self.service.discord_guilds()["42"]["platforms"]["twitter"][
+            "monitored_accounts"
+        ]
+        self.assertEqual(accounts[0]["user_id"], "2244994945")
+        self.assertEqual(accounts[0]["destination_channel"], "987654321098765432")
+        self.assertIn("usage charges may apply", self.context.messages[-1])
+
+    async def test_twitter_account_add_uses_platform_destination(self):
+        self.service.platform("twitter")["bearer_token"] = "token"
+        self.service.set_guild_platform_override(
+            42, "twitter", "destination_channel", "123456789012345678"
+        )
+
+        async def resolve(username, token, session):
+            return {"user_id": "1", "username": username, "name": "Example"}
+
+        self.bot.twitter_account_resolver = resolve
+        await self.cog.platform_command(
+            self.context, "twitter", "account", "add", value="@example"
+        )
+
+        accounts = self.service.discord_guilds()["42"]["platforms"]["twitter"][
+            "monitored_accounts"
+        ]
+        self.assertEqual(accounts[0]["destination_channel"], "123456789012345678")
+
+    async def test_bluesky_account_add_accepts_optional_destination(self):
+        async def resolve(handle, session):
+            self.assertEqual(handle, "atproto.com")
+            return {
+                "did": "did:plc:example",
+                "handle": "atproto.com",
+                "display_name": "AT Protocol",
+            }
+
+        self.bot.bluesky_account_resolver = resolve
+        await self.cog.platform_command(
+            self.context,
+            "bluesky",
+            "account",
+            "add",
+            value="https://bsky.app/profile/atproto.com <#987654321098765432>",
+        )
+
+        accounts = self.service.discord_guilds()["42"]["platforms"]["bluesky"][
+            "monitored_accounts"
+        ]
+        self.assertEqual(accounts[0]["did"], "did:plc:example")
+        self.assertEqual(accounts[0]["destination_channel"], "987654321098765432")
+        self.assertIn("Monitoring **@atproto.com**", self.context.messages[-1])
+
+    async def test_kick_channel_add_accepts_destination(self):
+        await self.cog.platform_command(
+            self.context,
+            "kick",
+            "channel",
+            "add",
+            value="creator <#987654321098765432>",
+        )
+        channels = self.service.discord_guilds()["42"]["platforms"]["kick"]["channels"]
+        self.assertEqual(channels[0]["channel"], "creator")
+        self.assertEqual(channels[0]["destination_channel"], "987654321098765432")
+
+    async def test_substack_publication_add_uses_default_destination(self):
+        self.service.set_guild_platform_override(
+            42, "substack", "destination_channel", "123456789012345678"
+        )
+        await self.cog.platform_command(
+            self.context,
+            "substack",
+            "publication",
+            "add",
+            value="https://example.substack.com",
+        )
+        rows = self.service.discord_guilds()["42"]["platforms"]["substack"]["publications"]
+        self.assertEqual(rows[0]["publication_url"], "https://example.substack.com")
+        self.assertEqual(rows[0]["destination_channel"], "123456789012345678")
+
+    async def test_kofi_public_page_monitoring_is_rejected(self):
+        await self.cog.platform_command(
+            self.context, "kofi", "page", "add", value="https://ko-fi.com/example"
+        )
+        self.assertIn("does not provide", self.context.messages[-1])
 
     async def test_enable_and_disable_change_only_service_state(self):
         self.service.set_guild_platform_override(

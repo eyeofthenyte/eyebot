@@ -154,6 +154,40 @@ class LiveNotificationTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(targets[0][1], "987654321098765432")
             self.assertEqual(targets[0][2]["channel"], "creator")
 
+    async def test_kick_channels_use_individual_or_default_destinations(self):
+        with tempfile.TemporaryDirectory() as root:
+            settings = {
+                "enabled": True,
+                "destination_channel": "123456789012345678",
+            }
+            guild = {
+                "platforms": {
+                    "kick": {
+                        "channels": [
+                            {
+                                "channel": "first_creator",
+                                "destination_channel": "987654321098765432",
+                            },
+                            {"channel": "second_creator"},
+                        ]
+                    }
+                }
+            }
+            service = PlatformService(root, settings, guild)
+            notifier = RecordingNotifier(
+                "kick", {"kick": {}}, service, lambda *_: None, Logger()
+            )
+
+            targets = list(notifier._targets())
+
+            self.assertEqual(
+                [(destination, config["channel"]) for _, destination, config in targets],
+                [
+                    ("987654321098765432", "first_creator"),
+                    ("123456789012345678", "second_creator"),
+                ],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
