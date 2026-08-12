@@ -645,6 +645,57 @@ class PlatformCommandTests(unittest.IsolatedAsyncioTestCase):
         await self.cog.platform_command(self.context, "bluesky", "videos", "on")
         self.assertIn("does not support", self.context.messages[-1])
 
+    async def test_owner_can_set_validated_global_non_secret_parameter(self):
+        await self.cog.platform_command(
+            self.context,
+            "kick",
+            "global",
+            "live_poll_seconds",
+            value="120",
+        )
+
+        self.assertEqual(self.service.platform("kick")["live_poll_seconds"], 120)
+        self.assertIn("kick.live_poll_seconds", self.context.messages[-1])
+
+    async def test_owner_global_set_alias_and_list(self):
+        await self.cog.platform_command(
+            self.context,
+            "kick",
+            "global",
+            "set",
+            value="live_poll_seconds 180",
+        )
+        await self.cog.platform_command(self.context, "kick", "global", "list")
+
+        self.assertEqual(self.service.platform("kick")["live_poll_seconds"], 180)
+        self.assertIn("Kick global settings", self.context.messages[-1])
+        self.assertIn("`live_poll_seconds`: `180`", self.context.messages[-1])
+
+    async def test_global_command_rejects_secret_parameter(self):
+        await self.cog.platform_command(
+            self.context,
+            "kick",
+            "global",
+            "client_secret",
+            value="do-not-save",
+        )
+
+        self.assertIn("Secret parameters cannot be entered", self.context.messages[-1])
+        self.assertNotEqual(
+            self.service.platform("kick").get("client_secret"), "do-not-save"
+        )
+
+    async def test_global_poll_interval_is_bounded(self):
+        await self.cog.platform_command(
+            self.context,
+            "kick",
+            "global",
+            "live_poll_seconds",
+            value="5",
+        )
+
+        self.assertIn("15 through 86400", self.context.messages[-1])
+
     async def test_non_owner_cannot_change_global_policy(self):
         async def is_owner(_user):
             return False

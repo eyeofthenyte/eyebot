@@ -193,6 +193,28 @@ PLATFORM_RULES = {
     },
 }
 
+POLL_INTERVAL_PLATFORMS = {
+    "live_poll_seconds": {
+        "twitch", "youtube", "facebook", "kick", "twitter", "tiktok", "instagram"
+    },
+    "posts_poll_seconds": {"facebook", "twitter", "bluesky", "instagram"},
+    "videos_poll_seconds": {"tiktok"},
+}
+GLOBAL_PLATFORM_RULES = {
+    platform_name: {
+        "available": ParameterRule("bool", "true or false"),
+        **rules,
+        **{
+            parameter: ParameterRule(
+                "poll_seconds", "poll interval from 15 through 86400 seconds"
+            )
+            for parameter, supported_platforms in POLL_INTERVAL_PLATFORMS.items()
+            if platform_name in supported_platforms
+        },
+    }
+    for platform_name, rules in PLATFORM_RULES.items()
+}
+
 
 def _validate_url(value: str, *, hostname: str | None = None) -> str:
     parsed = urlparse(value)
@@ -236,6 +258,13 @@ def validate_parameter_value(rule: ParameterRule, raw_value: str):
         if normalized in FALSE_VALUES:
             return False
         raise PlatformValueError("must be true/false, yes/no, on/off, or 1/0")
+    if rule.kind == "poll_seconds":
+        if not value.isascii() or not value.isdigit():
+            raise PlatformValueError("must be a whole number of seconds")
+        seconds = int(value)
+        if not 15 <= seconds <= 86400:
+            raise PlatformValueError("must be from 15 through 86400 seconds")
+        return seconds
     if rule.kind == "discord_channel":
         match = DISCORD_CHANNEL_PATTERN.fullmatch(value)
         if not match:
@@ -303,6 +332,9 @@ class Platform(commands.Cog):
             "`!platform <platform|all> instructions`\n\n"
             "**Bot owner global policy:**\n"
             "`!platform <platform> <on|off>` — availability\n"
+            "`!platform <platform> global <parameter> <value>`\n"
+            "`!platform <platform> global set <parameter> <value>`\n"
+            "`!platform <platform> global list`\n"
             "`!platform <platform> post <enabled|disabled>`\n"
             "`!platform <platform> chat <on|off>`\n"
             "`!platform <platform> videos <on|off>`",
@@ -416,6 +448,62 @@ class Platform(commands.Cog):
         if selected_platform not in PLATFORM_RULES:
             return await ctx.send(
                 "❌ Select a platform: " + ", ".join(PLATFORM_NAMES) + "."
+            )
+
+        if selected_action == "global":
+            if not await self.bot.is_owner(ctx.author):
+                return await ctx.send(
+                    "❌ Only the EyeBot application owner can change global platform settings."
+                )
+            global_parameter = (parameter or "").casefold()
+            raw_global_value = value
+            if global_parameter == "set":
+                parts = str(value or "").split(maxsplit=1)
+                if len(parts) != 2:
+                    return await ctx.send(
+                        "❌ Use `!platform <platform> global set <parameter> <value>`."
+                    )
+                global_parameter, raw_global_value = parts[0].casefold(), parts[1]
+            if global_parameter in {"list", "show"}:
+                if raw_global_value is not None:
+                    return await ctx.send("❌ `global list` does not accept a value.")
+                settings = service.platform(selected_platform)
+                lines = [f"## {PLATFORM_DISPLAY_NAMES[selected_platform]} global settings"]
+                for name in sorted(GLOBAL_PLATFORM_RULES[selected_platform]):
+                    raw = settings.get(name)
+                    displayed = "NULL" if raw is None else str(raw).lower() if isinstance(raw, bool) else str(raw)
+                    lines.append(f"> `{name}`: `{displayed}`")
+                return await ctx.send("\n".join(lines))
+            secret_names = SECRET_PARAMETERS | PLATFORM_SECRET_PARAMETERS.get(
+                selected_platform, frozenset()
+            )
+            if global_parameter in secret_names:
+                return await ctx.send(
+                    "❌ Secret parameters cannot be entered through Discord. "
+                    "Use host-side `manage_secrets.py`."
+                )
+            rule = GLOBAL_PLATFORM_RULES[selected_platform].get(global_parameter)
+            if rule is None:
+                available = ", ".join(
+                    f"`{name}`" for name in sorted(GLOBAL_PLATFORM_RULES[selected_platform])
+                )
+                return await ctx.send(
+                    f"❌ `{global_parameter or 'missing parameter'}` is not an allowed "
+                    f"global non-secret setting for `{selected_platform}`. Available: {available}."
+                )
+            try:
+                normalized = validate_parameter_value(rule, raw_global_value or "")
+            except PlatformValueError as error:
+                return await ctx.send(
+                    f"❌ Invalid global `{global_parameter}` value: {error}."
+                )
+            service.set_global_platform_value(
+                selected_platform, global_parameter, normalized
+            )
+            await self._reconcile_platform_workers()
+            return await ctx.send(
+                f"✅ Global `{selected_platform}.{global_parameter}` set to "
+                f"`{str(normalized).lower() if isinstance(normalized, bool) else normalized}`."
             )
 
         if selected_platform == "twitch" and selected_action == "channel":

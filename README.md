@@ -966,6 +966,9 @@ Roll delivery flags must appear at the end of the command:
 | `!platform <name> enable` | Enable that platform's service for this server only |
 | `!platform <name> disable` | Disable that platform's service for this server only |
 | `!platform <name> on\|off` | Bot owner: allow or prohibit the connector globally |
+| `!platform <name> global <parameter> <value>` | Bot owner: set a validated global non-secret parameter |
+| `!platform <name> global set <parameter> <value>` | Explicit form of the global-setting command |
+| `!platform <name> global list` | Bot owner: list allowed global non-secret parameters and values |
 | `!platform <name> post enabled\|disabled` | Bot owner: set the global posting default where supported |
 | `!platform <name> chat on\|off` | Bot owner: set the global livestream-chat default where supported |
 | `!platform <name> videos on\|off` | Bot owner: set the global video-notification default where supported |
@@ -1027,6 +1030,18 @@ An unavailable connector cannot run even when a guild has enabled it. When an
 available connector is enabled by the first guild, EyeBot dynamically starts
 its worker; it stops the worker after the final enabled guild disables it.
 `post`, `chat`, and `videos` update only parameters supported by that platform.
+
+The bot owner can also manage validated non-secret global defaults:
+
+```text
+!platform kick global live_poll_seconds 120
+!platform youtube global set videos_enabled true
+!platform kick global list
+```
+
+Polling intervals accept whole seconds from 15 through 86400. Credential and
+token parameters are rejected and must be stored with host-side
+`manage_secrets.py`.
 
 The read-only `!platform <name>` status command shows effective values and
 whether each value is inherited or overridden by the guild. Secret values are
