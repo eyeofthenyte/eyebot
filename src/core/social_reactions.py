@@ -23,7 +23,10 @@ def enabled_reaction_emojis(
         if platform == "all":
             continue
         settings = platform_service.effective_guild_platform(guild_id, platform)
-        if settings.get("enabled") is not True:
+        if (
+            settings.get("available", True) is not True
+            or settings.get("enabled") is not True
+        ):
             continue
         if platform in ATTACHMENT_PLATFORMS and has_attachments:
             emojis.append(emoji)

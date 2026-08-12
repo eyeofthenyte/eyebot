@@ -15,7 +15,7 @@ import time
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
-from core.platform_config import is_platform_enabled
+from core.platform_config import is_platform_available, is_platform_enabled
 from services.platformConfigService import load_split_config
 
 
@@ -77,15 +77,22 @@ def load_supervisor_config(
     return config
 
 
-def enabled_platforms(config: Mapping) -> tuple[str, ...]:
-    """Return enabled platforms in deterministic startup order."""
+def enabled_platforms(config: Mapping, guilds: Mapping | None = None) -> tuple[str, ...]:
+    """Return available platforms required globally or by at least one guild."""
+    guilds = guilds or {}
     return tuple(
         platform
         for platform in PLATFORM_ENTRYPOINTS
-        if is_platform_enabled(
-            config,
-            platform,
-            default=platform == "discord",
+        if is_platform_available(config, platform, default=platform == "discord")
+        and (
+            is_platform_enabled(config, platform, default=platform == "discord")
+            or any(
+                isinstance(guild, Mapping)
+                and isinstance(guild.get("platforms"), Mapping)
+                and isinstance(guild["platforms"].get(platform), Mapping)
+                and guild["platforms"][platform].get("enabled") is True
+                for guild in guilds.values()
+            )
         )
     )
 
@@ -137,6 +144,21 @@ class BotSupervisor:
             self.processes[platform] = self._spawn(platform)
             return f"{platform} restarted"
 
+    def reconcile(self, desired_platforms: Sequence[str]) -> str:
+        """Start newly required workers and stop workers no longer required."""
+        desired = tuple(dict.fromkeys(desired_platforms))
+        with self._lock:
+            if self.stopping:
+                raise RuntimeError("EyeBot is shutting down")
+            for platform in tuple(self.processes):
+                if platform not in desired:
+                    self._stop_process(platform, self.processes.pop(platform))
+            for platform in desired:
+                if platform not in self.processes:
+                    self.processes[platform] = self._spawn(platform)
+            self.platforms = desired
+        return "platform workers reconciled: " + ", ".join(desired)
+
     def stop(self) -> None:
         with self._lock:
             if self.stopping:
@@ -184,6 +206,22 @@ def send_restart_command(
     return str(response["message"])
 
 
+def send_reconcile_command(
+    *, host: str = CONTROL_HOST, port: int = CONTROL_PORT, timeout: float = 10
+) -> str:
+    """Ask the running supervisor to reload platform and guild policy."""
+    request = json.dumps({"command": "reconcile"}).encode() + b"\n"
+    with socket.create_connection((host, port), timeout=timeout) as client:
+        client.sendall(request)
+        response_bytes = client.makefile("rb").readline()
+    if not response_bytes:
+        raise RuntimeError("The EyeBot supervisor returned no response")
+    response = json.loads(response_bytes)
+    if not response.get("ok"):
+        raise RuntimeError(str(response.get("error", "Reconciliation failed")))
+    return str(response["message"])
+
+
 class _ControlHandler(socketserver.StreamRequestHandler):
     def handle(self) -> None:
         try:
@@ -191,11 +229,17 @@ class _ControlHandler(socketserver.StreamRequestHandler):
             if len(request_bytes) > 4096:
                 raise ValueError("Supervisor command is too long")
             request = json.loads(request_bytes)
-            if request.get("command") != "restart":
+            if request.get("command") == "restart":
+                message = self.server.supervisor.restart(
+                    str(request.get("platform", ""))
+                )
+            elif request.get("command") == "reconcile":
+                config, guilds = load_supervisor_state()
+                message = self.server.supervisor.reconcile(
+                    enabled_platforms(config, guilds)
+                )
+            else:
                 raise ValueError("Unsupported supervisor command")
-            message = self.server.supervisor.restart(
-                str(request.get("platform", ""))
-            )
             response = {"ok": True, "message": message}
         except (json.JSONDecodeError, TypeError, ValueError, RuntimeError) as error:
             response = {"ok": False, "error": str(error)}
@@ -216,6 +260,22 @@ class SupervisorControlServer(socketserver.TCPServer):
         super().__init__((host, port), _ControlHandler)
 
 
+def load_supervisor_state() -> tuple[Mapping, Mapping]:
+    """Reload merged global policy and isolated guild configuration."""
+    config, global_service, platform_service = load_split_config(
+        CONFIG_PATH,
+        PLATFORM_CONFIG_PATH,
+        guild_config_dir=os.getenv(
+            "EYEBOT_GUILD_CONFIG_DIR",
+            str(CONFIG_PATH.resolve().parent / "data" / "guilds"),
+        ),
+    )
+    global_config = global_service.get()
+    if not isinstance(global_config, Mapping) or not global_config:
+        raise ValueError(f"EyeBot configuration is empty or invalid: {CONFIG_PATH}")
+    return config, platform_service.discord_guilds()
+
+
 def _run_supervisor() -> int:
     logging.basicConfig(
         level=logging.INFO,
@@ -227,7 +287,8 @@ def _run_supervisor() -> int:
         logger.error("%s", error)
         return 2
     logger.info("Loaded configuration from %s", CONFIG_PATH)
-    platforms = enabled_platforms(config)
+    _reloaded_config, guilds = load_supervisor_state()
+    platforms = enabled_platforms(config, guilds)
     if not platforms:
         logger.error(
             "No platform bots are enabled. Set at least one "

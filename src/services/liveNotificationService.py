@@ -115,6 +115,8 @@ class LiveNotificationService:
             effective = self.platform_service.effective_guild_platform(
                 guild_id, self.platform_name
             )
+            if effective.get("available", True) is not True:
+                continue
             if effective.get("enabled") is not True:
                 continue
             destination = effective.get("destination_channel")

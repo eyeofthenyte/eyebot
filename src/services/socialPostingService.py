@@ -52,6 +52,10 @@ class SocialPostingService:
         hosted_media = None
         for platform in selected:
             settings = self.platforms.effective_guild_platform(request.guild_id, platform)
+            if settings.get("available", True) is not True:
+                if request.platform != "all":
+                    raise ValueError(f"{platform} is unavailable on this EyeBot host")
+                continue
             if settings.get("enabled") is not True:
                 if request.platform != "all":
                     raise ValueError(f"{platform} is disabled for this server")

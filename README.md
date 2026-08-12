@@ -938,10 +938,16 @@ Roll delivery flags must appear at the end of the command:
 | `!setmodchannel` | Configure or disable the moderation-log channel |
 | `!settimer <interval> [duration]` | Auto-clear the current channel; values are minutes; interval `0` disables |
 | `!setprefix <prefix>` | Set this server's 1–5 character command prefix; use `reset` for the global default |
+| `!platform <name>` | Display effective guild parameters and masked secret presence |
+| `!platform <guild_id>` | Display every effective platform setting for a managed guild |
 | `!platform <name> set <parameter> <value>` | Set a validated guild override for one platform |
 | `!platform <name> default <parameter\|all>` | Remove overrides and inherit `platforms.yaml` values |
 | `!platform <name> enable` | Enable that platform's service for this server only |
 | `!platform <name> disable` | Disable that platform's service for this server only |
+| `!platform <name> on\|off` | Bot owner: allow or prohibit the connector globally |
+| `!platform <name> post enabled\|disabled` | Bot owner: set the global posting default where supported |
+| `!platform <name> chat on\|off` | Bot owner: set the global livestream-chat default where supported |
+| `!platform <name> videos on\|off` | Bot owner: set the global video-notification default where supported |
 | `!platform <name> connect` | DM a signed per-guild OAuth link to the moderator |
 | `!platform <name> disconnect` | Remove that guild's OAuth tokens and connection metadata |
 | `!socialpost <name\|all> <text>` | Queue a text post for enabled social connectors |
@@ -994,6 +1000,23 @@ the private conversation.
 
 `enable` and `disable` modify only the guild's `enabled` override. They do not
 reset, remove, or otherwise change any of that platform's other parameters.
+
+The bot-owner-only `on` and `off` actions control the global `available` gate.
+An unavailable connector cannot run even when a guild has enabled it. When an
+available connector is enabled by the first guild, EyeBot dynamically starts
+its worker; it stops the worker after the final enabled guild disables it.
+`post`, `chat`, and `videos` update only parameters supported by that platform.
+
+The read-only `!platform <name>` status command shows effective values and
+whether each value is inherited or overridden by the guild. Secret values are
+never displayed: `*****` means a global or guild secret is present and `NULL`
+means it is absent.
+
+`!platform <guild_id>` produces a Markdown report for every platform configured
+for that guild. The report uses an underlined guild heading, a bullet for each
+platform, and separate block-quoted Global Parameters, Guild Parameters, and
+Secrets sections. It follows the same Manage Server and moderation-channel/DM
+restrictions as the other platform commands.
 
 `default` does not copy a value into the guild file. It removes the override,
 so the current value in `platforms.yaml` is inherited just as it is for a newly

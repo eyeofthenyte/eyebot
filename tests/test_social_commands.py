@@ -207,6 +207,24 @@ class SocialReactionPlaceholderTests(unittest.TestCase):
             ("📘",),
         )
 
+    def test_globally_unavailable_account_has_no_placeholder(self):
+        service = _PlatformService(
+            {
+                "instagram": {
+                    "available": False,
+                    "enabled": True,
+                    "connected": True,
+                    "posting_enabled": True,
+                }
+            }
+        )
+        self.assertEqual(
+            enabled_reaction_emojis(
+                service, "42", self.reactions, has_attachments=True
+            ),
+            (),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -7,7 +7,7 @@ from twitchio.ext import commands
 
 from adapters.twitch_adapter import TwitchTransportAdapter
 from core.command_model import CommandPlatform
-from core.platform_config import is_platform_enabled
+from core.platform_config import is_platform_available
 from core.portable_runtime import build_portable_runtime
 from core.twitch_config import resolve_twitch_channels
 from services.logService import LogService
@@ -33,7 +33,7 @@ config.setdefault("twitch", {})
 config["twitch"].setdefault("enabled", False)
 
 BOT_PREFIX = config["prefix"] or "!"
-TWITCH_ENABLED = is_platform_enabled(config, CommandPlatform.TWITCH)
+TWITCH_ENABLED = is_platform_available(config, CommandPlatform.TWITCH)
 TMI_TOKEN = config["twitch"].get("tmi_token", "")
 CLIENT_ID = config["twitch"].get("client_id", "")
 BOT_NICK = config["twitch"].get("nick", "")
@@ -132,7 +132,7 @@ class Bot(commands.Bot):
 def main():
     if not TWITCH_ENABLED:
         logger.info(
-            "Twitch integration is disabled. Set twitch.enabled to true "
+            "Twitch integration is disabled or unavailable. Set twitch.available to true "
             "to start it."
         )
         return 0

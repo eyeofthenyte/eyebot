@@ -1,11 +1,13 @@
 ---
 # Platform credentials and connector-wide options.
 discord:
+  available: true
   enabled: true
   bot_token:
   mod_channel_name: mod-logs
 
 twitch:
+  available: false
   enabled: false
   tmi_token:
   client_id:
@@ -21,6 +23,7 @@ twitch:
   live_poll_seconds: 60
 
 youtube:
+  available: false
   enabled: false
   api_key:
   client_id:
@@ -37,6 +40,7 @@ youtube:
   livestream_chat_commands_enabled: false
 
 facebook:
+  available: false
   enabled: false
   app_id:
   app_secret:
@@ -50,6 +54,7 @@ facebook:
   livestream_chat_commands_enabled: false
 
 kick:
+  available: false
   enabled: false
   client_id:
   client_secret:
@@ -61,6 +66,7 @@ kick:
   livestream_chat_commands_enabled: false
 
 twitter:
+  available: false
   enabled: false
   api_key:
   api_secret:
@@ -76,12 +82,14 @@ twitter:
   posting_enabled: false
 
 bluesky:
+  available: false
   enabled: false
   handle:
   app_password:
   posting_enabled: false
 
 tiktok:
+  available: false
   enabled: false
   client_key:
   client_secret:
@@ -93,6 +101,7 @@ tiktok:
   posting_enabled: false
 
 instagram:
+  available: false
   enabled: false
   app_id:
   app_secret:
@@ -105,6 +114,7 @@ instagram:
   posting_enabled: false
 
 substack:
+  available: false
   enabled: false
   publication_url:
   email:
@@ -114,6 +124,7 @@ substack:
   podcasts_enabled: false
 
 kofi:
+  available: false
   enabled: false
   page_url:
   verification_token:

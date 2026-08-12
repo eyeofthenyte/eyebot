@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from core.command_model import CommandPlatform
-from core.platform_config import is_platform_enabled
+from core.platform_config import is_platform_available, is_platform_enabled
 
 
 TWITCH_PATH = Path(__file__).resolve().parents[1] / "src/eyebot_twitch.py"
@@ -69,6 +69,20 @@ class PlatformConfigTests(unittest.TestCase):
 
     def test_default_can_preserve_legacy_behavior_when_requested(self):
         self.assertTrue(is_platform_enabled({}, "legacy", default=True))
+
+    def test_available_is_host_gate_with_legacy_enabled_fallback(self):
+        self.assertFalse(
+            is_platform_available(
+                {"instagram": {"available": False, "enabled": True}},
+                "instagram",
+            )
+        )
+        self.assertTrue(
+            is_platform_available(
+                {"instagram": {"enabled": True}},
+                "instagram",
+            )
+        )
 
     def test_disabled_twitch_does_not_construct_or_run_bot(self):
         main, logger, bot = load_twitch_main(enabled=False)

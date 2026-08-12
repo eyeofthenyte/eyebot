@@ -16,6 +16,7 @@ from core.platform_setup_instructions import (
     split_markdown_messages,
 )
 from core.oauth_provider import OAUTH_PROVIDERS
+from core.platform_secret_schema import PLATFORM_SECRET_PARAMETERS
 from services.oauthStateService import OAuthStateService, resolve_oauth_state_key
 from services.platformConnectionService import PlatformConnectionService
 
@@ -35,9 +36,27 @@ PLATFORM_NAMES = (
     "substack",
     "kofi",
 )
+PLATFORM_DISPLAY_NAMES = {
+    "discord": "Discord",
+    "twitch": "Twitch",
+    "youtube": "YouTube",
+    "facebook": "Facebook",
+    "kick": "Kick",
+    "twitter": "Twitter/X",
+    "bluesky": "Bluesky",
+    "tiktok": "TikTok",
+    "instagram": "Instagram",
+    "substack": "Substack",
+    "kofi": "Ko-fi",
+}
 SOCIAL_SOURCE_PLATFORMS = frozenset(
     {"twitter", "facebook", "bluesky", "instagram", "tiktok"}
 )
+GLOBAL_ACTION_PARAMETERS = {
+    "post": "posting_enabled",
+    "chat": "livestream_chat_commands_enabled",
+    "videos": "videos_enabled",
+}
 SECRET_PARAMETERS = frozenset(
     {
         "access_token",
@@ -267,17 +286,27 @@ class Platform(commands.Cog):
         name="platform",
         extras=[
             "🌐  **__Platform Settings__**",
-            "**Usage:** `!platform <platform> set <parameter> <value>`\n"
-            "`!platform <platform> default <parameter|all>`\n\n"
-            "`!platform <platform> <enable|disable>`\n\n"
-            "`!platform <platform> <connect|disconnect>`\n\n"
+            "**Guild status:** `!platform <platform>`\n"
+            "**All guild platforms:** `!platform <guild_id>`\n"
+            "**Guild settings:** `!platform <platform> set <parameter> <value>`\n"
+            "`!platform <platform> default <parameter|all>`\n"
+            "`!platform <platform> <enable|disable>`\n"
+            "`!platform <platform> <connect|disconnect>`\n"
             "`!platform <platform|all> instructions`\n\n"
-            "In a DM with multiple managed servers, prefix the command with "
-            "the guild ID: `!platform <guild_id> <platform> ...`\n\n"
-            "Platforms: discord, twitch, youtube, facebook, kick, twitter, "
-            "bluesky, tiktok, instagram, substack, kofi.\n"
-            "Requires the Manage Server permission. Credentials and tokens "
-            "must be stored with the host-side manage_secrets.py tool.",
+            "**Bot owner global policy:**\n"
+            "`!platform <platform> <on|off>` — availability\n"
+            "`!platform <platform> post <enabled|disabled>`\n"
+            "`!platform <platform> chat <on|off>`\n"
+            "`!platform <platform> videos <on|off>`",
+            "Guild commands require Manage Server and the configured mod channel, "
+            "or a bot DM. With multiple managed servers in DM, use "
+            "`!platform <guild_id> <platform> ...`. Status masks every configured "
+            "secret as `*****` and shows an absent secret as `NULL`. Global commands "
+            "are restricted to the EyeBot application owner. `post`, `chat`, and "
+            "`videos` are accepted only where that platform supports the setting. "
+            "Secrets must be stored with host-side `manage_secrets.py`; never enter "
+            "them in Discord. Platforms: discord, twitch, youtube, facebook, kick, "
+            "twitter, bluesky, tiktok, instagram, substack, kofi.",
         ],
     )
     async def platform_command(
@@ -351,9 +380,69 @@ class Platform(commands.Cog):
             if not await self._require_mod_channel(ctx, service, target_guild):
                 return
 
+        if selected_platform == "__all_status__":
+            if selected_action or parameter is not None or value is not None:
+                return await ctx.send("❌ Guild platform status does not accept extra values.")
+            return await self._send_all_platform_status(
+                ctx,
+                service,
+                target_guild,
+            )
+
         if selected_platform not in PLATFORM_RULES:
             return await ctx.send(
                 "❌ Select a platform: " + ", ".join(PLATFORM_NAMES) + "."
+            )
+
+        if not selected_action:
+            if parameter is not None or value is not None:
+                return await ctx.send("❌ Platform status does not accept extra values.")
+            return await self._send_platform_status(
+                ctx,
+                service,
+                target_guild,
+                selected_platform,
+            )
+
+        if selected_action in {"on", "off", *GLOBAL_ACTION_PARAMETERS}:
+            if not await self.bot.is_owner(ctx.author):
+                return await ctx.send(
+                    "❌ Only the EyeBot application owner can change global platform policy."
+                )
+            if value is not None:
+                return await ctx.send("❌ This global command accepts only one value.")
+            if selected_action in {"on", "off"}:
+                if parameter is not None:
+                    return await ctx.send(
+                        f"❌ `{selected_action}` does not accept another value."
+                    )
+                global_parameter = "available"
+                normalized = selected_action == "on"
+            else:
+                global_parameter = GLOBAL_ACTION_PARAMETERS[selected_action]
+                if global_parameter not in PLATFORM_RULES[selected_platform]:
+                    return await ctx.send(
+                        f"❌ `{selected_platform}` does not support the global "
+                        f"`{selected_action}` setting."
+                    )
+                try:
+                    normalized = validate_parameter_value(
+                        PLATFORM_RULES[selected_platform][global_parameter],
+                        parameter or "",
+                    )
+                except PlatformValueError as error:
+                    return await ctx.send(
+                        f"❌ Invalid global `{selected_action}` value: {error}."
+                    )
+            service.set_global_platform_value(
+                selected_platform,
+                global_parameter,
+                normalized,
+            )
+            await self._reconcile_platform_workers()
+            return await ctx.send(
+                f"✅ Global `{selected_platform}.{global_parameter}` set to "
+                f"`{str(normalized).lower()}`."
             )
 
         if selected_action in {"connect", "disconnect"}:
@@ -427,6 +516,7 @@ class Platform(commands.Cog):
                 "enabled",
                 enabled,
             )
+            await self._reconcile_platform_workers()
             state = "enabled" if enabled else "disabled"
             await ctx.send(
                 f"✅ `{selected_platform}` is now {state} for this server. "
@@ -501,6 +591,148 @@ class Platform(commands.Cog):
 
     def _service(self):
         return getattr(self.bot, "platform_config_service", None)
+
+    async def _send_platform_status(self, ctx, service, guild, platform_name):
+        """Display effective guild settings without revealing secret values."""
+        effective = service.effective_guild_platform(guild.id, platform_name)
+        global_settings = service.platform(platform_name)
+        guild_settings = (
+            service.discord_guilds()
+            .get(str(guild.id), {})
+            .get("platforms", {})
+            .get(platform_name, {})
+        )
+        if not isinstance(guild_settings, dict):
+            guild_settings = {}
+
+        secret_names = set(PLATFORM_SECRET_PARAMETERS.get(platform_name, ()))
+        global_names = {
+            name
+            for name in global_settings
+            if name not in SECRET_PARAMETERS and name not in secret_names
+        }
+        guild_names = set(PLATFORM_RULES[platform_name])
+        guild_names.update(
+            name
+            for name in effective
+            if name not in SECRET_PARAMETERS
+            and name not in secret_names
+        )
+        guild_names.discard("available")
+
+        lines = [
+            f"## {PLATFORM_DISPLAY_NAMES[platform_name]} settings for {guild.name}",
+            f"Guild ID: `{guild.id}`",
+            "",
+            "**Global Parameters**",
+        ]
+        for name in sorted(global_names):
+            raw = global_settings.get(name)
+            lines.append(f"- `{name}`: `{self._display_platform_value(raw)}`")
+
+        lines.extend(("", "**Guild Parameters**"))
+        for name in sorted(guild_names):
+            raw = effective.get(name)
+            source = "guild override" if name in guild_settings else "inherited"
+            lines.append(
+                f"- `{name}`: `{self._display_platform_value(raw)}` ({source})"
+            )
+
+        lines.extend(("", "**Secrets**"))
+        for name in sorted(PLATFORM_SECRET_PARAMETERS.get(platform_name, ())):
+            marker = "*****" if effective.get(name) not in (None, "") else "NULL"
+            lines.append(f"- `{name}`: `{marker}`")
+
+        for page in split_markdown_messages("\n".join(lines)):
+            await ctx.send(page)
+
+    async def _send_all_platform_status(self, ctx, service, guild):
+        """Display every effective guild platform setting with masked secrets."""
+        lines = [f"## __{guild.name}'s Social Platform Information__", ""]
+        guild_platforms = (
+            service.discord_guilds()
+            .get(str(guild.id), {})
+            .get("platforms", {})
+        )
+        if not isinstance(guild_platforms, dict):
+            guild_platforms = {}
+
+        for platform_name in PLATFORM_NAMES:
+            effective = service.effective_guild_platform(guild.id, platform_name)
+            global_settings = service.platform(platform_name)
+            guild_settings = guild_platforms.get(platform_name, {})
+            if not isinstance(guild_settings, dict):
+                guild_settings = {}
+
+            secret_names = set(PLATFORM_SECRET_PARAMETERS.get(platform_name, ()))
+            global_names = {
+                name
+                for name in global_settings
+                if name not in SECRET_PARAMETERS and name not in secret_names
+            }
+            guild_names = set(PLATFORM_RULES[platform_name])
+            guild_names.update(
+                name
+                for name in effective
+                if name not in SECRET_PARAMETERS
+                and name not in secret_names
+            )
+            guild_names.discard("available")
+
+            lines.append(f"- **{PLATFORM_DISPLAY_NAMES[platform_name]}**")
+            lines.append("> **Global Parameters**")
+            if global_names:
+                for name in sorted(global_names):
+                    raw = global_settings.get(name)
+                    lines.append(
+                        f"> `{name}`: `{self._display_platform_value(raw)}`"
+                    )
+            else:
+                lines.append("> `NULL`")
+
+            lines.append("> **Guild Parameters**")
+            for name in sorted(guild_names):
+                raw = effective.get(name)
+                source = "guild override" if name in guild_settings else "inherited"
+                lines.append(
+                    f"> `{name}`: `{self._display_platform_value(raw)}` ({source})"
+                )
+
+            lines.append("> **Secrets**")
+            for name in sorted(secret_names):
+                marker = "*****" if effective.get(name) not in (None, "") else "NULL"
+                lines.append(f"> `{name}`: `{marker}` (secret)")
+            lines.append("")
+
+        logger = getattr(self.bot, "logger", None)
+        if logger is not None:
+            logger.info(
+                f"{ctx.author} requested social platform status for {guild.name}"
+            )
+
+        for page in split_markdown_messages("\n".join(lines)):
+            await ctx.send(page)
+
+    def _display_platform_value(self, value):
+        if value is None or value == "":
+            return "NULL"
+        if isinstance(value, bool):
+            return str(value).lower()
+        if isinstance(value, (list, tuple, set)):
+            return ", ".join(str(item) for item in value) or "NULL"
+        displayed = str(value).replace("`", "'").replace("\n", " ")
+        return displayed[:500]
+
+    async def _reconcile_platform_workers(self):
+        reconcile = getattr(self.bot, "platform_reconciler", None)
+        if reconcile is None:
+            return
+        try:
+            await asyncio.to_thread(reconcile)
+        except (OSError, RuntimeError, ValueError) as error:
+            logger = getattr(self.bot, "logger", None)
+            if logger is not None:
+                logger.warning(f"Platform worker reconciliation failed: {error}")
 
     async def _ensure_socialmedia_source_channel(self, ctx, service, guild):
         guild_config = service.ensure_discord_guild(str(guild.id), guild.name)
@@ -629,6 +861,31 @@ class Platform(commands.Cog):
         parameter,
         value,
     ):
+        possible_guild_id = str(platform_name or "")
+        bare_guild_status = (
+            possible_guild_id.isdigit()
+            and action is None
+            and parameter is None
+            and value is None
+        )
+        if bare_guild_status:
+            target = next(
+                (
+                    guild
+                    for guild in getattr(self.bot, "guilds", ())
+                    if str(guild.id) == possible_guild_id
+                    and self._can_manage(guild, ctx.author)
+                ),
+                None,
+            )
+            if target is None:
+                await ctx.send(
+                    "❌ That server is unavailable or you do not have Manage "
+                    "Server permission there."
+                )
+                return None
+            return target, "__all_status__", None, None, None
+
         if ctx.guild is not None:
             return ctx.guild, platform_name, action, parameter, value
 
@@ -637,7 +894,6 @@ class Platform(commands.Cog):
             for guild in getattr(self.bot, "guilds", ())
             if self._can_manage(guild, ctx.author)
         ]
-        possible_guild_id = str(platform_name or "")
         if possible_guild_id.isdigit():
             target = next(
                 (guild for guild in managed_guilds if str(guild.id) == possible_guild_id),

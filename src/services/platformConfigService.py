@@ -194,7 +194,18 @@ class PlatformConfigService(ConfigService):
             platform_name,
             {},
         )
-        return deep_merge(effective, guild_secrets)
+        effective = deep_merge(effective, guild_secrets)
+        # Availability is a host-owner policy and cannot be overridden by a guild.
+        if "available" in base:
+            effective["available"] = base["available"]
+        return effective
+
+    def set_global_platform_value(self, platform_name: str, parameter: str, value) -> None:
+        """Persist one connector-wide, bot-owner-controlled setting."""
+        if platform_name not in PLATFORM_NAMES:
+            raise ValueError(f"Unsupported platform: {platform_name}")
+        self.platform(platform_name)[parameter] = deepcopy(value)
+        self.save()
 
     def set_guild_platform_override(
         self,

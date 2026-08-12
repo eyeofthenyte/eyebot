@@ -44,6 +44,8 @@ class PlatformWorkerService:
         settings = self.platforms.effective_guild_platform(
             job["guild_id"], self.platform
         )
+        if settings.get("available", True) is not True:
+            raise RuntimeError(f"{self.platform} is unavailable on this EyeBot host")
         if settings.get("enabled") is not True or settings.get("posting_enabled") is not True:
             raise RuntimeError(f"{self.platform} posting is disabled for this guild")
         payload = job.get("payload", {})

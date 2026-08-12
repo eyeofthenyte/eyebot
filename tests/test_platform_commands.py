@@ -28,6 +28,10 @@ for node in TREE.body:
                 "__init__",
                 "platform_command",
                 "_service",
+                "_reconcile_platform_workers",
+                "_send_platform_status",
+                "_send_all_platform_status",
+                "_display_platform_value",
                 "_delete_invocation",
                 "_can_manage",
                 "_resolve_target",
@@ -187,7 +191,12 @@ class PlatformCommandTests(unittest.IsolatedAsyncioTestCase):
             platform_config_service=self.service,
             guilds=(self.guild,),
             config={},
+            logger=types.SimpleNamespace(messages=[]),
         )
+        self.bot.logger.info = self.bot.logger.messages.append
+        async def is_owner(user):
+            return user.id == 7
+        self.bot.is_owner = is_owner
         self.cog = Platform(self.bot)
         self.context = Recorder(self.guild)
 
@@ -214,6 +223,78 @@ class PlatformCommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(saved["platforms"]["youtube"]["videos_enabled"])
         self.assertNotIn("api_key", saved["platforms"]["youtube"])
         self.assertEqual(self.context.deleted, 1)
+
+    async def test_platform_without_action_displays_effective_masked_status(self):
+        self.service.set_guild_platform_override(
+            42,
+            "youtube",
+            "enabled",
+            True,
+        )
+        self.service.set_guild_platform_override(
+            42,
+            "youtube",
+            "channel_id",
+            "UC" + "a" * 22,
+        )
+
+        await self.cog.platform_command(self.context, "youtube")
+
+        output = "\n".join(self.context.messages)
+        self.assertIn("YouTube settings for Campaign", output)
+        self.assertIn("**Global Parameters**", output)
+        self.assertIn("**Guild Parameters**", output)
+        self.assertIn("`enabled`: `true` (guild override)", output)
+        self.assertIn("`channel_id`: `UC" + "a" * 22, output)
+        self.assertIn("`api_key`: `*****`", output)
+        self.assertIn("`client_secret`: `NULL`", output)
+        self.assertNotIn("platform-secret", output)
+
+    async def test_platform_status_in_dm_supports_explicit_guild_id(self):
+        second = Guild(84, "Second Campaign")
+        self.bot.guilds = (self.guild, second)
+        self.service.ensure_discord_guild("84", "Second Campaign")
+        context = Recorder(None)
+
+        await self.cog.platform_command(context, "84", "youtube")
+
+        self.assertIn("YouTube settings for Second Campaign", context.messages[0])
+
+    async def test_bare_guild_id_displays_all_platform_status(self):
+        self.service.set_guild_platform_override(42, "youtube", "enabled", True)
+
+        await self.cog.platform_command(self.context, "42")
+
+        output = "\n".join(self.context.messages)
+        self.assertIn("## __Campaign's Social Platform Information__", output)
+        for platform in ("Discord", "Twitch", "YouTube", "Twitter/X", "Ko-fi"):
+            self.assertIn(f"- **{platform}**", output)
+        self.assertIn("> **Global Parameters**", output)
+        self.assertIn("> **Guild Parameters**", output)
+        self.assertIn("> **Secrets**", output)
+        self.assertIn("> `enabled`: `true` (guild override)", output)
+        self.assertIn("> `api_key`: `*****` (secret)", output)
+        self.assertNotIn("platform-secret", output)
+        self.assertEqual(
+            self.bot.logger.messages,
+            [f"{self.context.author} requested social platform status for Campaign"],
+        )
+
+    async def test_bare_guild_id_status_works_in_dm(self):
+        context = Recorder(None)
+
+        await self.cog.platform_command(context, "42")
+
+        self.assertIn("Campaign's Social Platform Information", context.messages[0])
+
+    async def test_bare_guild_id_rejects_unmanaged_guild(self):
+        unmanaged = Guild(84, "Unmanaged", manager_id=999)
+        self.bot.guilds = (self.guild, unmanaged)
+        context = Recorder(None)
+
+        await self.cog.platform_command(context, "84")
+
+        self.assertIn("unavailable or you do not have", context.messages[-1])
 
     async def test_twitch_go_live_destination_is_saved_per_guild(self):
         await self.cog.platform_command(
@@ -254,6 +335,33 @@ class PlatformCommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(overrides["enabled"])
         self.assertTrue(overrides["videos_enabled"])
         self.assertEqual(self.context.deleted, 2)
+
+    async def test_owner_global_commands_write_platform_file(self):
+        await self.cog.platform_command(self.context, "youtube", "on")
+        await self.cog.platform_command(
+            self.context, "youtube", "videos", "on"
+        )
+        await self.cog.platform_command(
+            self.context, "youtube", "chat", "off"
+        )
+
+        saved = yaml.safe_load(self.platform_path.read_text(encoding="utf-8"))
+        self.assertTrue(saved["youtube"]["available"])
+        self.assertTrue(saved["youtube"]["videos_enabled"])
+        self.assertFalse(saved["youtube"]["livestream_chat_commands_enabled"])
+        self.assertNotIn("available", self.service.discord_guilds()["42"])
+
+    async def test_global_command_rejects_unsupported_parameter(self):
+        await self.cog.platform_command(self.context, "bluesky", "videos", "on")
+        self.assertIn("does not support", self.context.messages[-1])
+
+    async def test_non_owner_cannot_change_global_policy(self):
+        async def is_owner(_user):
+            return False
+        self.bot.is_owner = is_owner
+        await self.cog.platform_command(self.context, "youtube", "off")
+        self.assertIn("application owner", self.context.messages[-1])
+        self.assertNotIn("available", self.service.platform("youtube"))
 
     async def test_enabling_social_platform_prompts_for_source_channel(self):
         async def wait_for(event, timeout, check):

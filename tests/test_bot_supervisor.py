@@ -47,6 +47,22 @@ class EnabledPlatformTests(unittest.TestCase):
         }
         self.assertEqual(enabled_platforms(config), ("twitch", "youtube"))
 
+    def test_available_platform_starts_for_enabled_guild(self):
+        config = {
+            "discord": {"available": True, "enabled": True},
+            "instagram": {"available": True, "enabled": False},
+            "tiktok": {"available": False, "enabled": False},
+        }
+        guilds = {
+            "42": {
+                "platforms": {
+                    "instagram": {"enabled": True},
+                    "tiktok": {"enabled": True},
+                }
+            }
+        }
+        self.assertEqual(enabled_platforms(config, guilds), ("discord", "instagram"))
+
     def test_supervisor_requires_a_real_nonempty_config_file(self):
         with tempfile.TemporaryDirectory() as directory:
             config_path = Path(directory) / "config.yaml"
@@ -120,6 +136,20 @@ class BotSupervisorTests(unittest.TestCase):
             supervisor.restart("twitch")
         with self.assertRaisesRegex(ValueError, "Unknown platform"):
             supervisor.restart("not-a-platform")
+
+    @patch("eyebot.subprocess.Popen")
+    def test_reconcile_starts_and_stops_workers(self, popen):
+        popen.return_value = FakeProcess()
+        discord = FakeProcess()
+        twitch = FakeProcess()
+        supervisor = BotSupervisor(("discord", "twitch"))
+        supervisor.processes = {"discord": discord, "twitch": twitch}
+
+        message = supervisor.reconcile(("discord", "instagram"))
+
+        self.assertTrue(twitch.terminated)
+        self.assertIn("instagram", supervisor.processes)
+        self.assertIn("instagram", message)
 
 
 class SupervisorControlTests(unittest.TestCase):
