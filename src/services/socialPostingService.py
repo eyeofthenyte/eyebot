@@ -52,9 +52,21 @@ class SocialPostingService:
         hosted_media = None
         for platform in selected:
             settings = self.platforms.effective_guild_platform(request.guild_id, platform)
-            if settings.get("enabled") is not True or settings.get("posting_enabled") is not True:
+            if settings.get("enabled") is not True:
                 if request.platform != "all":
-                    raise ValueError(f"{platform} posting is disabled for this server")
+                    raise ValueError(f"{platform} is disabled for this server")
+                continue
+            if settings.get("connected") is not True:
+                if request.platform != "all":
+                    raise ValueError(
+                        f"{platform} is enabled but not connected for this server"
+                    )
+                continue
+            if settings.get("posting_enabled") is not True:
+                if request.platform != "all":
+                    raise ValueError(
+                        f"{platform} is enabled but posting is disabled for this server"
+                    )
                 continue
             self._validate_text(
                 platform,

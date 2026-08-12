@@ -39,7 +39,9 @@ Accepted Discord image uploads are JPEG, PNG, GIF, and WebP. For hosted
 Instagram and TikTok photo posts, EyeBot converts uploads to a compatible
 JPEG; an animated GIF is posted as its first frame.
 
-EyeBot only adds platform placeholders for accounts that are enabled, connected, and have posting enabled. Only moderators can approve them."""
+EyeBot adds placeholders for every enabled platform supported by the message.
+When a moderator selects one, EyeBot verifies that the account is connected,
+posting is enabled, and any required public-media hosting is available."""
 PUBLIC_MEDIA_PROVIDER_HELP = """**Public-media provider notation:**
 🏠 `local_caddy` — **implemented**; stores temporary files in EyeBot's Docker volume and serves them through the gateway behind Caddy.
 ☁️ `cloudflare_r2` — placeholder for an R2 bucket, S3 endpoint, custom media domain, access-key ID, and secret key.

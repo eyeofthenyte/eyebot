@@ -29,11 +29,11 @@ class SocialPostingServiceTests(unittest.IsolatedAsyncioTestCase):
         platform_path = root / "platforms.yaml"
         platform_path.write_text(
             """
-twitter: {enabled: true, posting_enabled: true}
-facebook: {enabled: true, posting_enabled: true}
-bluesky: {enabled: true, posting_enabled: true}
-instagram: {enabled: true, posting_enabled: true}
-tiktok: {enabled: true, posting_enabled: true}
+twitter: {enabled: true, connected: true, posting_enabled: true}
+facebook: {enabled: true, connected: true, posting_enabled: true}
+bluesky: {enabled: true, connected: true, posting_enabled: true}
+instagram: {enabled: true, connected: true, posting_enabled: true}
+tiktok: {enabled: true, connected: true, posting_enabled: true}
 kofi: {enabled: true}
 """.lstrip(),
             encoding="utf-8",
@@ -81,6 +81,20 @@ kofi: {enabled: true}
             )
         )
         self.assertEqual(result.queued, ("instagram",))
+
+    async def test_enabled_but_disconnected_platform_has_clear_error(self):
+        self.config.set_guild_platform_override("42", "instagram", "connected", False)
+        with self.assertRaisesRegex(ValueError, "enabled but not connected"):
+            await self.service.queue(
+                SocialPostRequest(
+                    "42",
+                    "instagram",
+                    "caption",
+                    "disconnected-100",
+                    "7",
+                    media_url="https://media.example/image.jpg",
+                )
+            )
 
     async def test_tiktok_accepts_public_https_media_url(self):
         result = await self.service.queue(

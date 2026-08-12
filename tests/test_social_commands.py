@@ -115,7 +115,7 @@ class SocialReactionPlaceholderTests(unittest.TestCase):
         "📣": "all",
     }
 
-    def test_attachment_reactions_only_include_ready_compatible_accounts(self):
+    def test_attachment_reactions_include_every_enabled_platform(self):
         service = _PlatformService(
             {
                 "twitter": {"enabled": True, "connected": True, "posting_enabled": True},
@@ -129,7 +129,7 @@ class SocialReactionPlaceholderTests(unittest.TestCase):
             enabled_reaction_emojis(
                 service, "42", self.reactions, has_attachments=True
             ),
-            ("🐦", "📘", "📣"),
+            ("🐦", "🦋", "📘", "📸", "📣"),
         )
 
     def test_url_reactions_include_connected_instagram_and_tiktok(self):
@@ -192,7 +192,7 @@ class SocialReactionPlaceholderTests(unittest.TestCase):
             ("🐦", "🦋", "📘", "📸", "🎵", "📣"),
         )
 
-    def test_disabled_or_non_posting_accounts_have_no_placeholder(self):
+    def test_disabled_accounts_are_omitted_but_enabled_non_posting_accounts_show(self):
         service = _PlatformService(
             {
                 "twitter": {"enabled": False, "connected": True, "posting_enabled": True},
@@ -204,7 +204,7 @@ class SocialReactionPlaceholderTests(unittest.TestCase):
             enabled_reaction_emojis(
                 service, "42", self.reactions, has_attachments=True
             ),
-            (),
+            ("📘",),
         )
 
 
