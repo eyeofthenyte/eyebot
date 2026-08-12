@@ -1,6 +1,16 @@
 import tempfile
+import sys
+import types
 import unittest
 from pathlib import Path
+
+if "aiohttp" not in sys.modules:
+    try:
+        import aiohttp  # noqa: F401
+    except ModuleNotFoundError:
+        sys.modules["aiohttp"] = types.SimpleNamespace(
+            BasicAuth=lambda *args, **kwargs: (args, kwargs)
+        )
 
 from services.liveNotificationService import LiveEvent, LiveNotificationService
 
@@ -14,12 +24,13 @@ class Logger:
 
 
 class PlatformService:
-    def __init__(self, root, settings):
+    def __init__(self, root, settings, guild=None):
         self.guild_config_dir = Path(root)
         self.settings = settings
+        self.guild = guild or {}
 
     def discord_guilds(self):
-        return {"42": {}}
+        return {"42": self.guild}
 
     def effective_guild_platform(self, guild_id, platform):
         return self.settings
@@ -78,6 +89,32 @@ class LiveNotificationTests(unittest.IsolatedAsyncioTestCase):
             )
             await notifier.poll_once(object())
             self.assertEqual(calls, [])
+
+    async def test_twitch_polls_each_guild_channel(self):
+        with tempfile.TemporaryDirectory() as root:
+            seen = []
+
+            async def detector(config, session):
+                seen.append(config["channel"])
+                return None
+
+            settings = {
+                "enabled": True,
+                "destination_channel": "123456789012345678",
+            }
+            guild = {
+                "platforms": {
+                    "twitch": {"channels": ["First", "#second", "first"]}
+                }
+            }
+            service = PlatformService(root, settings, guild)
+            notifier = RecordingNotifier(
+                "twitch", {"twitch": {}}, service, detector, Logger()
+            )
+
+            await notifier.poll_once(object())
+
+            self.assertEqual(seen, ["first", "second"])
 
 
 if __name__ == "__main__":

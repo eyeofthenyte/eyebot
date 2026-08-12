@@ -50,7 +50,7 @@ References: [Discord applications](https://discord.com/developers/applications) 
    `docker compose run --rm --no-deps eyebot python src/manage_secrets.py set twitch tmi_token`
    `docker compose run --rm --no-deps eyebot python src/manage_secrets.py set twitch client_id`
 5. For a private installation, set connector-wide `nick` and `channels` in `platforms.yaml`.
-6. For a shared installation, the host must set `private_install: false` in `config.yaml`; then set this server's Twitch channel with `!platform twitch set channel <channel_login>`.
+6. For a shared installation, the host must set `private_install: false` in `config.yaml`; then add this server's Twitch channels with `!platform twitch channel add <channel_login>`. Use `channel remove <channel_login>` or `channel list` to manage the guild-owned list. The legacy `set channel` command remains compatible.
 7. Select the Discord channel for Twitch go-live posts with `!platform twitch set destination_channel <#channel>`. EyeBot polls the official Helix Get Streams endpoint and posts once when a new stream becomes live.
 8. The host must also set connector-wide `twitch.enabled: true` in `platforms.yaml`. Enable this guild with `!platform twitch enable`, then restart the Twitch child so it joins the newly configured channel. The shared bot account must be permitted to join and speak in that Twitch channel.
 

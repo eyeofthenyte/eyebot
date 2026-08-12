@@ -39,6 +39,25 @@ class TwitchChannelResolutionTests(unittest.TestCase):
         }
         self.assertEqual(resolve_twitch_channels(config, service), ("owner", "guest"))
 
+    def test_shared_install_adds_multiple_guild_channels_without_duplicates(self):
+        service = PlatformService(
+            {
+                "42": {
+                    "platforms": {
+                        "twitch": {
+                            "enabled": True,
+                            "channels": ["First", "#SECOND", "first"],
+                        }
+                    }
+                }
+            }
+        )
+        config = {"private_install": False, "twitch": {"channels": ["Owner"]}}
+        self.assertEqual(
+            resolve_twitch_channels(config, service),
+            ("owner", "first", "second"),
+        )
+
     def test_missing_mode_fails_closed_as_private(self):
         service = PlatformService(
             {"42": {"platforms": {"twitch": {"enabled": True, "channel": "guest"}}}}

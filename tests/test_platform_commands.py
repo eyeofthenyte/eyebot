@@ -32,6 +32,9 @@ for node in TREE.body:
                 "_send_platform_status",
                 "_send_all_platform_status",
                 "_display_platform_value",
+                "_manage_twitch_channels",
+                "_guild_twitch_channels",
+                "_restart_twitch_worker",
                 "_delete_invocation",
                 "_can_manage",
                 "_resolve_target",
@@ -71,6 +74,8 @@ exec(compile(MODULE, str(PLATFORM_PATH), "exec"), namespace)
 Platform = namespace["Platform"]
 PlatformValueError = namespace["PlatformValueError"]
 PLATFORM_RULES = namespace["PLATFORM_RULES"]
+PLATFORM_NAMES = namespace["PLATFORM_NAMES"]
+PLATFORM_DISPLAY_NAMES = namespace["PLATFORM_DISPLAY_NAMES"]
 validate_parameter_value = namespace["validate_parameter_value"]
 
 
@@ -266,15 +271,26 @@ class PlatformCommandTests(unittest.IsolatedAsyncioTestCase):
         await self.cog.platform_command(self.context, "42")
 
         output = "\n".join(self.context.messages)
-        self.assertIn("## __Campaign's Social Platform Information__", output)
-        for platform in ("Discord", "Twitch", "YouTube", "Twitter/X", "Ko-fi"):
-            self.assertIn(f"- **{platform}**", output)
+        self.assertEqual(
+            self.context.messages[0],
+            "## __Campaign's Social Platform Information__",
+        )
+        self.assertEqual(len(self.context.messages), len(PLATFORM_NAMES) + 1)
+        for index, platform_name in enumerate(PLATFORM_NAMES, 1):
+            display_name = PLATFORM_DISPLAY_NAMES[platform_name]
+            self.assertTrue(
+                self.context.messages[index].startswith(f"- **{display_name}**\n")
+            )
         self.assertIn("> **Global Parameters**", output)
         self.assertIn("> **Guild Parameters**", output)
         self.assertIn("> **Secrets**", output)
         self.assertIn("> `enabled`: `true` (guild override)", output)
         self.assertIn("> `api_key`: `*****` (secret)", output)
         self.assertNotIn("platform-secret", output)
+        youtube_post = self.context.messages[PLATFORM_NAMES.index("youtube") + 1]
+        self.assertIn("> `enabled`: `true` (guild override)", youtube_post)
+        self.assertIn("> `api_key`: `*****` (secret)", youtube_post)
+        self.assertNotIn("- **Twitch**", youtube_post)
         self.assertEqual(
             self.bot.logger.messages,
             [f"{self.context.author} requested social platform status for Campaign"],
@@ -316,6 +332,42 @@ class PlatformCommandTests(unittest.IsolatedAsyncioTestCase):
             saved["platforms"]["twitch"]["destination_channel"],
             "123456789012345678",
         )
+
+    async def test_twitch_channel_add_remove_and_list(self):
+        restarts = []
+        self.bot.platform_restarter = restarts.append
+
+        await self.cog.platform_command(
+            self.context, "twitch", "channel", "add", value="First_Channel"
+        )
+        await self.cog.platform_command(
+            self.context, "twitch", "channel", "add", value="#second_channel"
+        )
+        await self.cog.platform_command(
+            self.context, "twitch", "channel", "list"
+        )
+
+        saved = self.service.discord_guilds()["42"]["platforms"]["twitch"]
+        self.assertEqual(saved["channels"], ["first_channel", "second_channel"])
+        self.assertIn("`first_channel`", self.context.messages[-1])
+        self.assertIn("`second_channel`", self.context.messages[-1])
+        self.assertEqual(restarts, ["twitch", "twitch"])
+
+        await self.cog.platform_command(
+            self.context, "twitch", "channel", "remove", value="first_channel"
+        )
+        self.assertEqual(saved["channels"], ["second_channel"])
+
+    async def test_twitch_channel_add_migrates_legacy_singular_value(self):
+        self.service.set_guild_platform_override(42, "twitch", "channel", "legacy")
+
+        await self.cog.platform_command(
+            self.context, "twitch", "channel", "add", value="new_channel"
+        )
+
+        saved = self.service.discord_guilds()["42"]["platforms"]["twitch"]
+        self.assertEqual(saved["channels"], ["legacy", "new_channel"])
+        self.assertNotIn("channel", saved)
 
     async def test_enable_and_disable_change_only_service_state(self):
         self.service.set_guild_platform_override(

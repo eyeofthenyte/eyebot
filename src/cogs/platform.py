@@ -120,6 +120,10 @@ PLATFORM_RULES = {
         "enabled": ParameterRule("bool", "true or false"),
         "nick": ParameterRule("twitch_name", "Twitch login name"),
         "channel": ParameterRule("twitch_name", "Twitch channel login name"),
+        "channels": ParameterRule(
+            "twitch_list",
+            f"comma-separated Twitch channel login names (maximum {MAX_LIST_ITEMS})",
+        ),
         "destination_channel": ParameterRule(
             "discord_channel",
             "Discord channel ID or mention for Twitch go-live posts",
@@ -289,6 +293,7 @@ class Platform(commands.Cog):
             "**Guild status:** `!platform <platform>`\n"
             "**All guild platforms:** `!platform <guild_id>`\n"
             "**Guild settings:** `!platform <platform> set <parameter> <value>`\n"
+            "**Twitch channels:** `!platform twitch channel <add|remove|list> [name]`\n"
             "`!platform <platform> default <parameter|all>`\n"
             "`!platform <platform> <enable|disable>`\n"
             "`!platform <platform> <connect|disconnect>`\n"
@@ -392,6 +397,15 @@ class Platform(commands.Cog):
         if selected_platform not in PLATFORM_RULES:
             return await ctx.send(
                 "❌ Select a platform: " + ", ".join(PLATFORM_NAMES) + "."
+            )
+
+        if selected_platform == "twitch" and selected_action == "channel":
+            return await self._manage_twitch_channels(
+                ctx,
+                service,
+                target_guild,
+                parameter,
+                value,
             )
 
         if not selected_action:
@@ -583,6 +597,8 @@ class Platform(commands.Cog):
             selected_parameter,
             normalized,
         )
+        if selected_platform == "twitch" and selected_parameter in {"channel", "channels"}:
+            await self._restart_twitch_worker()
         displayed = ", ".join(normalized) if isinstance(normalized, list) else str(normalized)
         await ctx.send(
             f"✅ `{selected_platform}.{selected_parameter}` set to `{displayed}` "
@@ -648,7 +664,6 @@ class Platform(commands.Cog):
 
     async def _send_all_platform_status(self, ctx, service, guild):
         """Display every effective guild platform setting with masked secrets."""
-        lines = [f"## __{guild.name}'s Social Platform Information__", ""]
         guild_platforms = (
             service.discord_guilds()
             .get(str(guild.id), {})
@@ -656,6 +671,8 @@ class Platform(commands.Cog):
         )
         if not isinstance(guild_platforms, dict):
             guild_platforms = {}
+
+        await ctx.send(f"## __{guild.name}'s Social Platform Information__")
 
         for platform_name in PLATFORM_NAMES:
             effective = service.effective_guild_platform(guild.id, platform_name)
@@ -679,7 +696,7 @@ class Platform(commands.Cog):
             )
             guild_names.discard("available")
 
-            lines.append(f"- **{PLATFORM_DISPLAY_NAMES[platform_name]}**")
+            lines = [f"- **{PLATFORM_DISPLAY_NAMES[platform_name]}**"]
             lines.append("> **Global Parameters**")
             if global_names:
                 for name in sorted(global_names):
@@ -702,16 +719,17 @@ class Platform(commands.Cog):
             for name in sorted(secret_names):
                 marker = "*****" if effective.get(name) not in (None, "") else "NULL"
                 lines.append(f"> `{name}`: `{marker}` (secret)")
-            lines.append("")
+
+            # Never combine two platforms in one Discord message. A single
+            # unusually large platform block may still require safe paging.
+            for page in split_markdown_messages("\n".join(lines)):
+                await ctx.send(page)
 
         logger = getattr(self.bot, "logger", None)
         if logger is not None:
             logger.info(
                 f"{ctx.author} requested social platform status for {guild.name}"
             )
-
-        for page in split_markdown_messages("\n".join(lines)):
-            await ctx.send(page)
 
     def _display_platform_value(self, value):
         if value is None or value == "":
@@ -722,6 +740,86 @@ class Platform(commands.Cog):
             return ", ".join(str(item) for item in value) or "NULL"
         displayed = str(value).replace("`", "'").replace("\n", " ")
         return displayed[:500]
+
+    async def _manage_twitch_channels(self, ctx, service, guild, operation, value):
+        selected_operation = str(operation or "").casefold()
+        if selected_operation not in {"add", "remove", "list"}:
+            return await ctx.send(
+                "❌ Use `!platform twitch channel add <name>`, "
+                "`remove <name>`, or `list`."
+            )
+        if selected_operation == "list":
+            if value is not None:
+                return await ctx.send("❌ `channel list` does not accept a channel name.")
+            channels = self._guild_twitch_channels(service, guild.id)
+            if not channels:
+                return await ctx.send("ℹ️ No Twitch channels are configured for this server.")
+            formatted = "\n".join(f"- `{name}`" for name in channels)
+            return await ctx.send(
+                f"**Twitch channels for {guild.name}**\n{formatted}"
+            )
+
+        try:
+            supplied_name = str(value or "").strip().removeprefix("#")
+            channel_name = validate_parameter_value(
+                PLATFORM_RULES["twitch"]["channel"],
+                supplied_name,
+            )
+        except PlatformValueError as error:
+            return await ctx.send(f"❌ Invalid Twitch channel: {error}.")
+
+        channels = list(self._guild_twitch_channels(service, guild.id))
+        if selected_operation == "add":
+            if channel_name in channels:
+                return await ctx.send(f"ℹ️ `{channel_name}` is already configured.")
+            if len(channels) >= MAX_LIST_ITEMS:
+                return await ctx.send(
+                    f"❌ A server can configure at most {MAX_LIST_ITEMS} Twitch channels."
+                )
+            channels.append(channel_name)
+            result = f"✅ Added `{channel_name}` to this server's Twitch channels."
+        else:
+            if channel_name not in channels:
+                return await ctx.send(f"ℹ️ `{channel_name}` is not configured.")
+            channels.remove(channel_name)
+            result = f"✅ Removed `{channel_name}` from this server's Twitch channels."
+
+        service.set_guild_platform_override(guild.id, "twitch", "channels", channels)
+        service.clear_guild_platform_override(guild.id, "twitch", "channel")
+        await self._restart_twitch_worker()
+        return await ctx.send(result)
+
+    def _guild_twitch_channels(self, service, guild_id):
+        guild = service.discord_guilds().get(str(guild_id), {})
+        platforms = guild.get("platforms", {}) if isinstance(guild, dict) else {}
+        twitch = platforms.get("twitch", {}) if isinstance(platforms, dict) else {}
+        if not isinstance(twitch, dict):
+            return ()
+        values = twitch.get("channels", ())
+        if isinstance(values, str):
+            values = (values,)
+        elif not isinstance(values, (list, tuple, set)):
+            values = ()
+        legacy = twitch.get("channel")
+        if legacy:
+            values = (*values, legacy)
+        normalized = []
+        for item in values:
+            name = str(item).strip().casefold().removeprefix("#")
+            if CHANNEL_NAME_PATTERN.fullmatch(name) and name not in normalized:
+                normalized.append(name)
+        return tuple(normalized)
+
+    async def _restart_twitch_worker(self):
+        restart = getattr(self.bot, "platform_restarter", None)
+        if restart is None:
+            return
+        try:
+            await asyncio.to_thread(restart, "twitch")
+        except (OSError, RuntimeError, ValueError) as error:
+            logger = getattr(self.bot, "logger", None)
+            if logger is not None:
+                logger.warning(f"Twitch worker restart after channel change failed: {error}")
 
     async def _reconcile_platform_workers(self):
         reconcile = getattr(self.bot, "platform_reconciler", None)

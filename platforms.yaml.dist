@@ -15,7 +15,9 @@ twitch:
   channels:
     - your_channel_name
   # In shared mode, each guild can override this with:
-  # !platform twitch set channel <twitch_login>
+  # !platform twitch channel add <twitch_login>
+  # A guild may add multiple channels. The singular channel setting remains
+  # available for compatibility with existing installations.
   channel:
   # Discord destination for go-live posts. Guilds should override this with:
   # !platform twitch set destination_channel <#channel>

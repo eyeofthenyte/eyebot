@@ -122,6 +122,30 @@ class LiveNotificationService:
             destination = effective.get("destination_channel")
             if not str(destination or "").isdigit():
                 continue
+            if self.platform_name == "twitch":
+                guild = self.platform_service.discord_guilds().get(str(guild_id), {})
+                platforms = guild.get("platforms", {}) if isinstance(guild, Mapping) else {}
+                twitch = platforms.get("twitch", {}) if isinstance(platforms, Mapping) else {}
+                configured = twitch.get("channels", ()) if isinstance(twitch, Mapping) else ()
+                if isinstance(configured, str):
+                    configured = (configured,)
+                elif not isinstance(configured, (list, tuple, set)):
+                    configured = ()
+                legacy = twitch.get("channel") if isinstance(twitch, Mapping) else None
+                if legacy:
+                    configured = (*configured, legacy)
+                if not configured and effective.get("channel"):
+                    configured = (effective.get("channel"),)
+                seen = set()
+                for channel in configured:
+                    normalized = str(channel).strip().casefold().removeprefix("#")
+                    if not normalized or normalized in seen:
+                        continue
+                    seen.add(normalized)
+                    selected = dict(effective)
+                    selected["channel"] = normalized
+                    yield str(guild_id), str(destination), selected
+                continue
             yield str(guild_id), str(destination), effective
 
     async def _post_discord(

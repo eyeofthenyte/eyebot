@@ -9,7 +9,7 @@ from core.cog_registry import build_portable_router
 from core.command_model import ResponseVisibility
 from services.logService import LogService
 from services.platformConfigService import load_split_config, resolve_discord_prefix
-from eyebot import send_reconcile_command
+from eyebot import send_reconcile_command, send_restart_command
 
 from discord.ext import commands
 
@@ -102,6 +102,7 @@ bot.logger = logger
 bot.config = config
 bot.platform_config_service = platformConfigService
 bot.platform_reconciler = send_reconcile_command
+bot.platform_restarter = send_restart_command
 
 currDir = os.path.dirname(os.path.realpath(__file__))
 

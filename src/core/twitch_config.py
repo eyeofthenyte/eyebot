@@ -27,8 +27,9 @@ def resolve_twitch_channels(config: Mapping, platform_service) -> tuple[str, ...
     """Return Twitch channels for a private or shared EyeBot installation.
 
     Private installations use only connector-wide ``twitch.channels``. Shared
-    installations additionally join the one ``twitch.channel`` selected by
-    every Discord guild that has its Twitch integration enabled.
+    installations additionally join every ``twitch.channels`` entry selected
+    by enabled Discord guilds. The legacy singular ``twitch.channel`` remains
+    supported during migration.
     """
     twitch = config.get("twitch", {})
     twitch = twitch if isinstance(twitch, Mapping) else {}
@@ -42,7 +43,11 @@ def resolve_twitch_channels(config: Mapping, platform_service) -> tuple[str, ...
         effective = platform_service.effective_guild_platform(guild_id, "twitch")
         if effective.get("enabled") is not True:
             continue
-        for channel in _channel_names(effective.get("channel")):
+        selected = (
+            *_channel_names(effective.get("channels")),
+            *_channel_names(effective.get("channel")),
+        )
+        for channel in selected:
             if channel not in channels:
                 channels.append(channel)
     return tuple(channels)

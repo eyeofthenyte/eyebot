@@ -940,6 +940,9 @@ Roll delivery flags must appear at the end of the command:
 | `!setprefix <prefix>` | Set this server's 1–5 character command prefix; use `reset` for the global default |
 | `!platform <name>` | Display effective guild parameters and masked secret presence |
 | `!platform <guild_id>` | Display every effective platform setting for a managed guild |
+| `!platform twitch channel add <name>` | Add a Twitch channel to the current guild |
+| `!platform twitch channel remove <name>` | Remove a Twitch channel from the current guild |
+| `!platform twitch channel list` | List Twitch channels owned by the current guild |
 | `!platform <name> set <parameter> <value>` | Set a validated guild override for one platform |
 | `!platform <name> default <parameter\|all>` | Remove overrides and inherit `platforms.yaml` values |
 | `!platform <name> enable` | Enable that platform's service for this server only |
@@ -1015,8 +1018,26 @@ means it is absent.
 `!platform <guild_id>` produces a Markdown report for every platform configured
 for that guild. The report uses an underlined guild heading, a bullet for each
 platform, and separate block-quoted Global Parameters, Guild Parameters, and
-Secrets sections. It follows the same Manage Server and moderation-channel/DM
-restrictions as the other platform commands.
+Secrets sections. The guild heading is sent first and every platform is sent as
+a separate Discord message, so parameters from different platforms are never
+combined in one post. It follows the same Manage Server and
+moderation-channel/DM restrictions as the other platform commands.
+
+A shared installation can associate multiple Twitch channels with one guild:
+
+```text
+!platform twitch channel add first_channel
+!platform twitch channel add second_channel
+!platform twitch channel list
+!platform twitch channel remove first_channel
+```
+
+Channel names are normalized, duplicates are ignored, and a guild can store up
+to 100 Twitch channels. EyeBot restarts the running Twitch child after a list
+change so its joined chats are refreshed. The existing singular `channel`
+setting is folded into the list the first time `channel add` or `channel remove`
+is used. All Twitch channels belonging to a guild share that guild's configured
+`destination_channel` for live notifications.
 
 `default` does not copy a value into the guild file. It removes the override,
 so the current value in `platforms.yaml` is inherited just as it is for a newly
