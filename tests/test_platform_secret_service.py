@@ -178,6 +178,59 @@ class ManageSecretsCliTests(unittest.TestCase):
                 "cli-secret",
             )
 
+    def test_cli_accepts_global_email_smtp_credentials(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            key_file = root / "master_key"
+            secret_dir = root / "encrypted"
+            username_file = root / "smtp_username.secret"
+            password_file = root / "smtp_password.secret"
+            username_file.write_text("eyebotdev@gmail.com\n", encoding="utf-8")
+            password_file.write_text("gmail-app-password\n", encoding="utf-8")
+            username_file.chmod(0o600)
+            password_file.chmod(0o600)
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(
+                    main(
+                        [
+                            "--secret-dir",
+                            str(secret_dir),
+                            "--key-file",
+                            str(key_file),
+                            "init",
+                        ]
+                    ),
+                    0,
+                )
+                for parameter, value_file in (
+                    ("smtp_username", username_file),
+                    ("smtp_password", password_file),
+                ):
+                    self.assertEqual(
+                        main(
+                            [
+                                "--secret-dir",
+                                str(secret_dir),
+                                "--key-file",
+                                str(key_file),
+                                "set",
+                                "email",
+                                parameter,
+                                "--value-file",
+                                str(value_file),
+                            ]
+                        ),
+                        0,
+                    )
+
+            email_secrets = PlatformSecretService(
+                secret_dir,
+                master_key_file=key_file,
+            ).global_platforms()["email"]
+            self.assertEqual(email_secrets["smtp_username"], "eyebotdev@gmail.com")
+            self.assertEqual(email_secrets["smtp_password"], "gmail-app-password")
+
 
 if __name__ == "__main__":
     unittest.main()

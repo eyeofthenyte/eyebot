@@ -59,3 +59,27 @@ google_sheets:
   refresh_in_background: true
   refresh_interval: 21600
   persistent_cache_dir: /app/data/cache/google_sheets
+
+# Discord-only private report workflow and SMTP delivery.
+bug_reports:
+  enabled: true
+  recipient: eyebotdev@gmail.com
+  sender: eyebotdev@gmail.com
+  subject_prefix: "[EyeBot Report]"
+  smtp_host: smtp.gmail.com
+  smtp_port: 587
+  smtp_starttls: true
+  smtp_ssl: false
+  smtp_timeout: 15
+  cooldown_seconds: 300
+  max_explanation_length: 4000
+  max_attachments: 3
+  max_attachment_bytes: 5242880
+  max_total_attachment_bytes: 10485760
+  allowed_attachment_types:
+    - image/png
+    - image/jpeg
+    - image/gif
+    - image/webp
+    - application/pdf
+    - text/plain

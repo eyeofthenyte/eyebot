@@ -40,6 +40,7 @@ PLATFORM_SECRET_PARAMETERS = {
     ),
     "substack": frozenset({"email", "credential"}),
     "kofi": frozenset({"verification_token"}),
+    "email": frozenset({"smtp_username", "smtp_password"}),
 }
 
 

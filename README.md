@@ -344,6 +344,7 @@ Supported secret parameters:
 | Instagram | `app_id`, `app_secret`, `access_token`, `refresh_token`, `webhook_verify_token` |
 | Substack | `email`, `credential` |
 | Ko-fi | `verification_token` |
+| Email | `smtp_username`, `smtp_password` |
 
 Direct entrypoints do not provide overall process supervision.
 
@@ -711,6 +712,75 @@ connectivity check. Discord-only administration is not exposed on Twitch.
 Attachments and everything beginning with `| Attachments:` are omitted from
 non-Discord command output.
 
+### Discord bug reports
+
+`!bugreport` is deliberately Discord-only and is not registered with the
+platform-neutral command router. It sends the requesting user a DM containing
+the originating guild name, instructions, and a selector for Bug Report,
+Feature Request, or Other. Bug reports additionally request the affected
+platform and command. Every form requests a Discord-safe explanation of at
+most 4,000 characters and an optional contact email address.
+
+Configure SMTP delivery in `config.yaml`:
+
+```yaml
+bug_reports:
+  enabled: true
+  recipient: eyebotdev@gmail.com
+  sender: eyebotdev@gmail.com
+  subject_prefix: "[EyeBot Report]"
+  smtp_host: smtp.gmail.com
+  smtp_port: 587
+  smtp_starttls: true
+  smtp_ssl: false
+  smtp_timeout: 15
+  cooldown_seconds: 300
+  max_explanation_length: 4000
+  max_attachments: 3
+  max_attachment_bytes: 5242880
+  max_total_attachment_bytes: 10485760
+  allowed_attachment_types:
+    - image/png
+    - image/jpeg
+    - image/gif
+    - image/webp
+    - application/pdf
+    - text/plain
+```
+
+Store SMTP authentication in the encrypted global secret store:
+
+```bash
+docker compose run --rm --no-deps eyebot python src/manage_secrets.py set email smtp_username
+docker compose run --rm --no-deps eyebot python src/manage_secrets.py set email smtp_password
+```
+
+For the EyeBot Gmail mailbox, enter `eyebotdev@gmail.com` as the SMTP
+username. Enter a dedicated Google App Password as the SMTP password; never
+enter the mailbox's normal Google Account password. The Google Account must
+have 2-Step Verification enabled before an App Password can be created.
+
+Do not put an SMTP password in `config.yaml` or `platforms.yaml`. Restart EyeBot
+after changing configuration or encrypted credentials.
+
+Users may attach allowed files to the original `!bugreport` command. Discord
+modals cannot accept file uploads, so attachments cannot be added after the DM
+form opens. EyeBot enforces attachment count, individual size, combined size,
+extension, declared MIME type, and binary signature. Text attachments are
+redacted before email delivery. Users must remove visible credentials from
+screenshots and PDFs because text redaction cannot inspect pixels.
+
+Every submission receives a traceable ID such as
+`BUG-20260815-143000-A1B2C3`. The report body and contact email are never placed
+in logs. Audit logs contain only the report ID, type, Discord user ID, and guild
+association. Known configured secrets and common token/password patterns are
+redacted from form fields, text attachments, and diagnostic errors. SMTP work
+runs outside the Discord event loop and has a bounded timeout.
+
+Discord does not expose a guild member's account email to a bot token. The
+optional address is therefore entered privately by the user in the modal; it
+is not collected automatically.
+
 ### Google Sheets
 
 In `config.yaml`:
@@ -1027,6 +1097,7 @@ Roll delivery flags must appear at the end of the command:
 | `!setmodchannel` | Configure or disable the moderation-log channel |
 | `!settimer <interval> [duration]` | Auto-clear the current channel; values are minutes; interval `0` disables |
 | `!setprefix <prefix>` | Set this server's 1–5 character command prefix; use `reset` for the global default |
+| `!bugreport` | Open the private DM report workflow; optional attachments belong on the command message |
 | `!platform <name>` | Display effective guild parameters and masked secret presence |
 | `!platform <guild_id>` | Display every effective platform setting for a managed guild |
 | `!platform twitch channel add <name> [<#destination>]` | Add a Twitch channel with an optional live-alert destination |
