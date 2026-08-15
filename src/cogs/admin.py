@@ -151,7 +151,8 @@ class Admin (commands.Cog):
             await guild.leave()
             self.logger.info(
                 f"connection_broken: {self.bot.user.name} has left: "
-                f"{guild.name} (id: {guild.id})"
+                f"{guild.name} (id: {guild.id})",
+                guild_id=guild.id,
             )
 
     #Check connected servers BOT OWNER ONLY

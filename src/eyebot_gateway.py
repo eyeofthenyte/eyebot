@@ -210,6 +210,8 @@ def create_app(config=None, platform_service=None):
         app["client_session"] = aiohttp.ClientSession(
             timeout=aiohttp.ClientTimeout(total=30)
         )
+        if _command_host.google_sheets is not None:
+            await _command_host.google_sheets.start()
         try:
             await kick_webhooks.refresh_public_key(app["client_session"])
         except Exception as error:
@@ -228,6 +230,8 @@ def create_app(config=None, platform_service=None):
                 await task
             except asyncio.CancelledError:
                 pass
+        if _command_host.google_sheets is not None:
+            await _command_host.google_sheets.close()
         await app["client_session"].close()
 
     async def public_media_cleanup(app):

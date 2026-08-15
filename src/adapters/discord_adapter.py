@@ -29,6 +29,7 @@ def request_from_discord_message(message, *, prefix: str) -> CommandRequest:
         role.name for role in getattr(message.author, "roles", ())
         if getattr(role, "name", None)
     )
+    permissions = getattr(message.author, "guild_permissions", None)
     return CommandRequest.from_text(
         platform=CommandPlatform.DISCORD,
         surface=(
@@ -41,6 +42,14 @@ def request_from_discord_message(message, *, prefix: str) -> CommandRequest:
             username=str(message.author),
             display_name=getattr(message.author, "display_name", None),
             roles=roles,
+            metadata={
+                "manage_guild": bool(
+                    permissions and getattr(permissions, "manage_guild", False)
+                ),
+                "administrator": bool(
+                    permissions and getattr(permissions, "administrator", False)
+                ),
+            },
         ),
         content=message.content,
         prefix=prefix,

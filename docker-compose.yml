@@ -36,13 +36,6 @@ services:
         target: /app/platforms.yaml
         bind:
           create_host_path: false
-      - type: bind
-        source: ./service_account.json
-        target: /app/service_account.json
-        read_only: true
-      - type: bind
-        source: ./storage.json
-        target: /app/storage.json
       - type: volume
         source: guild-data
         target: /app/data/guilds
@@ -52,6 +45,19 @@ services:
       - type: volume
         source: public-media
         target: /app/data/public_media
+      - type: volume
+        source: cache-data
+        target: /app/data/cache
+      - type: volume
+        source: log-data
+        target: /app/data/logs
+      # Google Sheets-backed commands require this private service-account key.
+      - type: bind
+        source: ${GOOGLE_SERVICE_ACCOUNT_SOURCE:-./service_account.json}
+        target: /app/service_account.json
+        read_only: true
+        bind:
+          create_host_path: false
     healthcheck:
       test:
         - CMD
@@ -66,6 +72,8 @@ volumes:
   guild-data:
   secret-data:
   public-media:
+  cache-data:
+  log-data:
 
 secrets:
   eyebot_master_key:

@@ -285,11 +285,17 @@ class PlatformConfigService(ConfigService):
                     raise ValueError("guild backup must be a mapping")
                 self._atomic_write_path(path, value, create_backup=False)
                 if self.logger:
-                    self.logger.info(f"Recovered guild config from {backup}")
+                    self.logger.info(
+                        f"Recovered guild config from {backup}",
+                        guild_id=path.stem if path.stem.isdecimal() else None,
+                    )
                 return value
             except (OSError, UnicodeError, yaml.YAMLError, ValueError):
                 if self.logger:
-                    self.logger.error(f"Failed to load guild config {path}: {error}")
+                    self.logger.error(
+                        f"Failed to load guild config {path}: {error}",
+                        guild_id=path.stem if path.stem.isdecimal() else None,
+                    )
                 return None
 
     def _atomic_write_guild(self, guild_id: str, value: dict) -> None:

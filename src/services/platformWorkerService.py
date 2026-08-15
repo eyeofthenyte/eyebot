@@ -128,7 +128,8 @@ class PlatformWorkerService:
                     self.jobs.complete(claimed)
                     self.media.remove(job.get("payload", {}).get("media"))
                     self.logger.info(
-                        f"Completed {self.platform} job {job.get('id')}"
+                        f"Completed {self.platform} job {job.get('id')}",
+                        guild_id=job.get("guild_id"),
                     )
                 except asyncio.CancelledError:
                     raise
@@ -137,5 +138,6 @@ class PlatformWorkerService:
                     if dead:
                         self.media.remove(job.get("payload", {}).get("media"))
                     self.logger.error(
-                        f"Failed {self.platform} job {job.get('id')}: {error}"
+                        f"Failed {self.platform} job {job.get('id')}: {error}",
+                        guild_id=job.get("guild_id"),
                     )

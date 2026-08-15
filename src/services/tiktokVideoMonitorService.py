@@ -54,7 +54,10 @@ class TikTokVideoMonitorService:
             try:
                 await self.tokens.refresh_guild(guild_id, "tiktok", session)
             except (OSError, RuntimeError, ValueError) as error:
-                self.logger.error(f"Skipping TikTok videos for guild {guild_id}: {error}")
+                self.logger.error(
+                    f"Skipping TikTok videos for guild {guild_id}: {error}",
+                    guild_id=guild_id,
+                )
                 continue
             settings = self.platforms.effective_guild_platform(guild_id, "tiktok")
             token = str(settings.get("access_token") or "")
@@ -68,7 +71,10 @@ class TikTokVideoMonitorService:
             ) as response:
                 body = await response.json(content_type=None)
                 if not 200 <= response.status < 300:
-                    self.logger.error(f"TikTok video list failed for guild {guild_id}: HTTP {response.status}")
+                    self.logger.error(
+                        f"TikTok video list failed for guild {guild_id}: HTTP {response.status}",
+                        guild_id=guild_id,
+                    )
                     continue
             rows = [row for row in body.get("data", {}).get("videos", ()) if row.get("id")]
             previous = self.state.get(str(guild_id))

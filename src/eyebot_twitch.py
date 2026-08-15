@@ -111,6 +111,8 @@ class Bot(commands.Bot):
             "Registered platform-neutral commands: "
             + ", ".join(self.command_router.registered_commands)
         )
+        if self.command_host.google_sheets is not None:
+            await self.command_host.google_sheets.start()
         if self.live_notification_task is None or self.live_notification_task.done():
             self.live_notification_task = asyncio.create_task(
                 self.live_notifier.run_forever()

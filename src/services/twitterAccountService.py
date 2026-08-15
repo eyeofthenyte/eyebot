@@ -119,7 +119,10 @@ class TwitterAccountMonitorService:
             try:
                 await self.tokens.refresh_guild(guild_id, "twitter", session)
             except (OSError, RuntimeError, ValueError) as error:
-                self.logger.error(f"Skipping X accounts for guild {guild_id}: {error}")
+                self.logger.error(
+                    f"Skipping X accounts for guild {guild_id}: {error}",
+                    guild_id=guild_id,
+                )
                 continue
             settings = self.platforms.effective_guild_platform(guild_id, "twitter")
             token = str(settings.get("bearer_token") or settings.get("access_token") or "")
@@ -150,7 +153,10 @@ class TwitterAccountMonitorService:
                 try:
                     body = await _get(session, f"users/{user_id}/tweets", token, params)
                 except ValueError as error:
-                    self.logger.error(f"X account @{username} poll failed: {error}")
+                    self.logger.error(
+                        f"X account @{username} poll failed: {error}",
+                        guild_id=guild_id,
+                    )
                     continue
                 rows = [
                     row for row in body.get("data", ())

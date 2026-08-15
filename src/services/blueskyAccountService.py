@@ -122,7 +122,10 @@ class BlueskyAccountMonitorService:
                         {"actor": did, "filter": "posts_no_replies", "limit": 10},
                     )
                 except ValueError as error:
-                    self.logger.error(f"Bluesky @{handle} poll failed: {error}")
+                    self.logger.error(
+                        f"Bluesky @{handle} poll failed: {error}",
+                        guild_id=guild_id,
+                    )
                     continue
                 rows = []
                 for item in body.get("feed", ()):

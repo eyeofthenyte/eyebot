@@ -45,10 +45,10 @@ class Session:
 
 
 class Logger:
-    def info(self, message):
+    def info(self, message, **kwargs):
         pass
 
-    def error(self, message):
+    def error(self, message, **kwargs):
         pass
 
 

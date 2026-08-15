@@ -14,6 +14,7 @@ class FakeAuthor:
     id = 7
     display_name = "Test"
     roles = [SimpleNamespace(name="Player")]
+    guild_permissions = SimpleNamespace(manage_guild=True, administrator=False)
 
     def __str__(self):
         return "test-user"
@@ -34,6 +35,7 @@ class DiscordRequestAdapterTests(unittest.TestCase):
         self.assertEqual(request.command, "roll")
         self.assertEqual(request.arguments, ("Test Attack", "-dm"))
         self.assertEqual(request.location.community_id, "9")
+        self.assertTrue(request.actor.metadata["manage_guild"])
 
 
 class DiscordTransportTests(unittest.IsolatedAsyncioTestCase):

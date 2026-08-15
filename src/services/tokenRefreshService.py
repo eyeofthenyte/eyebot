@@ -90,6 +90,8 @@ class TokenRefreshService:
         body.setdefault("refresh_token", refresh_token)
         self.connections.save_token_response(guild_id, platform, body)
         if self.logger:
-            self.logger.info(f"Refreshed {platform} authorization for guild {guild_id}")
+            self.logger.info(
+                f"Refreshed {platform} authorization for guild {guild_id}",
+                guild_id=guild_id,
+            )
         return True
-

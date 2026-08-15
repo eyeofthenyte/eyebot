@@ -1,7 +1,11 @@
 import discord
 import os
 import random
-from services.googleSheetsService import GoogleSheetsError, get_google_sheets_service
+from services.googleSheetsService import (
+    GoogleSheetsError,
+    get_google_sheets_service,
+    refresh_command,
+)
 from discord.ext import commands
 
 CAROUSING_SHEET_KEY = '1cezqq4iN5gToVHEVKcs8HgC8XFLsDe_7vX-KslL_Q30'
@@ -17,6 +21,13 @@ class Carousing(commands.Cog):
         self.config = bot.config
         self.prefix = self.config["prefix"]
         self.sheets = get_google_sheets_service(bot)
+        self.sheets.register_workbook(CAROUSING_SHEET_KEY)
+
+    async def cog_load(self):
+        try:
+            await self.sheets.worksheets(CAROUSING_SHEET_KEY)
+        except GoogleSheetsError as error:
+            self.logger.warning(f"Unable to warm Carousing data: {error}")
 
     #----------------------------
     # Events
@@ -40,8 +51,16 @@ class Carousing(commands.Cog):
     # Carousing Command
     #----------------------------
     #----------------------------
-    @commands.command(aliases=['carousing','carouse','drinking','getdrinks','pubcrawl'], extras=[":beers:  **__Carousing__**","**Usage: `!carousing`\nOther valid uses`!carouse`, `!drinking`, `!getdrinks` or `!pubcrawl`\n\nMakes a random selection from a table of possible drunken outcomes.\n"])
-    async def _carousing(self, ctx):
+    @commands.command(aliases=['carousing','carouse','drinking','getdrinks','pubcrawl'], extras=[":beers:  **__Carousing__**","**Usage: `!carousing`\nOther valid uses`!carouse`, `!drinking`, `!getdrinks` or `!pubcrawl`\n\nMakes a random selection from a table of possible drunken outcomes.\nAdministrators and stream moderators may use `!carousing refresh` to reload its Google Sheet.\n"])
+    async def _carousing(self, ctx, *, action=None):
+        if action:
+            if action.strip().casefold() == "refresh":
+                await refresh_command(
+                    ctx, self.sheets, CAROUSING_SHEET_KEY, "Carousing"
+                )
+            else:
+                await ctx.send("Usage: `!carousing` or `!carousing refresh`.")
+            return
         try:
             worksheet = await self.sheets.worksheet(CAROUSING_SHEET_KEY)
             outcomes = [value for value in worksheet.col_values(1) if value]

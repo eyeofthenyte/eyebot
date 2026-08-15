@@ -603,7 +603,15 @@ files to existing cogs as one guild mapping.
 | `public_media.cleanup_interval_seconds` | Expiration scan interval | `3600` |
 | `public_media.max_bytes_per_guild` | Independent storage quota for each guild | `1073741824` |
 | `logging.level` | Configured logging level | `DEBUG` |
-| `logging.output` | Log filename or `syslog` | `output.log` |
+| `logging.output` | `terminal`, `syslog`, `both`, or a legacy file path | `both` |
+| `logging.global_directory` | Folder for service-wide logs | `/app/data/logs/global` |
+| `logging.global_file` | Active global filename supporting `{name}` | `{name}.txt` |
+| `logging.guild_logs_enabled` | Also write records associated with a guild to its folder | `true` |
+| `logging.guild_directory` | Root folder for guild-specific logs | `/app/data/logs/guilds` |
+| `logging.guild_file` | Guild service filename supporting `{platform}` and `{name}` | `{platform}.txt` |
+| `logging.max_bytes` | Maximum size of each active log before rotation | `10485760` |
+| `logging.archive_days` | Completed backup window included in each ZIP archive | `30` |
+| `logging.archive_count` | Number of ZIP archives retained in each folder | `2` |
 
 Examples in this guide use `!`. This is also the default for newly discovered
 Discord guilds. A server can override it with `!setprefix <prefix>` and return
@@ -709,17 +717,64 @@ In `config.yaml`:
 
 ```yaml
 google_sheets:
-  credentials_file: service_account.json
-  cache_ttl: 300
+  credentials_file: /app/service_account.json
+  cache_ttl: 21600
+  stale_ttl: 604800
+  preload: true
+  refresh_in_background: true
+  refresh_interval: 21600
+  persistent_cache_dir: /app/data/cache/google_sheets
 ```
 
 | Key | Required | Meaning |
 | --- | --- | --- |
 | `google_sheets.credentials_file` | For Sheets-backed commands | Path to the service-account JSON |
-| `google_sheets.cache_ttl` | No | Worksheet cache lifetime in seconds |
+| `google_sheets.cache_ttl` | No | Fresh in-memory/disk cache lifetime in seconds; defaults to 6 hours |
+| `google_sheets.stale_ttl` | No | Maximum age of usable cached data; defaults to 7 days |
+| `google_sheets.preload` | No | Warm every registered command workbook when the bot process starts |
+| `google_sheets.refresh_in_background` | No | Serve stale data immediately while refreshing it asynchronously |
+| `google_sheets.refresh_interval` | No | Proactive refresh interval in seconds; defaults to 6 hours |
+| `google_sheets.persistent_cache_dir` | No | Snapshot directory retained across container restarts |
 
 `GOOGLE_SERVICE_ACCOUNT_FILE` can supply the credential path when
 `credentials_file` is omitted.
+
+### Logging destinations
+
+EyeBot can write each message to Docker's terminal output and a rotating file
+at the same time:
+
+```yaml
+logging:
+  level: INFO
+  output: both
+  global_directory: /app/data/logs/global
+  global_file: "{name}.txt"
+  guild_logs_enabled: true
+  guild_directory: /app/data/logs/guilds
+  guild_file: "{platform}.txt"
+  max_bytes: 10485760
+  archive_days: 30
+  archive_count: 2
+```
+
+`{name}` creates separate active files such as `discord.txt`, `gateway.txt`,
+and `kick.txt`, avoiding several processes writing the same file. Records tied
+to a guild are written both globally and beneath
+`guilds/<guild_id>/<platform>.txt`. The Compose `log-data` volume retains these
+files when the container is recreated. Use
+`output: terminal` (or the backward-compatible `syslog`) for terminal only, or
+put a filename directly in `output` for the legacy file-only behavior.
+
+When an active file reaches `max_bytes`, EyeBot renames it using the date and
+time of its final entry, for example `20260815-1427_kick.txt`. Once the oldest
+rolled file completes a 30-day window, all rolled service files in that window
+and folder are placed into `YYYYMMDD-HHMM_30-day-archive.zip`. Global and each
+guild folder are archived independently. Only the two newest archives remain;
+creating a third removes the oldest archive after the new ZIP is safely built.
+
+View terminal output with `docker compose logs -f eyebot`. List the persistent
+files with `docker compose exec eyebot sh -c "find /app/data/logs -type f -maxdepth 4 -print"`.
 
 ### Live-event notifications and remaining placeholders
 
@@ -756,9 +811,10 @@ Google Sheets access.
 6. Keep the key outside Git. `service_account.json` is ignored by this
    repository.
 
-The default Compose file does not mount the service-account key. If Sheets
-commands are required in Docker, add this read-only bind mount beneath the
-existing `eyebot.volumes` list:
+The Compose file mounts `./service_account.json` read-only by default and keeps
+worksheet snapshots in its `cache-data` volume. Set
+`GOOGLE_SERVICE_ACCOUNT_SOURCE` when the key is stored elsewhere. The effective
+mount is:
 
 ```yaml
 - type: bind
@@ -768,6 +824,28 @@ existing `eyebot.volumes` list:
 ```
 
 Restart the container after adding or replacing credentials.
+
+EyeBot registers the Carousing, Trinket, and Components workbooks as their cogs
+load. Discord warms them after extension loading; Twitch warms them when its bot
+becomes ready; and the HTTPS gateway warms them before accepting webhook chat
+commands. Expired snapshots remain immediately usable while a background
+refresh runs, and the persistent snapshot provides recovery during a temporary
+Google outage.
+
+Administrators may force an authoritative reload without restarting EyeBot:
+
+```text
+!carousing refresh
+!trinket refresh
+!flora refresh
+!potion refresh
+!poison refresh
+```
+
+On Discord these refresh operations require Manage Server or Administrator. In
+livestream chat they require the authenticated moderator or broadcaster role.
+Ordinary command use never forces a synchronous Google request while a usable
+cached snapshot exists.
 
 ## Permissions
 

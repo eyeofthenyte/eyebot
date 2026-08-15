@@ -74,7 +74,10 @@ class KickSubscriptionService:
             guild_id, "kick", "chat_subscription_id", subscription_id
         )
         if self.logger:
-            self.logger.info(f"Kick chat subscription ready for guild {guild_id}")
+            self.logger.info(
+                f"Kick chat subscription ready for guild {guild_id}",
+                guild_id=guild_id,
+            )
         return subscription_id
 
     async def delete_chat(self, guild_id, session) -> bool:
@@ -116,7 +119,8 @@ class KickSubscriptionService:
                 if self.logger:
                     self.logger.error(
                         f"Unable to reconcile Kick chat subscription for guild "
-                        f"{guild_id}: {error}"
+                        f"{guild_id}: {error}",
+                        guild_id=guild_id,
                     )
 
     async def run_forever(self, session, *, poll_seconds=300) -> None:

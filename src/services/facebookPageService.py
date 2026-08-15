@@ -146,7 +146,10 @@ class FacebookPageMonitorService:
             try:
                 await self.tokens.refresh_guild(guild_id, "facebook", session)
             except (OSError, RuntimeError, ValueError) as error:
-                self.logger.error(f"Skipping Facebook Pages for guild {guild_id}: {error}")
+                self.logger.error(
+                    f"Skipping Facebook Pages for guild {guild_id}: {error}",
+                    guild_id=guild_id,
+                )
                 continue
             settings = self.platforms.effective_guild_platform(guild_id, "facebook")
             token = str(
@@ -174,7 +177,10 @@ class FacebookPageMonitorService:
                         {"fields": "id,message,permalink_url,created_time,full_picture", "limit": 10},
                     )
                 except ValueError as error:
-                    self.logger.error(f"Facebook Page {page_id} poll failed: {error}")
+                    self.logger.error(
+                        f"Facebook Page {page_id} poll failed: {error}",
+                        guild_id=guild_id,
+                    )
                     continue
                 rows = [row for row in body.get("data", ()) if isinstance(row, dict) and row.get("id")]
                 if key not in self.state:

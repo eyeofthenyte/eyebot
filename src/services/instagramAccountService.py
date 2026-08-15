@@ -106,7 +106,10 @@ class InstagramAccountMonitorService:
             try:
                 await self.tokens.refresh_guild(guild_id, "instagram", session)
             except (OSError, RuntimeError, ValueError) as error:
-                self.logger.error(f"Skipping Instagram accounts for guild {guild_id}: {error}")
+                self.logger.error(
+                    f"Skipping Instagram accounts for guild {guild_id}: {error}",
+                    guild_id=guild_id,
+                )
                 continue
             settings = self.platforms.effective_guild_platform(guild_id, "instagram")
             owner_id = str(settings.get("account_id") or "")
@@ -130,7 +133,10 @@ class InstagramAccountMonitorService:
                 try:
                     account = await _get(session, owner_id, token, username)
                 except ValueError as error:
-                    self.logger.error(f"Instagram @{username} poll failed: {error}")
+                    self.logger.error(
+                        f"Instagram @{username} poll failed: {error}",
+                        guild_id=guild_id,
+                    )
                     continue
                 rows = [
                     row for row in (account.get("media") or {}).get("data", ())

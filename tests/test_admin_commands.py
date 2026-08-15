@@ -59,10 +59,10 @@ class Logger:
     def __init__(self):
         self.messages = []
 
-    def info(self, message):
+    def info(self, message, **kwargs):
         self.messages.append(message)
 
-    def error(self, message):
+    def error(self, message, **kwargs):
         self.messages.append(message)
 
 

@@ -27,8 +27,8 @@ class Platforms:
     def effective_guild_platform(self, *args): return self.settings
 
 class Logger:
-    def info(self, message): pass
-    def error(self, message): pass
+    def info(self, message, **kwargs): pass
+    def error(self, message, **kwargs): pass
 
 async def _false(): return False
 

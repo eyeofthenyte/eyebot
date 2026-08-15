@@ -87,6 +87,7 @@ class KickCommandService:
                 pass
         if self.logger:
             self.logger.info(
-                f"Processed Kick command {command_request.command} for guild {guild_id}"
+                f"Processed Kick command {command_request.command} for guild {guild_id}",
+                guild_id=guild_id,
             )
         return "processed"

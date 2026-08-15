@@ -129,6 +129,8 @@ async def load_extensions():
         "Registered platform-neutral commands: "
         + ", ".join(bot.command_router.registered_commands)
     )
+    if getattr(bot, "google_sheets", None) is not None:
+        await bot.google_sheets.start()
 
 
 async def resolve_discord_destinations(message, response):
@@ -186,7 +188,7 @@ async def on_ready():
     logger.info(f'{bot.user.name} has awoken!')
     logger.info(f'{bot.user.name} is connected to the following Discord Servers:')
     for guild in bot.guilds:
-        logger.info(f'  (id: {guild.id}) - {guild.name}')
+        logger.info(f'  (id: {guild.id}) - {guild.name}', guild_id=guild.id)
     logger.info('End of Server Listing')
 
 
@@ -215,9 +217,15 @@ async def on_guild_join(guild):
             await adder.send("You see a small strange egg.\nTo see what it's about type `.help`")
             break
     except Exception as e:
-        logger.error(f'connection_error - Could not send initial DM. Reason: {e}')
+        logger.error(
+            f'connection_error - Could not send initial DM. Reason: {e}',
+            guild_id=guild.id,
+        )
 
-    logger.info(f'connection_made - {bot.user.name} has been found in: {guild.name} (id: {guild.id})')
+    logger.info(
+        f'connection_made - {bot.user.name} has been found in: {guild.name} (id: {guild.id})',
+        guild_id=guild.id,
+    )
 
 
 # ----------------------------
@@ -231,12 +239,18 @@ async def on_command_error(ctx, error):
         return
 
     elif isinstance(error, commands.MissingPermissions):
-        logger.warning(f'{ctx.author} tried using a command without required permissions in {ctx.guild}.')
+        logger.warning(
+            f'{ctx.author} tried using a command without required permissions in {ctx.guild}.',
+            guild_id=ctx.guild.id if ctx.guild else None,
+        )
         await ctx.send("⛔ You don’t have the necessary permissions to use that command.")
         return
 
     elif isinstance(error, commands.NotOwner):
-        logger.warning(f'{ctx.author} attempted to use an owner-only command in {ctx.guild}.')
+        logger.warning(
+            f'{ctx.author} attempted to use an owner-only command in {ctx.guild}.',
+            guild_id=ctx.guild.id if ctx.guild else None,
+        )
         await ctx.send("🔒 Only the bot owner can use that command.")
         return
 

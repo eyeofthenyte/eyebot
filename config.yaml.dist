@@ -37,9 +37,25 @@ public_media:
 
 logging:
   level: DEBUG
-  output: output.log # Use syslog for container stdout logging.
+  # terminal/stdout/syslog = terminal only; a path = file only; both = both.
+  output: both
+  global_directory: /app/data/logs/global
+  # {name} becomes discord, gateway, twitch, kick, and so on.
+  global_file: "{name}.txt"
+  guild_logs_enabled: true
+  guild_directory: /app/data/logs/guilds
+  guild_file: "{platform}.txt"
+  max_bytes: 10485760
+  archive_days: 30
+  archive_count: 2
 
 google_sheets:
   # Can also be set with GOOGLE_SERVICE_ACCOUNT_FILE.
-  credentials_file: service_account.json
-  cache_ttl: 300
+  credentials_file: /app/service_account.json
+  # Tables rarely change: keep data fresh for 6 hours and usable for 7 days.
+  cache_ttl: 21600
+  stale_ttl: 604800
+  preload: true
+  refresh_in_background: true
+  refresh_interval: 21600
+  persistent_cache_dir: /app/data/cache/google_sheets

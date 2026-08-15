@@ -237,7 +237,8 @@ class LiveNotificationService:
                 except Exception as error:
                     self.logger.error(
                         f"Skipping {self.platform_name} live check for guild "
-                        f"{guild_id}: token refresh failed: {error}"
+                        f"{guild_id}: token refresh failed: {error}",
+                        guild_id=guild_id,
                     )
                     continue
                 effective = self.platform_service.effective_guild_platform(
@@ -265,7 +266,8 @@ class LiveNotificationService:
                 except Exception as error:
                     self.logger.error(
                         f"{self.platform_name} detector failed for guild "
-                        f"{guild_id}: {error}"
+                        f"{guild_id}: {error}",
+                        guild_id=guild_id,
                     )
                     failed_sources.add(source_key)
                     continue
@@ -283,14 +285,16 @@ class LiveNotificationService:
                 await self._post_discord(session, destination, event)
             except Exception as error:
                 self.logger.error(
-                    f"Discord live delivery failed for guild {guild_id}: {error}"
+                    f"Discord live delivery failed for guild {guild_id}: {error}",
+                    guild_id=guild_id,
                 )
                 continue
             self.state[state_key] = event.event_id
             changed = True
             self.logger.info(
                 f"Posted {self.platform_name} live event {event.event_id} "
-                f"for guild {guild_id} to Discord channel {destination}"
+                f"for guild {guild_id} to Discord channel {destination}",
+                guild_id=guild_id,
             )
         stale = set(self.state) - active_keys
         if stale:

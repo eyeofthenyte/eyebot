@@ -875,7 +875,8 @@ class Platform(commands.Cog):
         logger = getattr(self.bot, "logger", None)
         if logger is not None:
             logger.info(
-                f"{ctx.author} requested social platform status for {guild.name}"
+                f"{ctx.author} requested social platform status for {guild.name}",
+                guild_id=guild.id,
             )
 
     def _display_platform_value(self, value):

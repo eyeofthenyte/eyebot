@@ -206,7 +206,9 @@ class PlatformCommandTests(unittest.IsolatedAsyncioTestCase):
             config={},
             logger=types.SimpleNamespace(messages=[]),
         )
-        self.bot.logger.info = self.bot.logger.messages.append
+        self.bot.logger.info = (
+            lambda message, **kwargs: self.bot.logger.messages.append(message)
+        )
         async def is_owner(user):
             return user.id == 7
         self.bot.is_owner = is_owner

@@ -1,7 +1,11 @@
 import os
 import discord
 import random
-from services.googleSheetsService import GoogleSheetsError, get_google_sheets_service
+from services.googleSheetsService import (
+    GoogleSheetsError,
+    get_google_sheets_service,
+    refresh_command,
+)
 from discord.ext import commands
 
 TRINKET_SHEET_KEY = '1dwpn9CbEtwlkfzH4Qh0KafwZ2kvWarrDJCqPuR3fe0Q'
@@ -17,6 +21,13 @@ class Trinket(commands.Cog):
         self.config = bot.config
         self.prefix = self.config["prefix"]
         self.sheets = get_google_sheets_service(bot)
+        self.sheets.register_workbook(TRINKET_SHEET_KEY)
+
+    async def cog_load(self):
+        try:
+            await self.sheets.worksheets(TRINKET_SHEET_KEY)
+        except GoogleSheetsError as error:
+            self.logger.warning(f"Unable to warm Trinket data: {error}")
 
     # Log when the bot is ready
     @commands.Cog.listener()
@@ -97,8 +108,13 @@ class Trinket(commands.Cog):
         Examples:
         `!trinket bard` - Returns a Bard-themed trinket
         `!trinket rogue` - Returns a Rogue-themed trinket
+        `!trinket refresh` - Administrators and stream moderators reload the cache
 
         """
+
+        if select.strip().casefold() == "refresh":
+            await refresh_command(ctx, self.sheets, TRINKET_SHEET_KEY, "Trinket")
+            return
 
         try:
             class_key, trinkets = await self.get_trinket_data(select)

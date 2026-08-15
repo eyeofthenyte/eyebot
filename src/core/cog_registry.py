@@ -10,6 +10,7 @@ PORTABLE_COMMANDS = (
     PortableCommandSpec(
         "Carousing", "_carousing", "carousing",
         ("carouse", "drinking", "getdrinks", "pubcrawl"),
+        "optional_joined", "action",
     ),
     PortableCommandSpec(
         "Components", "_collect", "collect",

@@ -2,7 +2,11 @@ from copyreg import pickle
 import discord
 import os
 import random
-from services.googleSheetsService import GoogleSheetsError, get_google_sheets_service
+from services.googleSheetsService import (
+    GoogleSheetsError,
+    get_google_sheets_service,
+    refresh_command,
+)
 from discord.ext import commands, tasks
 from discord.utils import find
 
@@ -26,6 +30,13 @@ class Components(commands.Cog):
         self.config = bot.config
         self.prefix = self.config["prefix"]
         self.sheets = get_google_sheets_service(bot)
+        self.sheets.register_workbook(COMPONENTS_SHEET_KEY)
+
+    async def cog_load(self):
+        try:
+            await self.sheets.worksheets(COMPONENTS_SHEET_KEY)
+        except GoogleSheetsError as error:
+            self.logger.warning(f"Unable to warm Components data: {error}")
 
     #----------------------------
     # Events
@@ -105,6 +116,9 @@ class Components(commands.Cog):
     #----------------------------
     @commands.command(aliases=['hinfo', 'flora'], extras=[":mushroom:  **__Herb Info__**", "**Usage: `!flora name` or `!hinfo name` \nwhere `name = full name of herb`**\n\n For a full list of herbs type `!hinfo list`\nHerb name is one of the components from [Herbalism and Alchemy](https://drive.google.com/file/d/0B7CIGCMCtoETVmhDNEZMbUVweTg/view) homebrew supplement By [Dalagrath](https://www.reddit.com/r/dndnext/comments/3w1log/5e_herbalism_alchemy_v12_updates_fanmade/) .\n"])
     async def _flora(self, ctx, *, select):
+        if select.strip().casefold() == "refresh":
+            await refresh_command(ctx, self.sheets, COMPONENTS_SHEET_KEY, "Components")
+            return
         try:
             ws = await self.sheets.worksheet(COMPONENTS_SHEET_KEY, "Ingredients")
         except GoogleSheetsError as error:
@@ -157,6 +171,9 @@ class Components(commands.Cog):
     #----------------------------
     @commands.command(extras=[":alembic:  **__Potion__**", "**Usage: `!potion c `\nwhere `c = component` multiple components separated by a `,`**\n\nValid component selections can be found by using `!herb list` for a list of components or `!herb (name)` for details on a spicific component you wish to combine for effects."])
     async def potion(self, ctx, *, select):
+        if select.strip().casefold() == "refresh":
+            await refresh_command(ctx, self.sheets, COMPONENTS_SHEET_KEY, "Components")
+            return
         try:
             ws = await self.sheets.worksheet(COMPONENTS_SHEET_KEY, "Potion")
         except GoogleSheetsError as error:
@@ -227,6 +244,9 @@ class Components(commands.Cog):
     #----------------------------
     @commands.command(extras=[":test_tube:  **__Poison__**", "**Usage: `!poison c `\nwhere `c = component` multiple components separated by a `,`**\n\nValid component selections can be found by using `!herb list` for a list of components or `!herb (name)` for details on a spicific component you wish to combine for effects."])
     async def poison(self, ctx, *, select):
+        if select.strip().casefold() == "refresh":
+            await refresh_command(ctx, self.sheets, COMPONENTS_SHEET_KEY, "Components")
+            return
         try:
             ws = await self.sheets.worksheet(COMPONENTS_SHEET_KEY, "Poison")
         except GoogleSheetsError as error:

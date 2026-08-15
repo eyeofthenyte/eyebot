@@ -28,8 +28,8 @@ class Session:
 
 
 class Logger:
-    def info(self, message): pass
-    def error(self, message): pass
+    def info(self, message, **kwargs): pass
+    def error(self, message, **kwargs): pass
 
 
 class Platforms:
