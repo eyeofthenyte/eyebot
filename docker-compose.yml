@@ -40,6 +40,9 @@ services:
         source: ./service_account.json
         target: /app/service_account.json
         read_only: true
+      - type: bind
+        source: ./storage.json
+        target: /app/storage.json
       - type: volume
         source: guild-data
         target: /app/data/guilds
