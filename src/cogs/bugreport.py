@@ -47,8 +47,8 @@ class ReportModal(discord.ui.Modal):
         self.explanation_input = discord.ui.TextInput(
             label="Explanation",
             placeholder=(
-                "Describe what happened, what you expected, and steps that "
-                "can reproduce the problem. Do not include passwords or tokens."
+                "Describe what happened, what you expected, and how to reproduce it. "
+                "Do not include secrets."
             ),
             style=discord.TextStyle.paragraph,
             required=True,
@@ -135,6 +135,7 @@ class ReportModal(discord.ui.Modal):
 class ReportTypeSelect(discord.ui.Select):
     def __init__(self):
         super().__init__(
+            custom_id="eyebot:bugreport:type",
             placeholder="Select the type of report…",
             min_values=1,
             max_values=1,
@@ -166,7 +167,36 @@ class ReportTypeSelect(discord.ui.Select):
             return await interaction.response.send_message(
                 "ℹ️ This report form has already been submitted.", ephemeral=True
             )
-        await interaction.response.send_modal(ReportModal(view, self.values[0]))
+        report_type = self.values[0]
+        view.logger.info(
+            f"Discord user ID {interaction.user.id} selected bug report type "
+            f"{report_type}",
+            guild_id=view.guild_id,
+        )
+        try:
+            modal = ReportModal(view, report_type)
+            await interaction.response.send_modal(modal)
+        except Exception as error:
+            view.logger.error(
+                "Bug report type selection failed: "
+                + view.service.safe_error(error),
+                guild_id=view.guild_id,
+            )
+            message = (
+                "❌ EyeBot could not open the report form. Please run "
+                "`!bugreport` again or contact an EyeBot administrator."
+            )
+            try:
+                if interaction.response.is_done():
+                    await interaction.followup.send(message, ephemeral=True)
+                else:
+                    await interaction.response.send_message(message, ephemeral=True)
+            except Exception as response_error:
+                view.logger.error(
+                    "Bug report selection error response failed: "
+                    + view.service.safe_error(response_error),
+                    guild_id=view.guild_id,
+                )
 
 
 class BugReportView(discord.ui.View):
@@ -208,6 +238,34 @@ class BugReportView(discord.ui.View):
         )
         return False
 
+    async def on_error(
+        self,
+        interaction: discord.Interaction,
+        error: Exception,
+        item: discord.ui.Item,
+    ) -> None:
+        item_name = type(item).__name__
+        self.logger.error(
+            f"Bug report view item {item_name} failed: "
+            + self.service.safe_error(error),
+            guild_id=self.guild_id,
+        )
+        message = (
+            "❌ EyeBot could not process that report selection. Please run "
+            "`!bugreport` again or contact an EyeBot administrator."
+        )
+        try:
+            if interaction.response.is_done():
+                await interaction.followup.send(message, ephemeral=True)
+            else:
+                await interaction.response.send_message(message, ephemeral=True)
+        except Exception as response_error:
+            self.logger.error(
+                "Bug report view error response failed: "
+                + self.service.safe_error(response_error),
+                guild_id=self.guild_id,
+            )
+
     async def claim_submission(self) -> bool:
         async with self._submission_lock:
             if self.submitted:
@@ -221,6 +279,18 @@ class BugReportCog(commands.Cog, name="Bug Reports"):
         self.bot = bot
         self.logger = bot.logger
         self.service = BugReportService(bot.config, bot.logger)
+
+    @commands.Cog.listener()
+    async def on_interaction(self, interaction: discord.Interaction):
+        data = interaction.data if isinstance(interaction.data, dict) else {}
+        if data.get("custom_id") != "eyebot:bugreport:type":
+            return
+        guild_id = str(interaction.guild_id) if interaction.guild_id else None
+        self.logger.info(
+            f"Received bug report type interaction from Discord user ID "
+            f"{interaction.user.id}",
+            guild_id=guild_id,
+        )
 
     async def _attachments(self, source) -> tuple[ReportAttachment, ...]:
         configured_count = max(
