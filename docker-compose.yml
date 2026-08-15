@@ -36,6 +36,10 @@ services:
         target: /app/platforms.yaml
         bind:
           create_host_path: false
+      - type: bind
+        source: ./service_account.json
+        target: /app/service_account.json
+        read_only: true
       - type: volume
         source: guild-data
         target: /app/data/guilds
