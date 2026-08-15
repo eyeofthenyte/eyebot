@@ -15,7 +15,7 @@ storage.json
 eyebot.cfg
 *.backup
 *.bak
-logs/
+data/logs/
 experimental/
 cogs/namegen/originals/
 cogs/roller/config.json

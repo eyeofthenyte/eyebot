@@ -48,9 +48,11 @@ services:
       - type: volume
         source: cache-data
         target: /app/data/cache
-      - type: volume
-        source: log-data
+      - type: bind
+        source: ./data/logs
         target: /app/data/logs
+        bind:
+          create_host_path: false
       # Google Sheets-backed commands require this private service-account key.
       - type: bind
         source: ${GOOGLE_SERVICE_ACCOUNT_SOURCE:-./service_account.json}
