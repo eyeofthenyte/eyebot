@@ -1,6 +1,6 @@
 # EyeBot
 
-Current release: **2.0.0**
+Current release: **2.1.0**
 
 EyeBot is a Python bot framework for tabletop-RPG utilities and shared chat
 commands. Discord and Twitch are currently implemented. A platform-neutral
@@ -791,6 +791,72 @@ runs outside the Discord event loop and has a bounded timeout.
 Discord does not expose a guild member's account email to a bot token. The
 optional address is therefore entered privately by the user in the modal; it
 is not collected automatically.
+
+### Discord support tickets
+
+EyeBot provides a Discord-only private support workflow through `/ticket`.
+Each user may have at most three open or assigned tickets. The ticket modal
+accepts a required description, an optional same-server Discord message link,
+and up to four optional PNG, JPEG, GIF, or WebP images. Ephemeral modal uploads
+are downloaded immediately, validated, re-encoded without metadata, and posted
+only to the configured moderator log channel. Message-link previews are
+suppressed.
+
+Run `/ticket-setup` with moderator permissions to select an existing standard
+text channel, create `#support_tickets`, or disable tickets. A moderator log
+channel must already be configured with `!setmodchannel`. Ticket setup is
+stored in the individual guild YAML file; ticket records are stored atomically
+under `data/guilds/.tickets/` and recover from their own backup files.
+
+The public support channel shows only the ticket number and state—it never
+identifies the opener. The moderator ticket contains the opener, description,
+optional link, and images, together with these controls:
+
+- 📋 **Assign** — atomically assigns the ticket, creates a private support
+  thread, adds the opener, notifies them by DM, and updates the public status.
+- ✅ **Resolve** — resolves an assigned ticket, exports a bounded transcript to
+  the moderator channel, removes the opener, locks and archives the thread,
+  and deletes the public status after 30 seconds.
+- ❌ **Cancel** — requires confirmation, cancels the ticket, performs the same
+  privacy cleanup, and deletes the public status after 30 seconds.
+
+Moderator application commands:
+
+| Command | Purpose |
+| --- | --- |
+| `/resolved` | Resolve the ticket associated with the current private thread |
+| `/resolved ticketnumber:TICKET-000001` | Resolve a ticket from another channel |
+| `/ticket-status ticketnumber:TICKET-000001` | Privately display one ticket's state |
+| `/ticket-list` | Privately list active tickets without their descriptions |
+| `/ticket-reopen ticketnumber:TICKET-000001` | Reopen a closed ticket; requires Manage Server |
+
+Support ticket runtime limits are global defaults in `config.yaml`:
+
+```yaml
+support_tickets:
+  enabled: true
+  max_open_per_user: 3
+  max_description_length: 4000
+  max_images: 4
+  max_image_bytes: 5242880
+  max_total_image_bytes: 15728640
+  max_image_pixels: 40000000
+  status_delete_seconds: 30
+  thread_auto_archive_minutes: 1440
+  transcript_max_messages: 500
+  opening_cooldown_seconds: 60
+```
+
+EyeBot requires **View Channels**, **Send Messages**, **Manage Channels**,
+**Manage Messages**, **Create Private Threads**, **Send Messages in Threads**,
+**Manage Threads**, **Read Message History**, **Attach Files**, and **Embed
+Links** for the configured support and moderator channels. Moderators who need
+access to every private ticket thread require **Manage Threads**. If the bot
+cannot DM a ticket opener, the ticket remains valid and updates continue in the
+private thread.
+
+The bot installation must include both the `bot` and `applications.commands`
+OAuth scopes so Discord can register and display the slash commands.
 
 ### Google Sheets
 

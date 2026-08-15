@@ -1,6 +1,6 @@
 ---
 # Global EyeBot runtime configuration.
-# Platform settings belong in platforms.yaml. Credentials belong in the
+# Platform settings belong in platforms.yaml; credentials belong in the
 # encrypted secret store managed by src/manage_secrets.py.
 
 # Default command prefix. Individual Discord guilds may override this value.
@@ -83,3 +83,18 @@ bug_reports:
     - image/webp
     - application/pdf
     - text/plain
+
+# Discord-only private support ticket workflow. Channel selection and enabled
+# state are stored separately in each guild's YAML file.
+support_tickets:
+  enabled: true
+  max_open_per_user: 3
+  max_description_length: 4000
+  max_images: 4
+  max_image_bytes: 5242880
+  max_total_image_bytes: 15728640
+  max_image_pixels: 40000000
+  status_delete_seconds: 30
+  thread_auto_archive_minutes: 1440
+  transcript_max_messages: 500
+  opening_cooldown_seconds: 60

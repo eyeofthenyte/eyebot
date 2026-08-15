@@ -1,6 +1,6 @@
 FROM python:3.12.13-slim-bookworm
 
-ARG EYEBOT_VERSION=2.0.0
+ARG EYEBOT_VERSION=2.1.0
 
 LABEL org.opencontainers.image.title="EyeBot" \
       org.opencontainers.image.version="${EYEBOT_VERSION}" \

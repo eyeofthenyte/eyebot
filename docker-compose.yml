@@ -2,12 +2,12 @@ name: eyebot
 
 services:
   eyebot:
-    image: ${IMAGE_NAME:-eyebot}:${EYEBOT_VERSION:-2.0.0}
+    image: ${IMAGE_NAME:-eyebot}:${EYEBOT_VERSION:-2.1.0}
     build:
       context: .
       dockerfile: dockerfile
       args:
-        EYEBOT_VERSION: ${EYEBOT_VERSION:-2.0.0}
+        EYEBOT_VERSION: ${EYEBOT_VERSION:-2.1.0}
     init: true
     restart: unless-stopped
     stop_grace_period: 30s

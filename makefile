@@ -1,5 +1,5 @@
 IMAGE_NAME ?= eyebot
-VERSION ?= 2.0.0
+VERSION ?= 2.1.0
 
 .PHONY: build start stop restart logs
 

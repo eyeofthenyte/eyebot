@@ -196,6 +196,10 @@ class PlatformConfigServiceTests(unittest.TestCase):
             default_prefix="!",
         )
         self.assertEqual(guild["prefix"], "!")
+        self.assertEqual(
+            guild["support_tickets"],
+            {"enabled": True, "channel_id": "UNSET"},
+        )
 
         guild_message = SimpleNamespace(guild=SimpleNamespace(id=42))
         dm_message = SimpleNamespace(guild=None)
