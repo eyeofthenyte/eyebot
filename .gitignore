@@ -24,6 +24,7 @@ config.yaml
 platforms.yaml
 data/guilds/
 data/secrets/
+data/webhooks/
 secrets/
 *.secrets
 output.log

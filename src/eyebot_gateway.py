@@ -14,6 +14,15 @@ from services.oauthStateService import OAuthStateService, resolve_oauth_state_ke
 from services.platformConnectionService import PlatformConnectionService
 from services.publicMediaService import PublicMediaService
 from services.webhookService import WebhookService
+from services.kickWebhookService import (
+    KickWebhookAuthenticationError,
+    KickWebhookDuplicateError,
+    KickWebhookError,
+    KickWebhookService,
+)
+from core.portable_runtime import build_portable_runtime
+from services.kickCommandService import KickCommandService
+from services.kickSubscriptionService import KickSubscriptionService
 
 
 def create_app(config=None, platform_service=None):
@@ -29,6 +38,17 @@ def create_app(config=None, platform_service=None):
     oauth = OAuthService(config, platform_service, states, public_url)
     connections = PlatformConnectionService(platform_service)
     webhooks = WebhookService(config, platform_service, logger)
+    kick_webhooks = KickWebhookService(
+        platform_service.guild_config_dir.parent / "webhooks" / "kick-events.json"
+    )
+    _command_host, command_router = build_portable_runtime(
+        config=config,
+        logger=logger,
+    )
+    kick_commands = KickCommandService(
+        config, platform_service, command_router, kick_webhooks, logger
+    )
+    kick_subscriptions = KickSubscriptionService(platform_service, logger)
     public_media = PublicMediaService(config, platform_service.guild_config_dir)
 
     request_windows = {}
@@ -60,6 +80,15 @@ def create_app(config=None, platform_service=None):
             {
                 "status": "ok",
                 "public_media": "enabled" if public_media.enabled else "disabled",
+            }
+        )
+
+    async def webhook_status(request):
+        return web.json_response(
+            {
+                "service": "EyeBot webhook gateway",
+                "status": "available",
+                "platforms": ["facebook", "instagram", "kick", "kofi"],
             }
         )
 
@@ -110,6 +139,14 @@ def create_app(config=None, platform_service=None):
             request.app["client_session"],
         )
         connections.save_token_response(state.guild_id, platform, token_response)
+        if platform == "kick":
+            kick_settings = platform_service.effective_guild_platform(
+                state.guild_id, "kick"
+            )
+            if kick_settings.get("livestream_chat_commands_enabled") is True:
+                await kick_subscriptions.ensure_chat(
+                    state.guild_id, request.app["client_session"]
+                )
         return web.Response(text="EyeBot connection saved. You may close this window.")
 
     async def meta_verify(request):
@@ -139,14 +176,58 @@ def create_app(config=None, platform_service=None):
         )
         return web.Response(text="ok")
 
+    async def kick_event(request):
+        raw_body = await request.read()
+        event = None
+        try:
+            event = kick_webhooks.authenticate(raw_body, request.headers)
+            kick_webhooks.claim(event)
+            outcome = await kick_commands.handle(
+                event, request.headers, request.app["client_session"]
+            )
+            kick_webhooks.remember(event)
+        except KickWebhookDuplicateError as error:
+            # Kick retries deliveries. Previously accepted message IDs are
+            # acknowledged without executing them again.
+            return web.Response(status=204)
+        except KickWebhookAuthenticationError as error:
+            raise web.HTTPUnauthorized(text=str(error)) from error
+        except KickWebhookError as error:
+            raise web.HTTPBadRequest(text=str(error)) from error
+        except Exception:
+            if event is not None:
+                kick_webhooks.release(event.message_id)
+            raise
+        logger.info(
+            f"Accepted Kick webhook {event.event_type} message "
+            f"{event.message_id} ({outcome})"
+        )
+        return web.Response(status=204)
+
     async def start_session(app):
         import aiohttp
 
         app["client_session"] = aiohttp.ClientSession(
             timeout=aiohttp.ClientTimeout(total=30)
         )
+        try:
+            await kick_webhooks.refresh_public_key(app["client_session"])
+        except Exception as error:
+            logger.warning(
+                f"Unable to refresh Kick webhook public key; using bundled key: {error}"
+            )
+        app["kick_subscription_task"] = asyncio.create_task(
+            kick_subscriptions.run_forever(app["client_session"])
+        )
 
     async def close_session(app):
+        task = app.get("kick_subscription_task")
+        if task is not None:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
         await app["client_session"].close()
 
     async def public_media_cleanup(app):
@@ -169,6 +250,7 @@ def create_app(config=None, platform_service=None):
     app.on_cleanup.append(close_session)
     app.cleanup_ctx.append(public_media_cleanup)
     app.router.add_get("/health", health)
+    app.router.add_get("/webhooks", webhook_status)
     app.router.add_get(
         "/media/{guild_id}/{batch}/{filename}",
         serve_public_media,
@@ -178,6 +260,7 @@ def create_app(config=None, platform_service=None):
     app.router.add_get("/webhooks/{platform:facebook|instagram}/{guild_id}", meta_verify)
     app.router.add_post("/webhooks/{platform:facebook|instagram}/{guild_id}", meta_event)
     app.router.add_post("/webhooks/kofi/{guild_id}", kofi_event)
+    app.router.add_post("/webhooks/kick", kick_event)
     return app
 
 

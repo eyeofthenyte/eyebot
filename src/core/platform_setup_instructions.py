@@ -88,16 +88,16 @@ References: [YouTube authentication](https://developers.google.com/youtube/v3/gu
 References: [Meta apps](https://developers.facebook.com/apps/) · [Facebook Login](https://developers.facebook.com/documentation/facebook-login) · [Access tokens](https://developers.facebook.com/documentation/facebook-login/guides/access-tokens) · [Graph API](https://developers.facebook.com/docs/graph-api/get-started/)
 """,
     "kick": """# Kick setup
-**Connector status:** Live-event detection and Discord go-live posting are implemented; chat transport remains a placeholder.
+**Connector status:** Live-event detection, Discord alerts, verified webhook chat commands, and Kick chat responses are implemented.
 
 1. Sign in to [Kick](https://kick.com/), open account settings, and use the **Developer** tab to create an application.
-2. Review [Kick Dev](https://dev.kick.com/) and the [Kick developer documentation](https://docs.kick.com/) for current OAuth endpoints, redirect URI rules, scopes, and app approval requirements.
+2. Review [Kick Dev](https://dev.kick.com/) and the [Kick developer documentation](https://docs.kick.com/) for current OAuth endpoints, redirect URI rules, scopes, and app approval requirements. Configure the OAuth callback as `https://<host>/oauth/kick/callback` and the webhook as `https://<host>/webhooks/kick`.
 3. Select only the permissions needed for the enabled capabilities.
 4. Store the application values on the EyeBot host; the gateway obtains guild tokens:
    `docker compose run --rm --no-deps eyebot python src/manage_secrets.py set kick client_id --guild {guild_id}`
    `docker compose run --rm --no-deps eyebot python src/manage_secrets.py set kick client_secret --guild {guild_id}`
 5. Set the source and destination with `!platform kick set channel <channel_name>` and `!platform kick set destination_channel <#channel>`.
-6. Enable after the application has access to Kick's public channels endpoint.
+6. Enable Kick webhooks in the developer application, reconnect to grant `events:subscribe` and `chat:write`, then enable the platform and chat commands. EyeBot verifies Kick's RSA signature before processing an event.
 7. Add multiple public Kick channels with `!platform kick channel add <channel_name> [<#destination>]`; manage them with `channel list` and `channel remove <channel_name>`. Each channel may route go-live alerts separately.
 
 References: [Kick Dev](https://dev.kick.com/) · [Kick documentation](https://docs.kick.com/) · [Kick developer settings](https://kick.com/settings/developer)

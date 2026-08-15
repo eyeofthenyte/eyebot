@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from adapters.platform_api_adapter import PlatformApiAdapter, PlatformCapabilityError
+from adapters.platform_api_adapter import PlatformApiAdapter
 from core.command_model import (
     CommandActor,
     CommandLocation,
@@ -12,10 +12,17 @@ from core.command_model import (
     CommandPlatform,
     CommandRequest,
     CommandSurface,
+    CommandResponse,
+    ResponseMessage,
+    ResponseVisibility,
 )
+from core.transport import strip_non_discord_attachment_suffix
 
 
 KICK_CHAT_EVENT = "chat.message.sent"
+KICK_CHAT_URL = "https://api.kick.com/public/v1/chat"
+KICK_MESSAGE_LIMIT = 500
+SAFE_KICK_MESSAGE_LIMIT = 450
 
 
 def _mapping(value, field_name: str) -> Mapping:
@@ -122,15 +129,77 @@ def request_from_kick_chat_event(
     )
 
 
+def _flatten_message(message: ResponseMessage) -> str:
+    sections = []
+    if message.content:
+        sections.append(message.content)
+    if message.card:
+        card = message.card
+        if card.title:
+            sections.append(card.title)
+        if card.description:
+            sections.append(card.description)
+        sections.extend(f"{field.name}: {field.value}" for field in card.fields)
+        if card.footer:
+            sections.append(card.footer)
+    return strip_non_discord_attachment_suffix(
+        " | ".join(str(section).strip() for section in sections if str(section).strip())
+    )
+
+
+def split_kick_text(content: str, *, limit: int = SAFE_KICK_MESSAGE_LIMIT) -> tuple[str, ...]:
+    if not 1 <= limit <= KICK_MESSAGE_LIMIT:
+        raise ValueError("Kick message limit must be between 1 and 500")
+    remaining = content.strip()
+    chunks = []
+    while len(remaining) > limit:
+        split_at = max(remaining.rfind(" ", 0, limit + 1), remaining.rfind("\n", 0, limit + 1))
+        if split_at <= 0:
+            split_at = limit
+        chunks.append(remaining[:split_at].rstrip())
+        remaining = remaining[split_at:].lstrip()
+    if remaining:
+        chunks.append(remaining)
+    return tuple(chunks)
+
+
+async def send_kick_response(session, settings, request, response: CommandResponse) -> tuple[str, ...]:
+    if response.visibility != ResponseVisibility.PUBLIC:
+        return ()
+    token = str(settings.get("access_token") or "")
+    if not token:
+        raise ValueError("Kick access token is unavailable")
+    sent_ids = []
+    for message in response.messages:
+        for chunk in split_kick_text(_flatten_message(message)):
+            payload = {"content": chunk, "type": "bot"}
+            reply_id = str(request.metadata.get("message_id") or "")
+            if reply_id:
+                payload["reply_to_message_id"] = reply_id
+            async with session.post(
+                KICK_CHAT_URL,
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            ) as http_response:
+                body = await http_response.json(content_type=None)
+                if not 200 <= http_response.status < 300:
+                    message_text = body.get("message") if isinstance(body, Mapping) else None
+                    raise ValueError(
+                        f"Kick chat API returned HTTP {http_response.status}: "
+                        f"{message_text or 'request failed'}"
+                    )
+            result = body.get("data", {}) if isinstance(body, Mapping) else {}
+            message_id = str(result.get("message_id") or "")
+            if message_id:
+                sent_ids.append(message_id)
+    return tuple(sent_ids)
+
+
 class KickAdapter(PlatformApiAdapter):
     def __init__(self):
-        super().__init__(CommandPlatform.KICK, ("live_events",))
-
-    async def connect_chat(self, settings, handler):
-        raise PlatformCapabilityError(
-            "Kick chat requires the app's approved event/chat API contract; "
-            "live-event polling is implemented, but chat is not enabled."
-        )
-
+        super().__init__(CommandPlatform.KICK, ("live_events", "livestream_chat"))
 
 KICK_ADAPTER = KickAdapter()

@@ -63,7 +63,7 @@ OAUTH_PROVIDERS = {
         "https://id.kick.com/oauth/token",
         "client_id",
         "client_secret",
-        ("user:read", "channel:read", "chat:write"),
+        ("user:read", "channel:read", "chat:write", "events:subscribe"),
     ),
     "twitter": OAuthProvider(
         "twitter",

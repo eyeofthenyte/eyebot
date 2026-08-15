@@ -62,5 +62,7 @@ class PlatformConnectionService:
             "connected_at",
             "account_id",
             "account_name",
+            "broadcaster_user_id",
+            "chat_subscription_id",
         ):
             self.platforms.clear_guild_platform_override(guild_id, platform, parameter)

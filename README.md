@@ -55,7 +55,7 @@ required before a connector can call its production platform API.
 | Twitch | `twitch` | Implemented | Yes | Yes |
 | YouTube | `youtube` | Live alerts and chat API adapter | Yes | API adapter |
 | Facebook | `facebook` | Live alerts and Page posting | Yes | Webhook events |
-| Kick | `kick` | Live alerts implemented | Yes | No |
+| Kick | `kick` | Live alerts and verified webhook chat commands | Yes | Yes |
 | Twitter/X | `twitter` | Spaces alerts and posting | Yes | No |
 | Bluesky | `bluesky` | Posting implemented | No | No |
 | TikTok | `tiktok` | Approved Content Posting; LIVE API unavailable | No | No |
@@ -370,6 +370,18 @@ for each application:
 ```text
 https://bot.example.com/oauth/<platform>/callback
 ```
+
+Kick additionally uses one application-wide webhook endpoint:
+
+```text
+https://bot.example.com/webhooks/kick
+```
+
+Enable that URL in the Kick developer application. EyeBot verifies the
+`Kick-Event-Signature` RSA signature over the exact raw request body, rejects
+stale timestamps, persists message-ID deduplication under `data/webhooks/`,
+and routes the verified broadcaster ID to one eligible guild. Kick OAuth must
+grant `user:read`, `channel:read`, `chat:write`, and `events:subscribe`.
 
 Store the platform application client ID/secret with `manage_secrets.py`, set
 the guild's source account/channel parameters, then have a Manage Server user
@@ -725,7 +737,6 @@ interactive browser session. Remaining placeholder capabilities are:
 
 - YouTube: videos, community posts, and livestream chat commands
 - Facebook: publishing and livestream chat commands
-- Kick: livestream chat commands
 - Twitter/X, Bluesky, TikTok, and Instagram: publishing
 - Substack: newsletter and podcast retrieval
 - Ko-fi: donation, membership, shop-order, and webhook events

@@ -41,6 +41,27 @@ class _PlatformService:
 
 
 class MetaAccountDiscoveryTests(unittest.IsolatedAsyncioTestCase):
+    async def test_kick_records_authorized_broadcaster_identity(self):
+        service = _PlatformService({"kick": {}})
+        session = _Session(
+            [({"data": [{"user_id": 123456, "name": "EyeBot"}]}, 200)]
+        )
+
+        result = await discover_oauth_account(
+            "kick",
+            "42",
+            {"access_token": "kick-token"},
+            service,
+            session,
+        )
+
+        self.assertEqual(result["access_token"], "kick-token")
+        self.assertIn(
+            ("42", "kick", "broadcaster_user_id", "123456"),
+            service.overrides,
+        )
+        self.assertIn(("42", "kick", "account_name", "EyeBot"), service.overrides)
+
     async def test_instagram_uses_page_returned_by_me_accounts(self):
         service = _PlatformService(
             {

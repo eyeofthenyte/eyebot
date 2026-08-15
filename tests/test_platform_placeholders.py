@@ -32,8 +32,8 @@ class PlatformConnectorTests(unittest.TestCase):
         self.assertTrue(all(item.implemented for item in adapters))
         self.assertTrue(all(item.capabilities for item in adapters))
 
-    def test_kick_chat_remains_explicitly_unavailable(self):
-        self.assertNotIn("livestream_chat", KICK_ADAPTER.capabilities)
+    def test_kick_chat_is_exposed_through_verified_webhooks(self):
+        self.assertIn("livestream_chat", KICK_ADAPTER.capabilities)
 
     def test_distribution_config_contains_disabled_blank_sections(self):
         with (PROJECT_ROOT / "platforms.yaml.dist").open(encoding="utf-8") as file:

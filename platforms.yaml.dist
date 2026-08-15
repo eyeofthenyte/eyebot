@@ -65,6 +65,8 @@ kick:
   client_secret:
   access_token:
   refresh_token:
+  # Discovered from the authorized Kick account; do not guess this value.
+  broadcaster_user_id:
   channel:
   destination_channel:
   live_poll_seconds: 60

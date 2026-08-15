@@ -142,6 +142,23 @@ async def discover_oauth_account(
         platform_service.set_guild_platform_override(
             guild_id, platform, "account_name", account.get("username", "")
         )
+    elif platform == "kick":
+        body = await _get_json(
+            session,
+            "https://api.kick.com/public/v1/users",
+            token=token,
+        )
+        rows = body.get("data", [])
+        if not rows or not rows[0].get("user_id"):
+            raise ValueError("Kick did not return the authorized broadcaster identity")
+        account = rows[0]
+        broadcaster_id = str(account["user_id"])
+        platform_service.set_guild_platform_override(
+            guild_id, platform, "broadcaster_user_id", broadcaster_id
+        )
+        platform_service.set_guild_platform_override(
+            guild_id, platform, "account_name", account.get("name", "")
+        )
     elif platform == "tiktok":
         body = await _get_json(
             session,
