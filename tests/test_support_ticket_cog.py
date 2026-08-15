@@ -45,6 +45,15 @@ class FakeAttachment:
         return self.data
 
 
+class FakeInstructionChannel:
+    def __init__(self):
+        self.sent = []
+
+    async def send(self, *args, **kwargs):
+        self.sent.append({"args": args, **kwargs})
+        return SimpleNamespace(id=123, jump_url="https://discord.com/channels/42/100/123")
+
+
 class SupportTicketCogTests(unittest.IsolatedAsyncioTestCase):
     async def test_support_application_commands_register_with_bot_tree(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -62,7 +71,7 @@ class SupportTicketCogTests(unittest.IsolatedAsyncioTestCase):
 
             names = {command.name for command in bot.tree.get_commands()}
             self.assertTrue(
-                {"ticket", "ticket-setup", "resolved", "cancel", "ticket-status", "ticket-list", "ticket-reopen"}
+                {"ticket", "ticket-setup", "ticket-guide", "resolved", "cancel", "ticket-status", "ticket-list", "ticket-reopen"}
                 <= names
             )
             await bot.close()
@@ -112,6 +121,46 @@ class SupportTicketCogTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(modal.note_input.min_length, 5)
         self.assertEqual(modal.note_input.max_length, 1000)
         self.assertTrue(modal.note_input.required)
+
+    async def test_support_instructions_embed_has_side_by_side_guides(self):
+        embed = Support.support_instructions_embed()
+
+        self.assertEqual(embed.title, "EyeBot Support Ticket Guide")
+        self.assertEqual(len(embed.fields), 2)
+        self.assertEqual(
+            [field.name for field in embed.fields],
+            ["👤 User Instructions", "🛡️ Moderator Instructions"],
+        )
+        self.assertTrue(all(field.inline for field in embed.fields))
+        self.assertTrue(all(len(field.value) <= 1024 for field in embed.fields))
+
+    async def test_post_support_instructions_sends_the_embed(self):
+        channel = FakeInstructionChannel()
+
+        message = await Support.post_support_instructions(channel)
+
+        self.assertEqual(message.id, 123)
+        self.assertEqual(len(channel.sent), 1)
+        self.assertIsInstance(channel.sent[0]["embed"], discord.Embed)
+        self.assertEqual(channel.sent[0]["embed"].title, "EyeBot Support Ticket Guide")
+
+    async def test_audit_messages_are_silent_and_disable_mentions(self):
+        channel = FakeInstructionChannel()
+        cog = SimpleNamespace(
+            mod_channel=lambda _guild: channel,
+            logger=SimpleNamespace(error=lambda *args, **kwargs: None),
+            safe_error=lambda error: str(error),
+        )
+
+        await Support.audit(cog, SimpleNamespace(id=42), "alice updated a ticket")
+
+        self.assertTrue(channel.sent[0]["silent"])
+        self.assertFalse(channel.sent[0]["allowed_mentions"].users)
+
+    def test_plain_username_uses_account_name_without_a_mention(self):
+        member = SimpleNamespace(name="plain_user", display_name="Server Nickname")
+
+        self.assertEqual(Support.plain_username(member), "plain\\_user")
 
 
 if __name__ == "__main__":

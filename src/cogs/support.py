@@ -159,6 +159,7 @@ class SupportChannelSelect(discord.ui.ChannelSelect):
     async def callback(self, interaction: discord.Interaction):
         view: TicketSetupView = self.view
         channel = self.values[0]
+        await interaction.response.defer(ephemeral=True, thinking=True)
         await view.cog.configure_support_channel(interaction, channel)
 
 
@@ -202,7 +203,7 @@ class TicketSetupView(discord.ui.View):
         )
         await self.cog.audit(
             interaction.guild,
-            f"{interaction.user.mention} disabled the support ticket system.",
+            f"{self.cog.plain_username(interaction.user)} disabled the support ticket system.",
         )
 
 
@@ -388,12 +389,22 @@ class Support(commands.Cog, name="Support Tickets"):
         destination = self.mod_channel(guild)
         if destination is not None:
             try:
-                await destination.send(f"🧾 {message}", file=file)
+                await destination.send(
+                    f"🧾 {message}",
+                    file=file,
+                    allowed_mentions=discord.AllowedMentions.none(),
+                    silent=True,
+                )
             except (discord.Forbidden, discord.HTTPException) as error:
                 self.logger.error(
                     "Support ticket audit delivery failed: " + self.safe_error(error),
                     guild_id=guild.id,
                 )
+
+    @staticmethod
+    def plain_username(user, *, fallback="unknown user"):
+        name = getattr(user, "name", None)
+        return discord.utils.escape_markdown(str(name or fallback))
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -477,15 +488,74 @@ class Support(commands.Cog, name="Support Tickets"):
             ephemeral=True,
         )
 
+    @app_commands.command(
+        name="ticket-guide",
+        description="Post the support ticket instructions in the configured channel",
+    )
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
+    async def ticket_guide(self, interaction: discord.Interaction):
+        if not is_moderator(interaction.user):
+            return await interaction.response.send_message(
+                "❌ Moderator permission is required.", ephemeral=True
+            )
+        channel = self.support_channel(interaction.guild)
+        if not isinstance(channel, discord.TextChannel):
+            return await interaction.response.send_message(
+                "❌ Configure a support ticket channel with `/ticket-setup` first.",
+                ephemeral=True,
+            )
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            guide_message = await self.post_support_instructions(channel)
+        except (discord.Forbidden, discord.HTTPException) as error:
+            self.logger.error(
+                "Support ticket guide delivery failed: " + self.safe_error(error),
+                guild_id=interaction.guild_id,
+            )
+            return await interaction.followup.send(
+                "❌ EyeBot could not post the guide. Check its Send Messages and "
+                "Embed Links permissions.",
+                ephemeral=True,
+            )
+        await interaction.followup.send(
+            f"✅ Support ticket guide posted: {guide_message.jump_url}",
+            ephemeral=True,
+        )
+        await self.audit(
+            interaction.guild,
+            f"{self.plain_username(interaction.user)} posted the support ticket guide "
+            f"in {channel.mention}.",
+        )
+
     async def configure_support_channel(self, interaction, channel):
         resolved = interaction.guild.get_channel(channel.id)
         if not isinstance(resolved, discord.TextChannel):
-            return await interaction.response.send_message("❌ Select a standard text channel.", ephemeral=True)
+            return await interaction.followup.send(
+                "❌ Select a standard text channel.", ephemeral=True
+            )
+        try:
+            guide_message = await self.post_support_instructions(resolved)
+        except (discord.Forbidden, discord.HTTPException) as error:
+            self.logger.error(
+                "Support ticket guide delivery failed: " + self.safe_error(error),
+                guild_id=interaction.guild_id,
+            )
+            return await interaction.followup.send(
+                "❌ EyeBot could not post in that channel. Check its Send Messages and Embed Links permissions.",
+                ephemeral=True,
+            )
         self.set_guild_ticket_config(interaction.guild, enabled=True, channel_id=str(resolved.id))
-        await interaction.response.send_message(
-            f"✅ Support tickets will use {resolved.mention}.", ephemeral=True
+        await interaction.followup.send(
+            f"✅ Support tickets will use {resolved.mention}. The instruction guide was posted: "
+            f"{guide_message.jump_url}",
+            ephemeral=True,
         )
-        await self.audit(interaction.guild, f"{interaction.user.mention} selected {resolved.mention} as the support ticket channel.")
+        await self.audit(
+            interaction.guild,
+            f"{self.plain_username(interaction.user)} selected {resolved.mention} "
+            "as the support ticket channel.",
+        )
 
     async def create_support_channel(self, interaction):
         guild = interaction.guild
@@ -517,9 +587,74 @@ class Support(commands.Cog, name="Support Tickets"):
                     "❌ EyeBot could not create the channel. Check its Manage Channels permission.",
                     ephemeral=True,
                 )
+        try:
+            guide_message = await self.post_support_instructions(existing)
+        except (discord.Forbidden, discord.HTTPException) as error:
+            self.logger.error(
+                "Support ticket guide delivery failed: " + self.safe_error(error),
+                guild_id=guild.id,
+            )
+            return await interaction.followup.send(
+                "❌ EyeBot could not post the ticket instructions. Check its Send Messages and Embed Links permissions.",
+                ephemeral=True,
+            )
         self.set_guild_ticket_config(guild, enabled=True, channel_id=str(existing.id))
-        await interaction.followup.send(f"✅ Support tickets will use {existing.mention}.", ephemeral=True)
-        await self.audit(guild, f"{interaction.user.mention} configured {existing.mention} for support tickets.")
+        await interaction.followup.send(
+            f"✅ Support tickets will use {existing.mention}. The instruction guide was posted: "
+            f"{guide_message.jump_url}",
+            ephemeral=True,
+        )
+        await self.audit(
+            guild,
+            f"{self.plain_username(interaction.user)} configured {existing.mention} "
+            "for support tickets.",
+        )
+
+    @staticmethod
+    def support_instructions_embed():
+        embed = discord.Embed(
+            title="EyeBot Support Ticket Guide",
+            description="Use this channel to open and track private support requests.",
+            color=0x5865F2,
+        )
+        embed.add_field(
+            name="👤 User Instructions",
+            value=(
+                "**Open a ticket**\n"
+                "Use `/ticket`, describe the issue, and optionally include a message "
+                "link and up to four images. Remove visible secrets before submitting.\n\n"
+                "**What happens next**\n"
+                "EyeBot creates a private thread shared with you and the moderators. "
+                "The public status shows only a `T-######` ticket number. You may have "
+                "up to three active tickets.\n\n"
+                "You will receive a DM when the ticket is assigned, closed, or reopened. "
+                "Resolution and cancellation DMs include the moderator's note."
+            ),
+            inline=True,
+        )
+        embed.add_field(
+            name="🛡️ Moderator Instructions",
+            value=(
+                "**Controls**\n"
+                "📋 assigns the ticket to you. ✅ resolves it. ❌ cancels it. Resolve and "
+                "Cancel require a brief note and can only be completed by the assigned moderator.\n\n"
+                "**Commands**\n"
+                "Inside a ticket thread: `/resolved reason:...` or `/cancel reason:...`\n"
+                "Outside a thread, also provide `ticketnumber:T-######`.\n"
+                "Use `/ticket-list`, `/ticket-status`, and `/ticket-reopen` for management.\n\n"
+                "Closing archives the private thread and transcript. Reopening restores the "
+                "thread, user access, controls, and user notification."
+            ),
+            inline=True,
+        )
+        embed.set_footer(
+            text="Ticket contents remain private; moderator actions are written to the configured mod log."
+        )
+        return embed
+
+    @staticmethod
+    async def post_support_instructions(channel):
+        return await channel.send(embed=Support.support_instructions_embed())
 
     async def submit_ticket(self, interaction, *, description, message_link, attachments):
         guild = interaction.guild
@@ -601,7 +736,8 @@ class Support(commands.Cog, name="Support Tickets"):
         )
         await self.audit(
             guild,
-            f"Ticket `{ticket.number}` was opened by {interaction.user.mention}. "
+            f"Ticket `{ticket.number}` was opened by "
+            f"{self.plain_username(interaction.user)}. "
             f"Images attached: **{ticket.image_count}**. "
             f"Message link included: **{'yes' if ticket.message_link else 'no'}**.",
         )
@@ -666,7 +802,12 @@ class Support(commands.Cog, name="Support Tickets"):
                 )
             except (discord.Forbidden, discord.HTTPException):
                 await thread.send("ℹ️ I could not DM the ticket opener; updates will remain in this thread.")
-            await self.audit(interaction.guild, f"{interaction.user.mention} claimed ticket `{ticket.number}` opened by <@{ticket.opener_id}>.")
+            await self.audit(
+                interaction.guild,
+                f"{self.plain_username(interaction.user)} claimed ticket "
+                f"`{ticket.number}` opened by "
+                f"{self.plain_username(opener, fallback=f'user ID {ticket.opener_id}')}.",
+            )
             self.logger.info(
                 f"Support ticket {ticket.number} assigned",
                 guild_id=interaction.guild_id,
@@ -718,8 +859,9 @@ class Support(commands.Cog, name="Support Tickets"):
                     pass
             await self.audit(
                 guild,
-                f"{interaction.user.mention} marked ticket `{ticket.number}` opened by "
-                f"<@{ticket.opener_id}> as {verb}. Note: {ticket.close_note}",
+                f"{self.plain_username(interaction.user)} marked ticket `{ticket.number}` "
+                f"opened by {self.plain_username(opener, fallback=f'user ID {ticket.opener_id}')} "
+                f"as {verb}. Note: {ticket.close_note}",
             )
             self.logger.info(
                 f"Support ticket {ticket.number} marked {verb}",
@@ -943,7 +1085,12 @@ class Support(commands.Cog, name="Support Tickets"):
                 TicketControlView(self, ticket),
                 message_id=public.id,
             )
-            await self.audit(interaction.guild, f"{interaction.user.mention} reopened ticket `{ticket.number}` opened by <@{ticket.opener_id}>.")
+            await self.audit(
+                interaction.guild,
+                f"{self.plain_username(interaction.user)} reopened ticket "
+                f"`{ticket.number}` opened by "
+                f"{self.plain_username(opener, fallback=f'user ID {ticket.opener_id}')}.",
+            )
             await interaction.followup.send(f"✅ Ticket `{ticket.number}` was reopened.", ephemeral=True)
         except SupportTicketError as error:
             await interaction.followup.send(f"❌ {error}", ephemeral=True)

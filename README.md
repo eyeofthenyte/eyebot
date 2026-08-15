@@ -815,6 +815,10 @@ moderator controls. The moderator log receives a compact opening record with
 the opener, ticket number, image count, and whether a message link was included;
 it does not receive the description, link, or images.
 
+Whenever a moderator creates or selects the support-ticket channel, EyeBot
+posts a two-column embed containing user instructions and moderator commands.
+The selected channel must allow EyeBot to send messages and embed links.
+
 - 📋 **Assign** — atomically assigns the ticket, records the assignee in the
   existing private thread, notifies the opener by DM, and updates the public
   status.
@@ -843,6 +847,11 @@ Moderator application commands:
 | `/ticket-status ticketnumber:T-000001` | Privately display one ticket's state |
 | `/ticket-list` | Privately list active tickets without their descriptions |
 | `/ticket-reopen ticketnumber:T-000001` | Reopen a closed ticket; requires Manage Server |
+| `/ticket-guide` | Repost the user and moderator guide in the configured support channel |
+
+Support-ticket audit entries use plain Discord account usernames instead of
+member mentions or server nicknames. EyeBot disables mentions and uses
+Discord's silent-notification flag for these moderator-log messages.
 
 Support ticket runtime limits are global defaults in `config.yaml`:
 
