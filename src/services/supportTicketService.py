@@ -19,7 +19,9 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 ACTIVE_STATUSES = frozenset({"open", "assigned"})
 FINAL_STATUSES = frozenset({"resolved", "canceled"})
-TICKET_PATTERN = re.compile(r"^TICKET-[0-9]{6}$")
+# Continue accepting legacy TICKET-###### records while generating only the
+# compact T-###### format for new tickets.
+TICKET_PATTERN = re.compile(r"^(?:T|TICKET)-[0-9]{6}$")
 MESSAGE_LINK_PATTERN = re.compile(
     r"^https://(?:canary\.|ptb\.)?discord(?:app)?\.com/channels/"
     r"(?P<guild>[0-9]{1,20})/(?P<channel>[0-9]{1,20})/(?P<message>[0-9]{1,20})$"
@@ -51,12 +53,14 @@ class SupportTicket:
     opener_id: str
     description: str
     message_link: str = ""
+    image_count: int = 0
     status: str = "open"
     assigned_to: str | None = None
     opened_at: str = ""
     assigned_at: str | None = None
     closed_at: str | None = None
     closed_by: str | None = None
+    close_note: str | None = None
     public_message_id: str | None = None
     mod_message_id: str | None = None
     thread_id: str | None = None
@@ -180,7 +184,14 @@ class SupportTicketService:
             if temporary.exists():
                 temporary.unlink()
 
-    def create(self, guild_id, opener_id, description, message_link="") -> SupportTicket:
+    def create(
+        self,
+        guild_id,
+        opener_id,
+        description,
+        message_link="",
+        image_count=0,
+    ) -> SupportTicket:
         selected_description = str(description or "").strip()
         maximum = max(100, min(4000, int(self.settings.get("max_description_length", 4000))))
         if len(selected_description) < 10:
@@ -200,7 +211,7 @@ class SupportTicketService:
                     f"You may have at most {self.maximum_open_per_user} open support tickets."
                 )
             sequence = store["next_number"]
-            number = f"TICKET-{sequence:06d}"
+            number = f"T-{sequence:06d}"
             timestamp = utc_now()
             ticket = SupportTicket(
                 number=number,
@@ -208,6 +219,7 @@ class SupportTicketService:
                 opener_id=str(opener_id),
                 description=selected_description,
                 message_link=selected_link,
+                image_count=max(0, min(self.maximum_images, int(image_count))),
                 opened_at=timestamp,
                 history=[{"action": "opened", "actor_id": str(opener_id), "at": timestamp}],
             )
@@ -219,7 +231,7 @@ class SupportTicketService:
     def get(self, guild_id, number) -> SupportTicket:
         selected = str(number or "").strip().upper()
         if not TICKET_PATTERN.fullmatch(selected):
-            raise SupportTicketError("Use a ticket number such as `TICKET-000001`.")
+            raise SupportTicketError("Use a ticket number such as `T-000001`.")
         with self._lock:
             value = self._read(guild_id)["tickets"].get(selected)
         if not isinstance(value, dict):
@@ -263,9 +275,15 @@ class SupportTicketService:
             ticket.history.append({"action": "assigned", "actor_id": str(moderator_id), "at": timestamp})
         return self._mutate(guild_id, number, change)
 
-    def close(self, guild_id, number, moderator_id, status) -> SupportTicket:
+    def close(self, guild_id, number, moderator_id, status, note) -> SupportTicket:
         if status not in FINAL_STATUSES:
             raise SupportTicketError("The requested ticket state is invalid.")
+        selected_note = str(note or "").strip()
+        maximum = max(20, min(1000, int(self.settings.get("max_close_note_length", 1000))))
+        if len(selected_note) < 5:
+            raise SupportTicketError("Enter a resolution or cancellation note of at least 5 characters.")
+        if len(selected_note) > maximum:
+            raise SupportTicketError(f"The closure note cannot exceed {maximum} characters.")
         def change(ticket):
             if ticket.status in FINAL_STATUSES:
                 if ticket.status == status:
@@ -275,7 +293,15 @@ class SupportTicketService:
             ticket.status = status
             ticket.closed_at = timestamp
             ticket.closed_by = str(moderator_id)
-            ticket.history.append({"action": status, "actor_id": str(moderator_id), "at": timestamp})
+            ticket.close_note = selected_note
+            ticket.history.append(
+                {
+                    "action": status,
+                    "actor_id": str(moderator_id),
+                    "note": selected_note,
+                    "at": timestamp,
+                }
+            )
         return self._mutate(guild_id, number, change)
 
     def reopen(self, guild_id, number, moderator_id) -> SupportTicket:
@@ -307,7 +333,7 @@ class SupportTicketService:
             ticket.assigned_at = None
             ticket.closed_at = None
             ticket.closed_by = None
-            ticket.thread_id = None
+            ticket.close_note = None
             ticket.public_delete_at = None
             ticket.history.append(
                 {

@@ -90,6 +90,7 @@ support_tickets:
   enabled: true
   max_open_per_user: 3
   max_description_length: 4000
+  max_close_note_length: 1000
   max_images: 4
   max_image_bytes: 5242880
   max_total_image_bytes: 15728640

@@ -35,8 +35,8 @@ class SupportTicketServiceTests(unittest.TestCase):
         first = self.service.create("42", "7", "This is the first support issue.")
         second = self.service.create("42", "8", "This is the second support issue.")
 
-        self.assertEqual(first.number, "TICKET-000001")
-        self.assertEqual(second.number, "TICKET-000002")
+        self.assertEqual(first.number, "T-000001")
+        self.assertEqual(second.number, "T-000002")
         self.assertEqual(self.service.get("42", first.number).opener_id, "7")
 
     def test_allows_three_open_tickets_per_user_and_releases_slot_on_close(self):
@@ -48,25 +48,38 @@ class SupportTicketServiceTests(unittest.TestCase):
         with self.assertRaisesRegex(SupportTicketError, "at most 3"):
             self.service.create("42", "7", "A fourth open support issue is blocked.")
 
-        self.service.close("42", tickets[0].number, "99", "canceled")
+        self.service.close("42", tickets[0].number, "99", "canceled", "Duplicate request")
         replacement = self.service.create("42", "7", "A replacement support issue is allowed.")
-        self.assertEqual(replacement.number, "TICKET-000004")
+        self.assertEqual(replacement.number, "T-000004")
 
     def test_claim_resolve_cancel_and_reopen_transitions_persist(self):
         ticket = self.service.create("42", "7", "The ticket transition needs verification.")
+        self.service.update_delivery("42", ticket.number, thread_id="555")
         assigned = self.service.claim("42", ticket.number, "99")
-        resolved = self.service.close("42", ticket.number, "99", "resolved")
+        resolved = self.service.close("42", ticket.number, "99", "resolved", "Configuration corrected")
         reopened = self.service.reopen("42", ticket.number, "100")
 
         self.assertEqual(assigned.status, "assigned")
         self.assertEqual(resolved.status, "resolved")
+        self.assertEqual(resolved.close_note, "Configuration corrected")
+        self.assertEqual(resolved.history[-1]["note"], "Configuration corrected")
         self.assertEqual(reopened.status, "open")
+        self.assertEqual(reopened.thread_id, "555")
         reloaded = SupportTicketService({}, self.root).get("42", ticket.number)
         self.assertEqual(reloaded.status, "open")
         self.assertEqual(
             [entry["action"] for entry in reloaded.history],
             ["opened", "assigned", "resolved", "reopened"],
         )
+
+    def test_closing_requires_a_brief_note(self):
+        ticket = self.service.create("42", "7", "This issue needs a closure note.")
+        self.service.claim("42", ticket.number, "99")
+
+        with self.assertRaisesRegex(SupportTicketError, "at least 5"):
+            self.service.close("42", ticket.number, "99", "resolved", "no")
+
+        self.assertEqual(self.service.get("42", ticket.number).status, "assigned")
 
     def test_rejects_cross_guild_and_malformed_message_links(self):
         valid = "https://discord.com/channels/42/100/200"
@@ -100,11 +113,22 @@ class SupportTicketServiceTests(unittest.TestCase):
         with self.assertRaisesRegex(SupportTicketError, "extension"):
             self.service.validate_images((image,))
 
+    def test_ticket_persists_uploaded_image_count(self):
+        ticket = self.service.create(
+            "42",
+            "7",
+            "This support issue includes several screenshots.",
+            image_count=4,
+        )
+
+        self.assertEqual(ticket.image_count, 4)
+        self.assertEqual(self.service.get("42", ticket.number).image_count, 4)
+
     def test_reopen_respects_three_active_ticket_limit(self):
         closed = self.service.create(
             "42", "7", "This ticket will be closed before the limit is filled."
         )
-        self.service.close("42", closed.number, "99", "canceled")
+        self.service.close("42", closed.number, "99", "canceled", "No longer needed")
         for index in range(3):
             self.service.create(
                 "42", "7", f"Another active support issue number {index}."

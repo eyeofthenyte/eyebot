@@ -25,6 +25,7 @@ CLAIM_EMOJI = "📋"
 RESOLVE_EMOJI = "✅"
 CANCEL_EMOJI = "❌"
 GENERIC_FAILURE = "EyeBot could not complete that ticket action. Please try again later."
+UNSET_VIEW = object()
 
 
 def is_moderator(member) -> bool:
@@ -229,17 +230,12 @@ class TicketActionButton(discord.ui.Button):
             return await interaction.response.send_message(
                 "❌ Only moderators may manage support tickets.", ephemeral=True
             )
-        if self.action == "cancel":
-            return await interaction.response.send_message(
-                f"Cancel `{self.ticket_number}`? This will close its private thread.",
-                view=CancelConfirmationView(self.cog, self.ticket_number, interaction.user.id),
-                ephemeral=True,
+        if self.action in {"resolve", "cancel"}:
+            return await interaction.response.send_modal(
+                TicketCloseModal(self.cog, self.ticket_number, self.action)
             )
         await interaction.response.defer(ephemeral=True, thinking=True)
-        if self.action == "claim":
-            await self.cog.claim_ticket(interaction, self.ticket_number)
-        else:
-            await self.cog.resolve_ticket(interaction, self.ticket_number)
+        await self.cog.claim_ticket(interaction, self.ticket_number)
 
 
 class TicketControlView(discord.ui.View):
@@ -268,27 +264,37 @@ class TicketControlView(discord.ui.View):
         await method(f"❌ {GENERIC_FAILURE}", ephemeral=True)
 
 
-class CancelConfirmationView(discord.ui.View):
-    def __init__(self, cog: "Support", ticket_number: str, moderator_id: int):
-        super().__init__(timeout=60)
+class TicketCloseModal(discord.ui.Modal):
+    def __init__(self, cog: "Support", ticket_number: str, action: str):
+        verb = "Resolve" if action == "resolve" else "Cancel"
+        super().__init__(title=f"{verb} {ticket_number}", timeout=300)
         self.cog = cog
         self.ticket_number = ticket_number
-        self.moderator_id = moderator_id
+        self.action = action
+        self.note_input = discord.ui.TextInput(
+            style=discord.TextStyle.paragraph,
+            placeholder=(
+                "Briefly describe the resolution."
+                if action == "resolve"
+                else "Briefly explain why the ticket is being canceled."
+            ),
+            required=True,
+            min_length=5,
+            max_length=cog.maximum_close_note_length,
+        )
+        self.add_item(
+            discord.ui.Label(
+                text="Resolution description" if action == "resolve" else "Cancellation reason",
+                component=self.note_input,
+            )
+        )
 
-    async def interaction_check(self, interaction):
-        if interaction.user.id == self.moderator_id and is_moderator(interaction.user):
-            return True
-        await interaction.response.send_message("❌ This confirmation is not yours.", ephemeral=True)
-        return False
-
-    @discord.ui.button(label="Confirm cancellation", emoji=CANCEL_EMOJI, style=discord.ButtonStyle.danger)
-    async def confirm(self, interaction, _button):
+    async def on_submit(self, interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
-        await self.cog.cancel_ticket(interaction, self.ticket_number)
-
-    @discord.ui.button(label="Keep ticket", style=discord.ButtonStyle.secondary)
-    async def keep(self, interaction, _button):
-        await interaction.response.edit_message(content="Cancellation dismissed.", view=None)
+        if self.action == "resolve":
+            await self.cog.resolve_ticket(interaction, self.ticket_number, self.note_input.value)
+        else:
+            await self.cog.cancel_ticket(interaction, self.ticket_number, self.note_input.value)
 
 
 class Support(commands.Cog, name="Support Tickets"):
@@ -304,6 +310,9 @@ class Support(commands.Cog, name="Support Tickets"):
         )
         self.maximum_description_length = max(
             100, min(4000, int(self.settings.get("max_description_length", 4000)))
+        )
+        self.maximum_close_note_length = max(
+            20, min(1000, int(self.settings.get("max_close_note_length", 1000)))
         )
         self._ticket_locks = {}
         self._open_attempts = {}
@@ -362,6 +371,19 @@ class Support(commands.Cog, name="Support Tickets"):
         except (TypeError, ValueError):
             return None
 
+    async def resolve_thread(self, guild, thread_id):
+        if not thread_id:
+            return None
+        selected = int(thread_id)
+        thread = guild.get_thread(selected) or self.bot.get_channel(selected)
+        if thread is not None:
+            return thread
+        try:
+            fetched = await self.bot.fetch_channel(selected)
+            return fetched if isinstance(fetched, discord.Thread) else None
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            return None
+
     async def audit(self, guild, message, *, file=None):
         destination = self.mod_channel(guild)
         if destination is not None:
@@ -387,8 +409,11 @@ class Support(commands.Cog, name="Support Tickets"):
         self._restored = True
         for guild in self.bot.guilds:
             for ticket in self.service.list(guild.id, active_only=True):
-                if ticket.mod_message_id:
-                    self.bot.add_view(TicketControlView(self, ticket), message_id=int(ticket.mod_message_id))
+                if ticket.public_message_id:
+                    self.bot.add_view(
+                        TicketControlView(self, ticket),
+                        message_id=int(ticket.public_message_id),
+                    )
             await self.cleanup_expired_statuses(guild)
 
     @app_commands.command(name="ticket", description="Open a private EyeBot support ticket")
@@ -516,19 +541,35 @@ class Support(commands.Cog, name="Support Tickets"):
             interaction.user.id,
             description,
             message_link,
+            image_count=len(images),
         )
-        embed = self.ticket_embed(ticket, opener=interaction.user)
-        files = [discord.File(io.BytesIO(image.data), filename=image.filename) for image in images]
+        thread = None
         public_message = None
         try:
-            public_message = await channel.send(
-                f"🎫 Ticket `{ticket.number}` has been opened."
+            thread = await channel.create_thread(
+                name=f"{ticket.number.lower()}-support",
+                type=discord.ChannelType.private_thread,
+                invitable=False,
+                auto_archive_duration=self.thread_archive_minutes,
+                reason=f"Support ticket {ticket.number} opened",
             )
-            mod_message = await mod_channel.send(
-                embed=embed,
+            await thread.add_user(interaction.user)
+            text = f"## {ticket.number}\n{ticket.description}"
+            if ticket.message_link:
+                text += f"\n\nMessage link: {ticket.message_link}"
+            files = [
+                discord.File(io.BytesIO(image.data), filename=image.filename)
+                for image in images
+            ]
+            await thread.send(
+                text,
                 files=files,
-                view=TicketControlView(self, ticket),
                 suppress_embeds=True,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            public_message = await channel.send(
+                view=TicketControlView(self, ticket),
+                content=f"🎫 Ticket `{ticket.number}` has been opened.",
             )
         except (discord.Forbidden, discord.HTTPException) as error:
             self.service.close(
@@ -536,28 +577,41 @@ class Support(commands.Cog, name="Support Tickets"):
                 ticket.number,
                 getattr(self.bot.user, "id", 0),
                 "canceled",
+                "EyeBot canceled ticket creation after Discord delivery failed.",
             )
             try:
                 if public_message is not None:
                     await public_message.delete()
+                if thread is not None:
+                    await thread.edit(locked=True, archived=True)
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 pass
             raise SupportTicketError(
-                "EyeBot could not deliver the private moderator ticket. No ticket was opened."
+                "EyeBot could not create the private ticket thread. No ticket was opened."
             ) from error
         ticket = self.service.update_delivery(
             guild.id,
             ticket.number,
             public_message_id=public_message.id,
-            mod_message_id=mod_message.id,
+            thread_id=thread.id,
         )
-        self.bot.add_view(TicketControlView(self, ticket), message_id=mod_message.id)
+        self.bot.add_view(
+            TicketControlView(self, ticket),
+            message_id=public_message.id,
+        )
+        await self.audit(
+            guild,
+            f"Ticket `{ticket.number}` was opened by {interaction.user.mention}. "
+            f"Images attached: **{ticket.image_count}**. "
+            f"Message link included: **{'yes' if ticket.message_link else 'no'}**.",
+        )
         self.logger.info(
             f"Support ticket {ticket.number} opened",
             guild_id=guild.id,
         )
         await interaction.followup.send(
-            f"✅ Ticket `{ticket.number}` was opened. Its contents are visible only to server moderators.",
+            f"✅ Ticket `{ticket.number}` was opened. Its contents are in a "
+            "private thread shared with you and server moderators.",
             ephemeral=True,
         )
 
@@ -569,10 +623,13 @@ class Support(commands.Cog, name="Support Tickets"):
         )
         embed.add_field(name="Status", value=ticket.status.title(), inline=True)
         embed.add_field(name="Opened by", value=(opener.mention if opener else f"<@{ticket.opener_id}>"), inline=True)
+        embed.add_field(name="Images", value=str(ticket.image_count), inline=True)
         if ticket.assigned_to:
             embed.add_field(name="Assigned to", value=f"<@{ticket.assigned_to}>", inline=True)
         if ticket.message_link:
             embed.add_field(name="Message link", value=ticket.message_link, inline=False)
+        if ticket.close_note:
+            embed.add_field(name="Closure note", value=ticket.close_note[:1024], inline=False)
         embed.set_footer(text="Ticket controls are restricted to moderators.")
         return embed
 
@@ -581,37 +638,28 @@ class Support(commands.Cog, name="Support Tickets"):
             ticket = self.service.get(interaction.guild_id, number)
             if ticket.status != "open":
                 return await interaction.followup.send(f"❌ Ticket `{number}` is already {ticket.status}.", ephemeral=True)
-            channel = self.support_channel(interaction.guild)
             opener = interaction.guild.get_member(int(ticket.opener_id))
             if opener is None:
                 try:
                     opener = await interaction.guild.fetch_member(int(ticket.opener_id))
                 except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                     return await interaction.followup.send("❌ The ticket opener is no longer available.", ephemeral=True)
-            try:
-                thread = await channel.create_thread(
-                    name=f"{ticket.number.lower()}-support",
-                    type=discord.ChannelType.private_thread,
-                    invitable=False,
-                    auto_archive_duration=self.thread_archive_minutes,
-                    reason=f"Support ticket {ticket.number} assigned by {interaction.user}",
+            thread = await self.resolve_thread(interaction.guild, ticket.thread_id)
+            if thread is None:
+                return await interaction.followup.send(
+                    "❌ The private ticket thread is unavailable.", ephemeral=True
                 )
-                await thread.add_user(opener)
-            except (discord.Forbidden, discord.HTTPException) as error:
-                self.logger.error("Private support thread creation failed: " + self.safe_error(error), guild_id=interaction.guild_id)
-                return await interaction.followup.send("❌ EyeBot could not create the private thread. Check thread permissions.", ephemeral=True)
             ticket = self.service.claim(interaction.guild_id, number, interaction.user.id)
-            ticket = self.service.update_delivery(interaction.guild_id, number, thread_id=thread.id)
-            text = f"## {ticket.number}\n{ticket.description}"
-            if ticket.message_link:
-                text += f"\n\nMessage link: {ticket.message_link}"
             await thread.send(
-                text,
-                suppress_embeds=True,
-                allowed_mentions=discord.AllowedMentions.none(),
+                f"{CLAIM_EMOJI} Ticket assigned to {interaction.user.mention}.",
+                allowed_mentions=discord.AllowedMentions(users=True),
             )
-            await self.update_public_status(interaction.guild, ticket, f"📋 Ticket `{ticket.number}` has been assigned.")
-            await interaction.message.edit(embed=self.ticket_embed(ticket), view=TicketControlView(self, ticket))
+            await self.update_public_status(
+                interaction.guild,
+                ticket,
+                f"📋 Ticket `{ticket.number}` has been assigned.",
+                view=TicketControlView(self, ticket),
+            )
             try:
                 await opener.send(
                     f"📋 Your support ticket `{ticket.number}` has been assigned. Watch the private support thread in **{interaction.guild.name}** for responses; it will be addressed shortly."
@@ -625,13 +673,13 @@ class Support(commands.Cog, name="Support Tickets"):
             )
             await interaction.followup.send(f"✅ Ticket `{ticket.number}` is assigned to you.", ephemeral=True)
 
-    async def resolve_ticket(self, interaction, number):
-        await self.close_ticket(interaction, number, "resolved")
+    async def resolve_ticket(self, interaction, number, note):
+        await self.close_ticket(interaction, number, "resolved", note)
 
-    async def cancel_ticket(self, interaction, number):
-        await self.close_ticket(interaction, number, "canceled")
+    async def cancel_ticket(self, interaction, number, note):
+        await self.close_ticket(interaction, number, "canceled", note)
 
-    async def close_ticket(self, interaction, number, status):
+    async def close_ticket(self, interaction, number, status, note):
         async with self.lock_for(interaction.guild_id, number):
             ticket = self.service.get(interaction.guild_id, number)
             if ticket.status not in ACTIVE_STATUSES:
@@ -639,32 +687,39 @@ class Support(commands.Cog, name="Support Tickets"):
                     f"ℹ️ Ticket `{number}` is already {ticket.status}.",
                     ephemeral=True,
                 )
-            if status == "resolved":
-                privileged = getattr(interaction.user.guild_permissions, "manage_guild", False) or getattr(interaction.user.guild_permissions, "administrator", False)
-                if ticket.status != "assigned":
-                    return await interaction.followup.send("❌ Claim this ticket before resolving it.", ephemeral=True)
-                if ticket.assigned_to != str(interaction.user.id) and not privileged:
-                    return await interaction.followup.send("❌ Only the assigned moderator or a server manager may resolve this ticket.", ephemeral=True)
-            ticket = self.service.close(interaction.guild_id, number, interaction.user.id, status)
+            if ticket.status != "assigned":
+                return await interaction.followup.send("❌ Claim this ticket before closing it.", ephemeral=True)
+            if ticket.assigned_to != str(interaction.user.id):
+                return await interaction.followup.send("❌ Only the assigned moderator may close this ticket.", ephemeral=True)
+            ticket = self.service.close(
+                interaction.guild_id, number, interaction.user.id, status, note
+            )
             guild = interaction.guild
-            transcript = await self.archive_thread(guild, ticket)
+            await self.archive_thread(guild, ticket)
             verb = "resolved" if status == "resolved" else "canceled"
             icon = RESOLVE_EMOJI if status == "resolved" else CANCEL_EMOJI
-            await self.update_public_status(guild, ticket, f"{icon} Ticket `{ticket.number}` has been {verb}.")
+            await self.update_public_status(
+                guild,
+                ticket,
+                f"{icon} Ticket `{ticket.number}` has been {verb}.",
+                view=None,
+            )
             delete_at = datetime.now(timezone.utc) + timedelta(seconds=self.status_delete_seconds)
             ticket = self.service.update_delivery(guild.id, number, public_delete_at=delete_at.isoformat())
             self.schedule_public_delete(guild.id, ticket)
-            await self.update_mod_message(guild, ticket)
             opener = guild.get_member(int(ticket.opener_id))
             if opener:
                 try:
-                    await opener.send(f"{icon} Your support ticket `{ticket.number}` in **{guild.name}** was {verb}.")
+                    await opener.send(
+                        f"{icon} Your support ticket `{ticket.number}` in **{guild.name}** "
+                        f"was {verb}.\n\n**Moderator note:** {ticket.close_note}"
+                    )
                 except (discord.Forbidden, discord.HTTPException):
                     pass
             await self.audit(
                 guild,
-                f"{interaction.user.mention} marked ticket `{ticket.number}` opened by <@{ticket.opener_id}> as {verb}.",
-                file=transcript,
+                f"{interaction.user.mention} marked ticket `{ticket.number}` opened by "
+                f"<@{ticket.opener_id}> as {verb}. Note: {ticket.close_note}",
             )
             self.logger.info(
                 f"Support ticket {ticket.number} marked {verb}",
@@ -675,44 +730,47 @@ class Support(commands.Cog, name="Support Tickets"):
     async def archive_thread(self, guild, ticket):
         if not ticket.thread_id:
             return None
-        thread = guild.get_thread(int(ticket.thread_id)) or self.bot.get_channel(int(ticket.thread_id))
+        thread = await self.resolve_thread(guild, ticket.thread_id)
         if thread is None:
             return None
-        transcript = None
         try:
+            await thread.send(
+                f"{'✅' if ticket.status == 'resolved' else '❌'} Ticket "
+                f"`{ticket.number}` is now {ticket.status}.\n\n"
+                f"**Moderator note:** {ticket.close_note}",
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
             lines = [f"Transcript for {ticket.number}"]
             limit = max(1, min(1000, int(self.settings.get("transcript_max_messages", 500))))
             async for message in thread.history(limit=limit, oldest_first=True):
                 content = str(message.content or "").replace("\r", " ")
                 lines.append(f"[{message.created_at.isoformat()}] {message.author} ({message.author.id}): {content}")
             data = "\n".join(lines).encode("utf-8")[:2_000_000]
-            transcript = discord.File(io.BytesIO(data), filename=f"{ticket.number}-transcript.txt")
             opener = guild.get_member(int(ticket.opener_id))
             if opener is not None:
                 await thread.remove_user(opener)
-            await thread.send(f"🔒 Ticket `{ticket.number}` is now {ticket.status} and this thread is being archived.")
+            await thread.send(
+                f"🔒 Ticket `{ticket.number}` is being archived.",
+                file=discord.File(
+                    io.BytesIO(data),
+                    filename=f"{ticket.number}-transcript.txt",
+                ),
+            )
             await thread.edit(locked=True, archived=True, reason=f"Support ticket {ticket.number} closed")
         except (discord.Forbidden, discord.HTTPException) as error:
             self.logger.error("Support ticket thread archival failed: " + self.safe_error(error), guild_id=guild.id)
-        return transcript
+        return None
 
-    async def update_public_status(self, guild, ticket, content):
+    async def update_public_status(self, guild, ticket, content, *, view=UNSET_VIEW):
         channel = self.support_channel(guild)
         if channel is None or not ticket.public_message_id:
             return
         try:
             message = await channel.fetch_message(int(ticket.public_message_id))
-            await message.edit(content=content)
-        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-            pass
-
-    async def update_mod_message(self, guild, ticket):
-        channel = self.mod_channel(guild)
-        if channel is None or not ticket.mod_message_id:
-            return
-        try:
-            message = await channel.fetch_message(int(ticket.mod_message_id))
-            await message.edit(embed=self.ticket_embed(ticket), view=TicketControlView(self, ticket))
+            kwargs = {"content": content}
+            if view is not UNSET_VIEW:
+                kwargs["view"] = view
+            await message.edit(**kwargs)
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             pass
 
@@ -771,16 +829,36 @@ class Support(commands.Cog, name="Support Tickets"):
         return ticket
 
     @app_commands.command(name="resolved", description="Resolve an assigned support ticket")
-    @app_commands.describe(ticketnumber="Ticket number; optional inside its private thread")
+    @app_commands.describe(
+        reason="Brief description of the resolution",
+        ticketnumber="Ticket number; optional inside its private thread",
+    )
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_messages=True)
-    async def resolved(self, interaction, ticketnumber: str | None = None):
+    async def resolved(self, interaction, reason: str, ticketnumber: str | None = None):
         if not is_moderator(interaction.user):
             return await interaction.response.send_message("❌ Moderator permission is required.", ephemeral=True)
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             ticket = self.ticket_from_context(interaction, ticketnumber)
-            await self.resolve_ticket(interaction, ticket.number)
+            await self.resolve_ticket(interaction, ticket.number, reason)
+        except SupportTicketError as error:
+            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+
+    @app_commands.command(name="cancel", description="Cancel an assigned support ticket")
+    @app_commands.describe(
+        reason="Brief reason for cancellation",
+        ticketnumber="Ticket number; optional inside its private thread",
+    )
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_messages=True)
+    async def cancel(self, interaction, reason: str, ticketnumber: str | None = None):
+        if not is_moderator(interaction.user):
+            return await interaction.response.send_message("❌ Moderator permission is required.", ephemeral=True)
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            ticket = self.ticket_from_context(interaction, ticketnumber)
+            await self.cancel_ticket(interaction, ticket.number, reason)
         except SupportTicketError as error:
             await interaction.followup.send(f"❌ {error}", ephemeral=True)
 
@@ -819,11 +897,52 @@ class Support(commands.Cog, name="Support Tickets"):
             return await interaction.response.send_message("❌ Manage Server permission is required.", ephemeral=True)
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
-            ticket = self.service.reopen(interaction.guild_id, ticketnumber, interaction.user.id)
+            closed_ticket = self.service.get(interaction.guild_id, ticketnumber)
             channel = self.support_channel(interaction.guild)
-            public = await channel.send(f"🎫 Ticket `{ticket.number}` has been reopened.")
+            thread = await self.resolve_thread(
+                interaction.guild,
+                closed_ticket.thread_id,
+            )
+            if thread is None:
+                raise SupportTicketError(
+                    "The original private ticket thread is unavailable."
+                )
+            ticket = self.service.reopen(
+                interaction.guild_id,
+                ticketnumber,
+                interaction.user.id,
+            )
+            await thread.edit(
+                archived=False,
+                locked=False,
+                reason=f"Support ticket {ticket.number} reopened",
+            )
+            opener = interaction.guild.get_member(int(ticket.opener_id))
+            if opener is not None:
+                await thread.add_user(opener)
+            await thread.send(
+                f"🔓 Ticket `{ticket.number}` was reopened by "
+                f"{interaction.user.mention}.",
+                allowed_mentions=discord.AllowedMentions(users=True),
+            )
+            if opener is not None:
+                try:
+                    await opener.send(
+                        f"🔓 Your support ticket `{ticket.number}` in "
+                        f"**{interaction.guild.name}** was reopened. Watch the "
+                        "private support thread for further responses."
+                    )
+                except (discord.Forbidden, discord.HTTPException):
+                    pass
+            public = await channel.send(
+                f"🎫 Ticket `{ticket.number}` has been reopened.",
+                view=TicketControlView(self, ticket),
+            )
             ticket = self.service.update_delivery(interaction.guild_id, ticket.number, public_message_id=public.id)
-            await self.update_mod_message(interaction.guild, ticket)
+            self.bot.add_view(
+                TicketControlView(self, ticket),
+                message_id=public.id,
+            )
             await self.audit(interaction.guild, f"{interaction.user.mention} reopened ticket `{ticket.number}` opened by <@{ticket.opener_id}>.")
             await interaction.followup.send(f"✅ Ticket `{ticket.number}` was reopened.", ephemeral=True)
         except SupportTicketError as error:

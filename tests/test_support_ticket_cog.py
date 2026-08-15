@@ -5,7 +5,13 @@ from types import SimpleNamespace
 import discord
 from discord.ext import commands
 
-from cogs.support import Support, TicketControlView, TicketModal, download_ticket_images
+from cogs.support import (
+    Support,
+    TicketCloseModal,
+    TicketControlView,
+    TicketModal,
+    download_ticket_images,
+)
 from services.supportTicketService import SupportTicket
 
 
@@ -56,7 +62,7 @@ class SupportTicketCogTests(unittest.IsolatedAsyncioTestCase):
 
             names = {command.name for command in bot.tree.get_commands()}
             self.assertTrue(
-                {"ticket", "ticket-setup", "resolved", "ticket-status", "ticket-list", "ticket-reopen"}
+                {"ticket", "ticket-setup", "resolved", "cancel", "ticket-status", "ticket-list", "ticket-reopen"}
                 <= names
             )
             await bot.close()
@@ -81,7 +87,7 @@ class SupportTicketCogTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_ticket_controls_disable_after_final_state(self):
         open_ticket = SupportTicket(
-            number="TICKET-000001",
+            number="T-000001",
             guild_id="42",
             opener_id="7",
             description="A sufficiently long ticket description.",
@@ -96,6 +102,16 @@ class SupportTicketCogTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(open_view.children[0].disabled)
         self.assertTrue(all(item.disabled for item in closed_view.children))
+
+    async def test_close_modal_requires_a_brief_note(self):
+        cog = FakeCog()
+        cog.maximum_close_note_length = 1000
+
+        modal = TicketCloseModal(cog, "T-000001", "resolve")
+
+        self.assertEqual(modal.note_input.min_length, 5)
+        self.assertEqual(modal.note_input.max_length, 1000)
+        self.assertTrue(modal.note_input.required)
 
 
 if __name__ == "__main__":

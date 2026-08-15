@@ -799,8 +799,9 @@ Each user may have at most three open or assigned tickets. The ticket modal
 accepts a required description, an optional same-server Discord message link,
 and up to four optional PNG, JPEG, GIF, or WebP images. Ephemeral modal uploads
 are downloaded immediately, validated, re-encoded without metadata, and posted
-only to the configured moderator log channel. Message-link previews are
-suppressed.
+inside the ticket's private support thread. Message-link previews are
+suppressed. The description, optional link, images, discussion, and closing
+transcript therefore remain together in one private location.
 
 Run `/ticket-setup` with moderator permissions to select an existing standard
 text channel, create `#support_tickets`, or disable tickets. A moderator log
@@ -809,26 +810,39 @@ stored in the individual guild YAML file; ticket records are stored atomically
 under `data/guilds/.tickets/` and recover from their own backup files.
 
 The public support channel shows only the ticket number and state—it never
-identifies the opener. The moderator ticket contains the opener, description,
-optional link, and images, together with these controls:
+identifies the opener. Its ticket status message contains the persistent
+moderator controls. The moderator log receives a compact opening record with
+the opener, ticket number, image count, and whether a message link was included;
+it does not receive the description, link, or images.
 
-- 📋 **Assign** — atomically assigns the ticket, creates a private support
-  thread, adds the opener, notifies them by DM, and updates the public status.
-- ✅ **Resolve** — resolves an assigned ticket, exports a bounded transcript to
-  the moderator channel, removes the opener, locks and archives the thread,
-  and deletes the public status after 30 seconds.
-- ❌ **Cancel** — requires confirmation, cancels the ticket, performs the same
-  privacy cleanup, and deletes the public status after 30 seconds.
+- 📋 **Assign** — atomically assigns the ticket, records the assignee in the
+  existing private thread, notifies the opener by DM, and updates the public
+  status.
+- ✅ **Resolve** — prompts the assigned moderator for a required resolution
+  description, resolves the ticket, places a bounded transcript in
+  the private thread, removes the opener, locks and archives the thread, removes
+  the controls, and deletes the public status after 30 seconds.
+- ❌ **Cancel** — prompts the assigned moderator for a required cancellation
+  reason, cancels the ticket, performs the same
+  privacy cleanup, removes the controls, and deletes the public status after 30
+  seconds.
+
+EyeBot creates the private thread as soon as the ticket is submitted and adds
+the opener immediately. Reopening a ticket unlocks and unarchives its original
+thread, re-adds the opener, posts the identity of the moderator who reopened
+it, and publishes a new anonymous status message with restored controls.
 
 Moderator application commands:
 
 | Command | Purpose |
 | --- | --- |
-| `/resolved` | Resolve the ticket associated with the current private thread |
-| `/resolved ticketnumber:TICKET-000001` | Resolve a ticket from another channel |
-| `/ticket-status ticketnumber:TICKET-000001` | Privately display one ticket's state |
+| `/resolved reason:<description>` | Resolve the ticket associated with the current private thread |
+| `/resolved reason:<description> ticketnumber:T-000001` | Resolve a ticket from another channel |
+| `/cancel reason:<description>` | Cancel the ticket associated with the current private thread |
+| `/cancel reason:<description> ticketnumber:T-000001` | Cancel a ticket from another channel |
+| `/ticket-status ticketnumber:T-000001` | Privately display one ticket's state |
 | `/ticket-list` | Privately list active tickets without their descriptions |
-| `/ticket-reopen ticketnumber:TICKET-000001` | Reopen a closed ticket; requires Manage Server |
+| `/ticket-reopen ticketnumber:T-000001` | Reopen a closed ticket; requires Manage Server |
 
 Support ticket runtime limits are global defaults in `config.yaml`:
 
@@ -837,6 +851,7 @@ support_tickets:
   enabled: true
   max_open_per_user: 3
   max_description_length: 4000
+  max_close_note_length: 1000
   max_images: 4
   max_image_bytes: 5242880
   max_total_image_bytes: 15728640
