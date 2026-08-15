@@ -1,10 +1,23 @@
 import unittest
 
-from cogs.bugreport import BugReportView, ReportModal
+import discord
+
+from cogs.bugreport import BugReportView, ReportModal, download_attachments
+from services.bugReportService import ReportAttachment
 
 
 class FakeService:
-    settings = {"max_explanation_length": 4000}
+    settings = {
+        "max_explanation_length": 4000,
+        "max_attachments": 3,
+        "max_attachment_bytes": 1024,
+    }
+
+    def __init__(self):
+        self.validated_attachments = None
+
+    def validate_attachments(self, attachments):
+        self.validated_attachments = tuple(attachments)
 
     @staticmethod
     def safe_error(error):
@@ -56,6 +69,19 @@ class FakeInteraction:
         self.followup = FakeFollowup()
 
 
+class FakeAttachment:
+    def __init__(self, filename="proof.png", content_type="image/png", data=b"png"):
+        self.filename = filename
+        self.content_type = content_type
+        self.data = data
+        self.size = len(data)
+        self.read_count = 0
+
+    async def read(self, *, use_cached=False):
+        self.read_count += 1
+        return self.data
+
+
 def build_view():
     return BugReportView(
         service=FakeService(),
@@ -89,10 +115,44 @@ class BugReportInteractionTests(unittest.IsolatedAsyncioTestCase):
         for report_type in ("bug", "feature", "other"):
             with self.subTest(report_type=report_type):
                 modal = ReportModal(view, report_type)
-                for component in modal.to_components():
-                    text_input = component["components"][0]
-                    placeholder = text_input.get("placeholder", "")
-                    self.assertLessEqual(len(placeholder), 100)
+                for label in modal.children:
+                    self.assertIsInstance(label, discord.ui.Label)
+                    component = label.component
+                    if isinstance(component, discord.ui.TextInput):
+                        self.assertLessEqual(len(component.placeholder or ""), 100)
+
+    async def test_modal_uses_labels_and_optional_bounded_file_upload(self):
+        view = build_view()
+
+        bug_modal = ReportModal(view, "bug")
+        self.assertEqual(len(bug_modal.children), 5)
+        self.assertIsInstance(bug_modal.attachments_input, discord.ui.FileUpload)
+        self.assertFalse(bug_modal.attachments_input.required)
+        self.assertEqual(bug_modal.attachments_input.min_values, 0)
+        self.assertEqual(bug_modal.attachments_input.max_values, 3)
+
+        feature_modal = ReportModal(view, "feature")
+        self.assertEqual(len(feature_modal.children), 3)
+
+    async def test_legacy_attachments_reduce_modal_upload_capacity(self):
+        view = build_view()
+        view.attachments = (
+            ReportAttachment("legacy.png", "image/png", b"png"),
+        )
+
+        modal = ReportModal(view, "bug")
+
+        self.assertEqual(modal.attachments_input.max_values, 2)
+
+    async def test_ephemeral_modal_attachment_is_downloaded_immediately(self):
+        service = FakeService()
+        attachment = FakeAttachment()
+
+        result = await download_attachments(service, [attachment])
+
+        self.assertEqual(attachment.read_count, 1)
+        self.assertEqual(result[0].filename, "proof.png")
+        self.assertEqual(service.validated_attachments, result)
 
     async def test_report_type_failure_returns_response_and_is_logged(self):
         view = build_view()

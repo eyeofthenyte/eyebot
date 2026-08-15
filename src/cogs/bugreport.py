@@ -22,6 +22,46 @@ GENERIC_FAILURE = (
 )
 
 
+async def download_attachments(
+    service: BugReportService, source
+) -> tuple[ReportAttachment, ...]:
+    """Immediately download and validate Discord attachments.
+
+    Modal uploads are ephemeral, so no Discord URL is retained for later use.
+    """
+    configured_count = max(
+        0, min(10, int(service.settings.get("max_attachments", 3)))
+    )
+    if len(source) > configured_count:
+        raise BugReportError(
+            f"A report may contain at most {configured_count} attachments."
+        )
+    maximum_each = max(
+        1, int(service.settings.get("max_attachment_bytes", 5_242_880))
+    )
+    results = []
+    for attachment in source:
+        if attachment.size > maximum_each:
+            raise BugReportError(
+                f"Attachment `{attachment.filename}` exceeds the per-file size limit."
+            )
+        content_type = str(
+            attachment.content_type
+            or mimetypes.guess_type(attachment.filename)[0]
+            or "application/octet-stream"
+        ).split(";", 1)[0].casefold()
+        results.append(
+            ReportAttachment(
+                filename=attachment.filename,
+                content_type=content_type,
+                data=await attachment.read(use_cached=True),
+            )
+        )
+    selected = tuple(results)
+    service.validate_attachments(selected)
+    return selected
+
+
 class ReportModal(discord.ui.Modal):
     def __init__(self, view: "BugReportView", report_type: str):
         super().__init__(title=REPORT_TYPES[report_type][0], timeout=900)
@@ -31,21 +71,24 @@ class ReportModal(discord.ui.Modal):
         self.command_input = None
         if report_type == "bug":
             self.platform_input = discord.ui.TextInput(
-                label="Platform",
                 placeholder="Discord, Twitch, Kick, Instagram, etc.",
                 required=True,
                 max_length=100,
             )
             self.command_input = discord.ui.TextInput(
-                label="Command being used",
                 placeholder="Example: !roll 1d20 or !platform twitch enable",
                 required=True,
                 max_length=200,
             )
-            self.add_item(self.platform_input)
-            self.add_item(self.command_input)
+            self.add_item(
+                discord.ui.Label(text="Platform", component=self.platform_input)
+            )
+            self.add_item(
+                discord.ui.Label(
+                    text="Command being used", component=self.command_input
+                )
+            )
         self.explanation_input = discord.ui.TextInput(
-            label="Explanation",
             placeholder=(
                 "Describe what happened, what you expected, and how to reproduce it. "
                 "Do not include secrets."
@@ -56,13 +99,40 @@ class ReportModal(discord.ui.Modal):
             max_length=view.maximum_explanation_length,
         )
         self.email_input = discord.ui.TextInput(
-            label="Contact email (optional)",
             placeholder="name@example.com",
             required=False,
             max_length=254,
         )
-        self.add_item(self.explanation_input)
-        self.add_item(self.email_input)
+        self.add_item(
+            discord.ui.Label(text="Explanation", component=self.explanation_input)
+        )
+        self.add_item(
+            discord.ui.Label(
+                text="Contact email (optional)", component=self.email_input
+            )
+        )
+        self.attachments_input = None
+        remaining_attachments = max(
+            0,
+            self.report_view.maximum_attachments
+            - len(self.report_view.attachments),
+        )
+        if remaining_attachments:
+            self.attachments_input = discord.ui.FileUpload(
+                required=False,
+                min_values=0,
+                max_values=remaining_attachments,
+            )
+            self.add_item(
+                discord.ui.Label(
+                    text="Attachments (optional)",
+                    description=(
+                        "Upload screenshots, logs, PDFs, or text files. Remove "
+                        "visible passwords and tokens first."
+                    ),
+                    component=self.attachments_input,
+                )
+            )
 
     async def on_submit(self, interaction: discord.Interaction):
         if not await self.report_view.claim_submission():
@@ -73,6 +143,11 @@ class ReportModal(discord.ui.Modal):
         service = self.report_view.service
         report = None
         try:
+            modal_attachments = await download_attachments(
+                service,
+                self.attachments_input.values if self.attachments_input else (),
+            )
+            attachments = self.report_view.attachments + modal_attachments
             report = service.build_report(
                 report_type=self.report_type,
                 origin_name=self.report_view.origin_name,
@@ -85,7 +160,7 @@ class ReportModal(discord.ui.Modal):
                 command=(self.command_input.value if self.command_input else ""),
                 explanation=self.explanation_input.value,
                 contact_email=self.email_input.value,
-                attachments=self.report_view.attachments,
+                attachments=attachments,
             )
             await service.send(report)
         except BugReportError as error:
@@ -221,6 +296,9 @@ class BugReportView(discord.ui.View):
         self.channel_name = channel_name
         self.channel_id = str(channel_id)
         self.attachments = tuple(attachments)
+        self.maximum_attachments = max(
+            0, min(10, int(service.settings.get("max_attachments", 3)))
+        )
         self.maximum_explanation_length = min(
             4000,
             max(100, int(service.settings.get("max_explanation_length", 4000))),
@@ -292,47 +370,15 @@ class BugReportCog(commands.Cog, name="Bug Reports"):
             guild_id=guild_id,
         )
 
-    async def _attachments(self, source) -> tuple[ReportAttachment, ...]:
-        configured_count = max(
-            0, min(10, int(self.service.settings.get("max_attachments", 3)))
-        )
-        if len(source) > configured_count:
-            raise BugReportError(
-                f"A report may contain at most {configured_count} attachments."
-            )
-        maximum_each = max(
-            1, int(self.service.settings.get("max_attachment_bytes", 5_242_880))
-        )
-        results = []
-        for attachment in source:
-            if attachment.size > maximum_each:
-                raise BugReportError(
-                    f"Attachment `{attachment.filename}` exceeds the per-file size limit."
-                )
-            content_type = str(
-                attachment.content_type
-                or mimetypes.guess_type(attachment.filename)[0]
-                or "application/octet-stream"
-            ).split(";", 1)[0].casefold()
-            results.append(
-                ReportAttachment(
-                    filename=attachment.filename,
-                    content_type=content_type,
-                    data=await attachment.read(use_cached=True),
-                )
-            )
-        selected = tuple(results)
-        self.service.validate_attachments(selected)
-        return selected
-
     @commands.command(
         name="bugreport",
         extras=[
             "🐛  **__Bug Report__**",
             "**Usage:** `!bugreport`\n"
             "EyeBot sends a private DM containing a report-type selector and "
-            "structured form. Attach up to the configured limit of PNG, JPEG, "
-            "GIF, WebP, PDF, or text files to the original command message. "
+            "structured form. Upload up to the configured limit of PNG, JPEG, "
+            "GIF, WebP, PDF, or text files while completing the form. Files on "
+            "the original command remain supported temporarily. "
             "Never include passwords, tokens, or other credentials.",
         ],
     )
@@ -341,7 +387,9 @@ class BugReportCog(commands.Cog, name="Bug Reports"):
         if not self.service.enabled:
             return await ctx.send("❌ Bug reporting is not currently available.")
         try:
-            attachments = await self._attachments(ctx.message.attachments)
+            attachments = await download_attachments(
+                self.service, ctx.message.attachments
+            )
             guild = ctx.guild
             origin_name = guild.name if guild else "Direct Message"
             channel_name = getattr(ctx.channel, "name", None) or "Direct Message"
@@ -371,7 +419,8 @@ class BugReportCog(commands.Cog, name="Bug Reports"):
             embed.add_field(
                 name="Attachments",
                 value=(
-                    f"{len(attachments)} attachment(s) captured from the command. "
+                    f"{len(attachments)} attachment(s) captured from the command; "
+                    "you may add more in the form up to the configured total. "
                     "Remove passwords, tokens, private keys, and visible credentials "
                     "from screenshots before submitting."
                 ),
@@ -409,7 +458,14 @@ class BugReportCog(commands.Cog, name="Bug Reports"):
             guild_id=ctx.guild.id if ctx.guild else None,
         )
         if ctx.guild:
-            await ctx.send("📨 Check your DMs to complete the EyeBot report form.")
+            try:
+                await ctx.message.delete()
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                pass
+            await ctx.send(
+                "📨 Check your DMs to complete the EyeBot report form.",
+                delete_after=10,
+            )
 
 
 async def setup(bot):

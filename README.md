@@ -763,12 +763,23 @@ have 2-Step Verification enabled before an App Password can be created.
 Do not put an SMTP password in `config.yaml` or `platforms.yaml`. Restart EyeBot
 after changing configuration or encrypted credentials.
 
-Users may attach allowed files to the original `!bugreport` command. Discord
-modals cannot accept file uploads, so attachments cannot be added after the DM
-form opens. EyeBot enforces attachment count, individual size, combined size,
-extension, declared MIME type, and binary signature. Text attachments are
-redacted before email delivery. Users must remove visible credentials from
-screenshots and PDFs because text redaction cannot inspect pixels.
+Users may upload allowed files directly in the private report modal. EyeBot
+downloads these ephemeral Discord attachments immediately during submission
+and retains its configured maximum of three files by default, even though
+Discord supports up to ten. Attachments on the original `!bugreport` message
+remain temporarily supported for backward compatibility and count toward the
+same configured maximum. EyeBot enforces attachment count, individual size,
+combined size, extension, declared MIME type, and binary signature. Text
+attachments are redacted before email delivery. Users must remove visible
+credentials from screenshots and PDFs because text redaction cannot inspect
+pixels.
+
+In guild channels, EyeBot attempts to delete the invoking `!bugreport` message
+after successfully sending the private form. This requires the **Manage
+Messages** permission. The channel acknowledgement is deleted automatically
+after ten seconds. Prefix-command replies cannot be ephemeral; only Discord
+interaction responses, such as slash-command responses and modal submissions,
+support the ephemeral flag.
 
 Every submission receives a traceable ID such as
 `BUG-20260815-143000-A1B2C3`. The report body and contact email are never placed
