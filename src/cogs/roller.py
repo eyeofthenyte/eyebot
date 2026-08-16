@@ -629,6 +629,7 @@ class Roll(commands.Cog):
     # ---------------------------------------
     # DM Channel
     # ---------------------------------------
+    @commands.command(name="set_dm")
     async def set_dm(self, ctx):
         """
         Interactive setup for the DM system.
@@ -661,7 +662,7 @@ class Roll(commands.Cog):
         dm_role_name = self.config[guild_id].get("dm_role", "UNSET")
         dm_channel_id = self.config[guild_id].get("dm_channel", "UNSET")
 
-        dm_role_obj = discord.utils.get(guild.roles, name=dm_role_name) if dm_role_name != "UNSET" else None
+        dm_role_obj = discord.utils.get(guild.roles, name=dm_role_name) if dm_role_name not in (None, "", "UNSET") else None
         dm_channel_obj = guild.get_channel(int(dm_channel_id)) if dm_channel_id != "UNSET" else None
 
         is_admin = ctx.author.guild_permissions.administrator
@@ -817,6 +818,7 @@ class Roll(commands.Cog):
     #----------------------------
     # User Private Roll Channels
     #----------------------------
+    @commands.command()
     async def privateroll(self, ctx, action: str = None, channel: discord.TextChannel = None, target_user: discord.Member = None):
         """Manage private roll channels.
 
@@ -934,7 +936,7 @@ class Roll(commands.Cog):
 
         recipients = [ctx.author]
         dm_role_name = guild_config.get("dm_role", "UNSET")
-        if dm_role_name != "UNSET":
+        if dm_role_name not in (None, "", "UNSET"):
             role = discord.utils.get(ctx.guild.roles, name=dm_role_name)
             if role:
                 recipients.extend(role.members)
@@ -968,7 +970,7 @@ class Roll(commands.Cog):
         dm_role_name = guild_config.get("dm_role", "UNSET")
         role = (
             discord.utils.get(ctx.guild.roles, name=dm_role_name)
-            if dm_role_name != "UNSET"
+            if dm_role_name not in (None, "", "UNSET")
             else None
         )
 

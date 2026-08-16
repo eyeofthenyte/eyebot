@@ -1,6 +1,6 @@
 # EyeBot
 
-Current release: **2.1.0**
+Current release: **2.0.0**
 
 EyeBot is a Python bot framework for tabletop-RPG utilities and shared chat
 commands. Discord and Twitch are currently implemented. A platform-neutral
@@ -344,7 +344,6 @@ Supported secret parameters:
 | Instagram | `app_id`, `app_secret`, `access_token`, `refresh_token`, `webhook_verify_token` |
 | Substack | `email`, `credential` |
 | Ko-fi | `verification_token` |
-| Email | `smtp_username`, `smtp_password` |
 
 Direct entrypoints do not provide overall process supervision.
 
@@ -604,15 +603,7 @@ files to existing cogs as one guild mapping.
 | `public_media.cleanup_interval_seconds` | Expiration scan interval | `3600` |
 | `public_media.max_bytes_per_guild` | Independent storage quota for each guild | `1073741824` |
 | `logging.level` | Configured logging level | `DEBUG` |
-| `logging.output` | `terminal`, `syslog`, `both`, or a legacy file path | `both` |
-| `logging.global_directory` | Folder for service-wide logs | `/app/data/logs/global` |
-| `logging.global_file` | Active global filename supporting `{name}` | `{name}.txt` |
-| `logging.guild_logs_enabled` | Also write records associated with a guild to its folder | `true` |
-| `logging.guild_directory` | Root folder for guild-specific logs | `/app/data/logs/guilds` |
-| `logging.guild_file` | Guild service filename supporting `{platform}` and `{name}` | `{platform}.txt` |
-| `logging.max_bytes` | Maximum size of each active log before rotation | `10485760` |
-| `logging.archive_days` | Completed backup window included in each ZIP archive | `30` |
-| `logging.archive_count` | Number of ZIP archives retained in each folder | `2` |
+| `logging.output` | Log filename or `syslog` | `output.log` |
 
 Examples in this guide use `!`. This is also the default for newly discovered
 Discord guilds. A server can override it with `!setprefix <prefix>` and return
@@ -712,240 +703,23 @@ connectivity check. Discord-only administration is not exposed on Twitch.
 Attachments and everything beginning with `| Attachments:` are omitted from
 non-Discord command output.
 
-### Discord bug reports
-
-`!bugreport` is deliberately Discord-only and is not registered with the
-platform-neutral command router. It sends the requesting user a DM containing
-the originating guild name, instructions, and a selector for Bug Report,
-Feature Request, or Other. Bug reports additionally request the affected
-platform and command. Every form requests a Discord-safe explanation of at
-most 4,000 characters and an optional contact email address.
-
-Configure SMTP delivery in `config.yaml`:
-
-```yaml
-bug_reports:
-  enabled: true
-  recipient: eyebotdev@gmail.com
-  sender: eyebotdev@gmail.com
-  subject_prefix: "[EyeBot Report]"
-  smtp_host: smtp.gmail.com
-  smtp_port: 587
-  smtp_starttls: true
-  smtp_ssl: false
-  smtp_timeout: 15
-  cooldown_seconds: 300
-  max_explanation_length: 4000
-  max_attachments: 3
-  max_attachment_bytes: 5242880
-  max_total_attachment_bytes: 10485760
-  allowed_attachment_types:
-    - image/png
-    - image/jpeg
-    - image/gif
-    - image/webp
-    - application/pdf
-    - text/plain
-```
-
-Store SMTP authentication in the encrypted global secret store:
-
-```bash
-docker compose run --rm --no-deps eyebot python src/manage_secrets.py set email smtp_username
-docker compose run --rm --no-deps eyebot python src/manage_secrets.py set email smtp_password
-```
-
-For the EyeBot Gmail mailbox, enter `eyebotdev@gmail.com` as the SMTP
-username. Enter a dedicated Google App Password as the SMTP password; never
-enter the mailbox's normal Google Account password. The Google Account must
-have 2-Step Verification enabled before an App Password can be created.
-
-Do not put an SMTP password in `config.yaml` or `platforms.yaml`. Restart EyeBot
-after changing configuration or encrypted credentials.
-
-Users may upload allowed files directly in the private report modal. EyeBot
-downloads these ephemeral Discord attachments immediately during submission
-and retains its configured maximum of three files by default, even though
-Discord supports up to ten. Attachments on the original `!bugreport` message
-remain temporarily supported for backward compatibility and count toward the
-same configured maximum. EyeBot enforces attachment count, individual size,
-combined size, extension, declared MIME type, and binary signature. Text
-attachments are redacted before email delivery. Users must remove visible
-credentials from screenshots and PDFs because text redaction cannot inspect
-pixels.
-
-In guild channels, EyeBot attempts to delete the invoking `!bugreport` message
-after successfully sending the private form. This requires the **Manage
-Messages** permission. The channel acknowledgement is deleted automatically
-after ten seconds. Prefix-command replies cannot be ephemeral; only Discord
-interaction responses, such as slash-command responses and modal submissions,
-support the ephemeral flag.
-
-Every submission receives a traceable ID such as
-`BUG-20260815-143000-A1B2C3`. The report body and contact email are never placed
-in logs. Audit logs contain only the report ID, type, Discord user ID, and guild
-association. Known configured secrets and common token/password patterns are
-redacted from form fields, text attachments, and diagnostic errors. SMTP work
-runs outside the Discord event loop and has a bounded timeout.
-
-Discord does not expose a guild member's account email to a bot token. The
-optional address is therefore entered privately by the user in the modal; it
-is not collected automatically.
-
-### Discord support tickets
-
-EyeBot provides a Discord-only private support workflow through `/ticket`.
-Each user may have at most three open or assigned tickets. The ticket modal
-accepts a required description, an optional same-server Discord message link,
-and up to four optional PNG, JPEG, GIF, or WebP images. Ephemeral modal uploads
-are downloaded immediately, validated, re-encoded without metadata, and posted
-inside the ticket's private support thread. Message-link previews are
-suppressed. The description, optional link, images, discussion, and closing
-transcript therefore remain together in one private location.
-
-Run `/ticket-setup` with moderator permissions to select an existing standard
-text channel, create `#support_tickets`, or disable tickets. A moderator log
-channel must already be configured with `!setmodchannel`. Ticket setup is
-stored in the individual guild YAML file; ticket records are stored atomically
-under `data/guilds/.tickets/` and recover from their own backup files.
-
-The public support channel shows only the ticket number and state—it never
-identifies the opener. Its ticket status message contains the persistent
-moderator controls. The moderator log receives a compact opening record with
-the opener, ticket number, image count, and whether a message link was included;
-it does not receive the description, link, or images.
-
-Whenever a moderator creates or selects the support-ticket channel, EyeBot
-posts a two-column embed containing user instructions and moderator commands.
-The selected channel must allow EyeBot to send messages and embed links.
-
-- 📋 **Assign** — atomically assigns the ticket, records the assignee in the
-  existing private thread, notifies the opener by DM, and updates the public
-  status.
-- ✅ **Resolve** — prompts the assigned moderator for a required resolution
-  description, resolves the ticket, places a bounded transcript in
-  the private thread, removes the opener, locks and archives the thread, removes
-  the controls, and deletes the public status after 30 seconds.
-- ❌ **Cancel** — prompts the assigned moderator for a required cancellation
-  reason, cancels the ticket, performs the same
-  privacy cleanup, removes the controls, and deletes the public status after 30
-  seconds.
-
-EyeBot creates the private thread as soon as the ticket is submitted and adds
-the opener immediately. Reopening a ticket unlocks and unarchives its original
-thread, re-adds the opener, posts the identity of the moderator who reopened
-it, and publishes a new anonymous status message with restored controls.
-
-Moderator application commands:
-
-| Command | Purpose |
-| --- | --- |
-| `/resolved reason:<description>` | Resolve the ticket associated with the current private thread |
-| `/resolved reason:<description> ticketnumber:T-000001` | Resolve a ticket from another channel |
-| `/cancel reason:<description>` | Cancel the ticket associated with the current private thread |
-| `/cancel reason:<description> ticketnumber:T-000001` | Cancel a ticket from another channel |
-| `/ticket-status ticketnumber:T-000001` | Privately display one ticket's state |
-| `/ticket-list` | Privately list active tickets without their descriptions |
-| `/ticket-reopen ticketnumber:T-000001` | Reopen a closed ticket; requires Manage Server |
-| `/ticket-guide` | Repost the user and moderator guide in the configured support channel |
-
-Support-ticket audit entries use plain Discord account usernames instead of
-member mentions or server nicknames. EyeBot disables mentions and uses
-Discord's silent-notification flag for these moderator-log messages.
-
-Support ticket runtime limits are global defaults in `config.yaml`:
-
-```yaml
-support_tickets:
-  enabled: true
-  max_open_per_user: 3
-  max_description_length: 4000
-  max_close_note_length: 1000
-  max_images: 4
-  max_image_bytes: 5242880
-  max_total_image_bytes: 15728640
-  max_image_pixels: 40000000
-  status_delete_seconds: 30
-  thread_auto_archive_minutes: 1440
-  transcript_max_messages: 500
-  opening_cooldown_seconds: 60
-```
-
-EyeBot requires **View Channels**, **Send Messages**, **Manage Channels**,
-**Manage Messages**, **Create Private Threads**, **Send Messages in Threads**,
-**Manage Threads**, **Read Message History**, **Attach Files**, and **Embed
-Links** for the configured support and moderator channels. Moderators who need
-access to every private ticket thread require **Manage Threads**. If the bot
-cannot DM a ticket opener, the ticket remains valid and updates continue in the
-private thread.
-
-The bot installation must include both the `bot` and `applications.commands`
-OAuth scopes so Discord can register and display the slash commands.
-
 ### Google Sheets
 
 In `config.yaml`:
 
 ```yaml
 google_sheets:
-  credentials_file: /app/service_account.json
-  cache_ttl: 21600
-  stale_ttl: 604800
-  preload: true
-  refresh_in_background: true
-  refresh_interval: 21600
-  persistent_cache_dir: /app/data/cache/google_sheets
+  credentials_file: service_account.json
+  cache_ttl: 300
 ```
 
 | Key | Required | Meaning |
 | --- | --- | --- |
 | `google_sheets.credentials_file` | For Sheets-backed commands | Path to the service-account JSON |
-| `google_sheets.cache_ttl` | No | Fresh in-memory/disk cache lifetime in seconds; defaults to 6 hours |
-| `google_sheets.stale_ttl` | No | Maximum age of usable cached data; defaults to 7 days |
-| `google_sheets.preload` | No | Warm every registered command workbook when the bot process starts |
-| `google_sheets.refresh_in_background` | No | Serve stale data immediately while refreshing it asynchronously |
-| `google_sheets.refresh_interval` | No | Proactive refresh interval in seconds; defaults to 6 hours |
-| `google_sheets.persistent_cache_dir` | No | Snapshot directory retained across container restarts |
+| `google_sheets.cache_ttl` | No | Worksheet cache lifetime in seconds |
 
 `GOOGLE_SERVICE_ACCOUNT_FILE` can supply the credential path when
 `credentials_file` is omitted.
-
-### Logging destinations
-
-EyeBot can write each message to Docker's terminal output and a rotating file
-at the same time:
-
-```yaml
-logging:
-  level: INFO
-  output: both
-  global_directory: /app/data/logs/global
-  global_file: "{name}.txt"
-  guild_logs_enabled: true
-  guild_directory: /app/data/logs/guilds
-  guild_file: "{platform}.txt"
-  max_bytes: 10485760
-  archive_days: 30
-  archive_count: 2
-```
-
-`{name}` creates separate active files such as `discord.txt`, `gateway.txt`,
-and `kick.txt`, avoiding several processes writing the same file. Records tied
-to a guild are written both globally and beneath
-`guilds/<guild_id>/<platform>.txt`. The Compose `log-data` volume retains these
-files when the container is recreated. Use
-`output: terminal` (or the backward-compatible `syslog`) for terminal only, or
-put a filename directly in `output` for the legacy file-only behavior.
-
-When an active file reaches `max_bytes`, EyeBot renames it using the date and
-time of its final entry, for example `20260815-1427_kick.txt`. Once the oldest
-rolled file completes a 30-day window, all rolled service files in that window
-and folder are placed into `YYYYMMDD-HHMM_30-day-archive.zip`. Global and each
-guild folder are archived independently. Only the two newest archives remain;
-creating a third removes the oldest archive after the new ZIP is safely built.
-
-View terminal output with `docker compose logs -f eyebot`. List the persistent
-files with `docker compose exec eyebot sh -c "find /app/data/logs -type f -maxdepth 4 -print"`.
 
 ### Live-event notifications and remaining placeholders
 
@@ -982,10 +756,9 @@ Google Sheets access.
 6. Keep the key outside Git. `service_account.json` is ignored by this
    repository.
 
-The Compose file mounts `./service_account.json` read-only by default and keeps
-worksheet snapshots in its `cache-data` volume. Set
-`GOOGLE_SERVICE_ACCOUNT_SOURCE` when the key is stored elsewhere. The effective
-mount is:
+The default Compose file does not mount the service-account key. If Sheets
+commands are required in Docker, add this read-only bind mount beneath the
+existing `eyebot.volumes` list:
 
 ```yaml
 - type: bind
@@ -995,28 +768,6 @@ mount is:
 ```
 
 Restart the container after adding or replacing credentials.
-
-EyeBot registers the Carousing, Trinket, and Components workbooks as their cogs
-load. Discord warms them after extension loading; Twitch warms them when its bot
-becomes ready; and the HTTPS gateway warms them before accepting webhook chat
-commands. Expired snapshots remain immediately usable while a background
-refresh runs, and the persistent snapshot provides recovery during a temporary
-Google outage.
-
-Administrators may force an authoritative reload without restarting EyeBot:
-
-```text
-!carousing refresh
-!trinket refresh
-!flora refresh
-!potion refresh
-!poison refresh
-```
-
-On Discord these refresh operations require Manage Server or Administrator. In
-livestream chat they require the authenticated moderator or broadcaster role.
-Ordinary command use never forces a synchronous Google request while a usable
-cached snapshot exists.
 
 ## Permissions
 
@@ -1196,9 +947,26 @@ Roll delivery flags must appear at the end of the command:
 | --- | --- |
 | `!clear [amount]` | Delete up to 100 messages; alias: `purge`; default: 100 |
 | `!setmodchannel` | Configure or disable the moderation-log channel |
+
+### Slash-command role setup
+
+Server members with **Manage Server** can use `/set modrole`, `/set adminrole`,
+`/set dmrole`, and `/set playerrole`. EyeBot requires **Manage Roles**; player
+lounge creation additionally requires **Manage Channels**. Each menu expires
+and disappears after two minutes and intentionally has no Cancel button.
+
+- **Default** creates or selects the standard role (`Moderator`, `Admin`, `DM`,
+  or `Player`) with EyeBot's permission template.
+- **Create** asks for a custom role name and creates it with the same template.
+- **Disable** stores YAML `null` for that guild setting.
+- `/set playerrole` also supports selecting an existing role. After assigning a
+  player, EyeBot can optionally create `<username>'s Private Lounge`, containing
+  `<username>-notes`, a media-style `<username>-references`, and
+  `<username>-private-rp` with permissions synchronized from the private
+  category. If the server/API cannot create a media channel, references safely
+  falls back to a private text channel.
 | `!settimer <interval> [duration]` | Auto-clear the current channel; values are minutes; interval `0` disables |
 | `!setprefix <prefix>` | Set this server's 1–5 character command prefix; use `reset` for the global default |
-| `!bugreport` | Open the private DM report workflow; optional attachments belong on the command message |
 | `!platform <name>` | Display effective guild parameters and masked secret presence |
 | `!platform <guild_id>` | Display every effective platform setting for a managed guild |
 | `!platform twitch channel add <name> [<#destination>]` | Add a Twitch channel with an optional live-alert destination |

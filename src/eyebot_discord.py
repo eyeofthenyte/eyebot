@@ -103,7 +103,6 @@ bot.config = config
 bot.platform_config_service = platformConfigService
 bot.platform_reconciler = send_reconcile_command
 bot.platform_restarter = send_restart_command
-bot.application_commands_synced = False
 
 currDir = os.path.dirname(os.path.realpath(__file__))
 
@@ -164,7 +163,7 @@ async def resolve_discord_destinations(message, response):
     dm_role_name = guild_config.get("dm_role", "UNSET")
     role = (
         discord.utils.get(message.guild.roles, name=dm_role_name)
-        if dm_role_name != "UNSET"
+        if dm_role_name not in (None, "", "UNSET")
         else None
     )
     if role is None:
@@ -180,15 +179,10 @@ async def resolve_discord_destinations(message, response):
 # ----------------------------
 @bot.event
 async def on_ready():
-    if not bot.application_commands_synced:
-        try:
-            synced = await bot.tree.sync()
-            bot.application_commands_synced = True
-            logger.info(
-                f"Synchronized {len(synced)} Discord application commands."
-            )
-        except discord.HTTPException as error:
-            logger.error(f"Unable to synchronize Discord application commands: {error}")
+    if not getattr(bot, "slash_commands_synced", False):
+        synced = await bot.tree.sync()
+        bot.slash_commands_synced = True
+        logger.info(f"Synced {len(synced)} Discord slash command(s).")
     await bot.change_presence(
         status=discord.Status.online,
         activity=discord.Game('with the strings of fate.')
@@ -219,15 +213,6 @@ async def on_guild_join(guild):
         BOT_PREFIX,
     )
     platformConfigService.save_discord_guild(guild.id)
-    moderator = bot.get_cog("Moderator")
-    if moderator is not None:
-        try:
-            await moderator.prompt_modchannel_setup(guild)
-        except (discord.Forbidden, discord.HTTPException) as error:
-            logger.error(
-                f"connection_error - Could not prompt for moderator setup in "
-                f"{guild.name}. Reason: {error}"
-            )
     try:
         async for entry in guild.audit_logs(limit=1, action=discord.AuditLogAction.bot_add):
             adder = entry.user
