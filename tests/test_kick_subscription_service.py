@@ -46,11 +46,15 @@ class _Session:
 
 
 class _Platforms:
-    def __init__(self):
+    def __init__(self, subscription_id=None):
         self.saved = []
+        self.subscription_id = subscription_id
 
     def effective_guild_platform(self, guild_id, platform):
-        return {"access_token": "token"}
+        return {
+            "access_token": "token",
+            "chat_subscription_id": self.subscription_id,
+        }
 
     def set_guild_platform_override(self, guild_id, platform, name, value):
         self.saved.append((str(guild_id), platform, name, value))
@@ -97,6 +101,27 @@ class KickSubscriptionTests(unittest.IsolatedAsyncioTestCase):
         request = session.requests[1][2]["json"]
         self.assertEqual(request["method"], "webhook")
         self.assertEqual(request["events"][0]["name"], "chat.message.sent")
+
+    async def test_unchanged_subscription_is_not_saved_or_logged_again(self):
+        class Logger:
+            def __init__(self):
+                self.messages = []
+
+            def info(self, message, **_kwargs):
+                self.messages.append(message)
+
+        platforms = _Platforms(subscription_id="sub-1")
+        logger = Logger()
+        service = KickSubscriptionService(platforms, logger)
+        session = _Session(
+            [(200, {"data": [{"id": "sub-1", "event": "chat.message.sent"}]})]
+        )
+
+        result = await service.ensure_chat("42", session)
+
+        self.assertEqual(result, "sub-1")
+        self.assertEqual(platforms.saved, [])
+        self.assertEqual(logger.messages, [])
 
 
 if __name__ == "__main__":

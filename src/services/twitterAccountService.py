@@ -94,6 +94,7 @@ class TwitterAccountMonitorService:
             self.state = loaded if isinstance(loaded, dict) else {}
         except (OSError, UnicodeError, json.JSONDecodeError):
             self.state = {}
+        self._refresh_errors = {}
 
     def _save(self):
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
@@ -119,11 +120,16 @@ class TwitterAccountMonitorService:
             try:
                 await self.tokens.refresh_guild(guild_id, "twitter", session)
             except (OSError, RuntimeError, ValueError) as error:
-                self.logger.error(
-                    f"Skipping X accounts for guild {guild_id}: {error}",
-                    guild_id=guild_id,
-                )
+                message = str(error)
+                if self._refresh_errors.get(str(guild_id)) != message:
+                    self.logger.error(
+                        f"Skipping X accounts for guild {guild_id}: {message}. "
+                        "Reconnect X with `!platform twitter connect`.",
+                        guild_id=guild_id,
+                    )
+                    self._refresh_errors[str(guild_id)] = message
                 continue
+            self._refresh_errors.pop(str(guild_id), None)
             settings = self.platforms.effective_guild_platform(guild_id, "twitter")
             token = str(settings.get("bearer_token") or settings.get("access_token") or "")
             accounts = settings.get("monitored_accounts", ())

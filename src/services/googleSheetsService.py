@@ -184,6 +184,29 @@ class GoogleSheetsService:
     def _load_workbook(self, spreadsheet_key: str) -> tuple[WorksheetSnapshot, ...]:
         try:
             workbook = self._get_client().open_by_key(spreadsheet_key)
+            worksheets = tuple(workbook.worksheets())
+            batch_get = getattr(workbook, "values_batch_get", None)
+            if callable(batch_get) and worksheets:
+                ranges = [
+                    "'" + worksheet.title.replace("'", "''") + "'"
+                    for worksheet in worksheets
+                ]
+                response = batch_get(ranges)
+                value_ranges = response.get("valueRanges", ())
+                if len(value_ranges) != len(worksheets):
+                    raise GoogleSheetsError(
+                        "Google Sheets batch response did not match the workbook tabs"
+                    )
+                return tuple(
+                    WorksheetSnapshot(
+                        title=worksheet.title,
+                        rows=tuple(
+                            tuple(str(value) for value in row)
+                            for row in values.get("values", ())
+                        ),
+                    )
+                    for worksheet, values in zip(worksheets, value_ranges)
+                )
             return tuple(
                 WorksheetSnapshot(
                     title=worksheet.title,
@@ -192,7 +215,7 @@ class GoogleSheetsService:
                         for row in worksheet.get_all_values()
                     ),
                 )
-                for worksheet in workbook.worksheets()
+                for worksheet in worksheets
             )
         except GoogleSheetsError:
             raise

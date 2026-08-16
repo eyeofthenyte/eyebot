@@ -36,6 +36,10 @@ class KickSubscriptionService:
         return tuple(row for row in rows if isinstance(row, dict))
 
     async def ensure_chat(self, guild_id, session) -> str:
+        settings = self.platforms.effective_guild_platform(guild_id, "kick")
+        configured_subscription_id = str(
+            settings.get("chat_subscription_id") or ""
+        )
         existing = next(
             (row for row in await self.list(guild_id, session) if row.get("event") == CHAT_EVENT),
             None,
@@ -43,7 +47,6 @@ class KickSubscriptionService:
         if existing:
             subscription_id = str(existing.get("id") or "")
         else:
-            settings = self.platforms.effective_guild_platform(guild_id, "kick")
             token = str(settings.get("access_token") or "")
             async with session.post(
                 SUBSCRIPTIONS_URL,
@@ -70,10 +73,11 @@ class KickSubscriptionService:
                     f"{(selected or {}).get('error') or 'missing subscription ID'}"
                 )
             subscription_id = str(selected["subscription_id"])
-        self.platforms.set_guild_platform_override(
-            guild_id, "kick", "chat_subscription_id", subscription_id
-        )
-        if self.logger:
+        if configured_subscription_id != subscription_id:
+            self.platforms.set_guild_platform_override(
+                guild_id, "kick", "chat_subscription_id", subscription_id
+            )
+        if self.logger and configured_subscription_id != subscription_id:
             self.logger.info(
                 f"Kick chat subscription ready for guild {guild_id}",
                 guild_id=guild_id,

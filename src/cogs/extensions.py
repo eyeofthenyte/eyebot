@@ -30,7 +30,11 @@ class Extensions(commands.Cog):
     async def sync_slash_commands(self):
         """Publish the current application-command tree to Discord."""
         synced = await self.bot.tree.sync()
-        names = ", ".join(command.qualified_name for command in synced)
+        names = ", ".join(
+            getattr(command, "qualified_name", None)
+            or getattr(command, "name", type(command).__name__)
+            for command in synced
+        )
         self.bot.logger.log(
             f"Synced {len(synced)} Discord slash command(s): {names or 'none'}"
         )

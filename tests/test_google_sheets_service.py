@@ -28,6 +28,21 @@ class FakeWorkbook:
         return self._worksheets
 
 
+class BatchWorkbook(FakeWorkbook):
+    def __init__(self, worksheets):
+        super().__init__(worksheets)
+        self.batch_calls = []
+
+    def values_batch_get(self, ranges):
+        self.batch_calls.append(ranges)
+        return {
+            "valueRanges": [
+                {"range": name, "values": worksheet._rows}
+                for name, worksheet in zip(ranges, self._worksheets)
+            ]
+        }
+
+
 class FakeClient:
     def __init__(self, workbook):
         self.workbook = workbook
@@ -77,6 +92,22 @@ class GoogleSheetsServiceTests(unittest.TestCase):
         asyncio.run(self.service.worksheet("spreadsheet", "Potion"))
 
         self.assertEqual(self.client.open_count, 1)
+
+    def test_batches_all_worksheet_reads(self):
+        workbook = BatchWorkbook(self.client.workbook.worksheets())
+        service = GoogleSheetsService(
+            client_factory=lambda _: FakeClient(workbook),
+            cache_ttl=300,
+            stale_ttl=600,
+            persistent_cache_dir=self.temporary_directory.name,
+            refresh_interval=0,
+        )
+
+        worksheets = asyncio.run(service.worksheets("batched-spreadsheet"))
+
+        self.assertEqual(len(workbook.batch_calls), 1)
+        self.assertEqual(workbook.batch_calls[0], ["'Ingredients'", "'Potion'"])
+        self.assertEqual(worksheets[0].cell(2, 1).value, "Aloe")
 
     def test_refresh_reloads_workbook(self):
         asyncio.run(self.service.worksheets("spreadsheet"))
