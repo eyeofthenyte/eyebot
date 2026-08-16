@@ -3,6 +3,7 @@ import asyncio
 import discord
 from discord.ext import commands
 from eyebot import send_restart_command
+from services.modChannelService import ModChannelHandler
 
 # ---------------------------------------------------------
 # Admin Commands
@@ -13,6 +14,8 @@ class Admin (commands.Cog):
         self.logger = bot.logger
         self.config = bot.config
         self.prefix = self.config["prefix"]
+        self.mod_channel_handler = ModChannelHandler(bot)
+        bot.mod_channel_handler = self.mod_channel_handler
 
 
     # ---------------------------------------------------------
@@ -151,8 +154,7 @@ class Admin (commands.Cog):
             await guild.leave()
             self.logger.info(
                 f"connection_broken: {self.bot.user.name} has left: "
-                f"{guild.name} (id: {guild.id})",
-                guild_id=guild.id,
+                f"{guild.name} (id: {guild.id})"
             )
 
     #Check connected servers BOT OWNER ONLY

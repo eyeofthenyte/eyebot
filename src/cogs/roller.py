@@ -629,7 +629,6 @@ class Roll(commands.Cog):
     # ---------------------------------------
     # DM Channel
     # ---------------------------------------
-    @commands.command(name="set_dm")
     async def set_dm(self, ctx):
         """
         Interactive setup for the DM system.
@@ -818,7 +817,6 @@ class Roll(commands.Cog):
     #----------------------------
     # User Private Roll Channels
     #----------------------------
-    @commands.command()
     async def privateroll(self, ctx, action: str = None, channel: discord.TextChannel = None, target_user: discord.Member = None):
         """Manage private roll channels.
 

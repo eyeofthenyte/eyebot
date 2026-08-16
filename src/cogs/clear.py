@@ -4,6 +4,7 @@ import json
 import asyncio
 from datetime import datetime, timedelta
 from discord.ext import commands, tasks
+from services.modChannelService import ModChannelHandler
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "clear/config.json")
 
@@ -13,6 +14,9 @@ class Clear(commands.Cog):
         self.platform_config_service = getattr(
             bot, "platform_config_service", None
         )
+        self.mod_channel_handler = getattr(
+            bot, "mod_channel_handler", None
+        ) or ModChannelHandler(bot)
         self.mod_channel_name = "mod-logs"
         self.config = self.load_config()
         self._last_runs = {}
@@ -83,6 +87,12 @@ class Clear(commands.Cog):
         config.setdefault("timers", {})
         return config
 
+    async def send_mod_action(self, guild, channel, *, content=None, embed=None):
+        """Send an audit action through the admin-owned no-mention handler."""
+        return await self.mod_channel_handler.send(
+            guild, channel=channel, content=content, embed=embed
+        )
+
     # ---------------------------------------
     # Mod Channel Setup
     # ---------------------------------------
@@ -90,7 +100,7 @@ class Clear(commands.Cog):
         guild_id = str(ctx.guild.id)
         current = self.guild_config(guild_id).get("mod_channel")
 
-        if current and current != "UNSET":
+        if current and current not in {"UNSET", "DISABLED"}:
             return ctx.guild.get_channel(current)
 
         if current == "DISABLED":
@@ -119,7 +129,11 @@ class Clear(commands.Cog):
             if str(r.emoji) == "✅":
                 self.guild_config(guild_id)["mod_channel"] = existing.id
                 self.save_config()
-                await existing.send(f":white_check_mark: Logging enabled by {ctx.author.mention}")
+                await self.send_mod_action(
+                    ctx.guild,
+                    existing,
+                    content=f":white_check_mark: Logging enabled by {ctx.author.mention}",
+                )
                 return existing
             else:
                 self.guild_config(guild_id)["mod_channel"] = "DISABLED"
@@ -172,7 +186,11 @@ class Clear(commands.Cog):
                     selected = channels[index - 1]
                     self.guild_config(guild_id)["mod_channel"] = selected.id
                     self.save_config()
-                    await selected.send(f":white_check_mark: Mod channel set by {ctx.author.mention}")
+                    await self.send_mod_action(
+                        guild,
+                        selected,
+                        content=f":white_check_mark: Mod channel set by {ctx.author.mention}",
+                    )
                     return selected
             except asyncio.TimeoutError:
                 return None
@@ -189,7 +207,11 @@ class Clear(commands.Cog):
                 channel = await guild.create_text_channel("mod-logs", overwrites=overwrites)
                 self.guild_config(guild_id)["mod_channel"] = channel.id
                 self.save_config()
-                await channel.send(f":white_check_mark: Mod channel created by {ctx.author.mention}")
+                await self.send_mod_action(
+                    guild,
+                    channel,
+                    content=f":white_check_mark: Mod channel created by {ctx.author.mention}",
+                )
                 return channel
             except discord.Forbidden:
                 await ctx.send(":x: I don't have permission to create a channel.")
@@ -234,10 +256,8 @@ class Clear(commands.Cog):
                 color=discord.Color.orange(),
                 timestamp=discord.utils.utcnow()
             )
-            await mod_channel.send(embed=embed)
+            await self.send_mod_action(ctx.guild, mod_channel, embed=embed)
 
-    @commands.command(name="setmodchannel", extras=[":bookmark:  **__Set Mod Channel__**", "**Usage: `!setmodchannel`**\n:one: Will keep current channel.\n:two: Will reset to new channel.\n:three: Will create a new mod channel.\n:mute: Disables mod channel\n:x: Cancels out of menu and applies no changes."])
-    @commands.has_permissions(manage_guild=True)
     async def set_mod_channel(self, ctx):
         guild_id = str(ctx.guild.id)
         current_id = self.guild_config(guild_id).get("mod_channel")
@@ -309,7 +329,7 @@ class Clear(commands.Cog):
                     color=discord.Color.red(),
                     timestamp=discord.utils.utcnow()
                 )
-                await mod_channel.send(embed=embed)
+                await self.send_mod_action(ctx.guild, mod_channel, embed=embed)
             return
 
         # Otherwise, set timer...
@@ -340,7 +360,7 @@ class Clear(commands.Cog):
             if duration:
                 embed.add_field(name="Duration", value=f"{duration} minute(s)")
             embed.set_footer(text=f"Set by {ctx.author}", icon_url=ctx.author.display_avatar.url)
-            await mod_channel.send(embed=embed)
+            await self.send_mod_action(ctx.guild, mod_channel, embed=embed)
 
     # ---------------------------------------
     # Background Timer Task
@@ -377,7 +397,7 @@ class Clear(commands.Cog):
                                 color=discord.Color.red(),
                                 timestamp=discord.utils.utcnow()
                             )
-                            await mod_channel.send(embed=embed)
+                            await self.send_mod_action(guild, mod_channel, embed=embed)
                     continue
 
                 if not start_time_str:

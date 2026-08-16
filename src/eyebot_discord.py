@@ -103,6 +103,7 @@ bot.config = config
 bot.platform_config_service = platformConfigService
 bot.platform_reconciler = send_reconcile_command
 bot.platform_restarter = send_restart_command
+bot.application_commands_synced = False
 
 currDir = os.path.dirname(os.path.realpath(__file__))
 
@@ -129,8 +130,6 @@ async def load_extensions():
         "Registered platform-neutral commands: "
         + ", ".join(bot.command_router.registered_commands)
     )
-    if getattr(bot, "google_sheets", None) is not None:
-        await bot.google_sheets.start()
 
 
 async def resolve_discord_destinations(message, response):
@@ -181,6 +180,15 @@ async def resolve_discord_destinations(message, response):
 # ----------------------------
 @bot.event
 async def on_ready():
+    if not bot.application_commands_synced:
+        try:
+            synced = await bot.tree.sync()
+            bot.application_commands_synced = True
+            logger.info(
+                f"Synchronized {len(synced)} Discord application commands."
+            )
+        except discord.HTTPException as error:
+            logger.error(f"Unable to synchronize Discord application commands: {error}")
     await bot.change_presence(
         status=discord.Status.online,
         activity=discord.Game('with the strings of fate.')
@@ -188,7 +196,7 @@ async def on_ready():
     logger.info(f'{bot.user.name} has awoken!')
     logger.info(f'{bot.user.name} is connected to the following Discord Servers:')
     for guild in bot.guilds:
-        logger.info(f'  (id: {guild.id}) - {guild.name}', guild_id=guild.id)
+        logger.info(f'  (id: {guild.id}) - {guild.name}')
     logger.info('End of Server Listing')
 
 
@@ -211,21 +219,24 @@ async def on_guild_join(guild):
         BOT_PREFIX,
     )
     platformConfigService.save_discord_guild(guild.id)
+    moderator = bot.get_cog("Moderator")
+    if moderator is not None:
+        try:
+            await moderator.prompt_modchannel_setup(guild)
+        except (discord.Forbidden, discord.HTTPException) as error:
+            logger.error(
+                f"connection_error - Could not prompt for moderator setup in "
+                f"{guild.name}. Reason: {error}"
+            )
     try:
         async for entry in guild.audit_logs(limit=1, action=discord.AuditLogAction.bot_add):
             adder = entry.user
             await adder.send("You see a small strange egg.\nTo see what it's about type `.help`")
             break
     except Exception as e:
-        logger.error(
-            f'connection_error - Could not send initial DM. Reason: {e}',
-            guild_id=guild.id,
-        )
+        logger.error(f'connection_error - Could not send initial DM. Reason: {e}')
 
-    logger.info(
-        f'connection_made - {bot.user.name} has been found in: {guild.name} (id: {guild.id})',
-        guild_id=guild.id,
-    )
+    logger.info(f'connection_made - {bot.user.name} has been found in: {guild.name} (id: {guild.id})')
 
 
 # ----------------------------
@@ -239,18 +250,12 @@ async def on_command_error(ctx, error):
         return
 
     elif isinstance(error, commands.MissingPermissions):
-        logger.warning(
-            f'{ctx.author} tried using a command without required permissions in {ctx.guild}.',
-            guild_id=ctx.guild.id if ctx.guild else None,
-        )
+        logger.warning(f'{ctx.author} tried using a command without required permissions in {ctx.guild}.')
         await ctx.send("⛔ You don’t have the necessary permissions to use that command.")
         return
 
     elif isinstance(error, commands.NotOwner):
-        logger.warning(
-            f'{ctx.author} attempted to use an owner-only command in {ctx.guild}.',
-            guild_id=ctx.guild.id if ctx.guild else None,
-        )
+        logger.warning(f'{ctx.author} attempted to use an owner-only command in {ctx.guild}.')
         await ctx.send("🔒 Only the bot owner can use that command.")
         return
 
