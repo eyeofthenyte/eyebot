@@ -34,6 +34,18 @@ MAX_EMBEDS_PER_ROLL = 10
 MAX_DISPLAYED_DICE_PER_COMPONENT = 50
 MAX_DISPLAYED_REPEATS = 10
 
+
+def configured_dm_channel_id(guild_config):
+    """Return a valid configured GM roll-channel ID, otherwise ``None``."""
+    value = guild_config.get("dm_channel") if isinstance(guild_config, dict) else None
+    if value in (None, "", "UNSET"):
+        return None
+    try:
+        channel_id = int(value)
+    except (TypeError, ValueError):
+        return None
+    return channel_id if channel_id > 0 else None
+
 # load Roller Config
 def load_config(bot=None):
     platform_service = getattr(bot, "platform_config_service", None) if bot else None
@@ -629,192 +641,6 @@ class Roll(commands.Cog):
     # ---------------------------------------
     # DM Channel
     # ---------------------------------------
-    @commands.command(name="set_dm")
-    async def set_dm(self, ctx):
-        """
-        Interactive setup for the DM system.
-
-        Allows an admin or DM to configure:
-        • 📑 The DM-only channel (existing, new, or reset)
-        • 👤 The DM role (existing, new, or reset)
-
-        This setup uses embeds and emoji reactions to guide configuration.
-        Only one DM role and channel can be active per server.
-
-        Permissions:
-        • Must be a server Admin or have the current DM role
-
-        Usage:
-        `!set_dm`
-        """
-
-        guild = ctx.guild
-        guild_id = str(guild.id)
-
-        if guild_id not in self.config:
-            self.config[guild_id] = {
-                "dm_channel": "UNSET",
-                "dm_role": "UNSET",
-                "aliases": {}
-            }
-
-        # Permission check
-        dm_role_name = self.config[guild_id].get("dm_role", "UNSET")
-        dm_channel_id = self.config[guild_id].get("dm_channel", "UNSET")
-
-        dm_role_obj = discord.utils.get(guild.roles, name=dm_role_name) if dm_role_name not in (None, "", "UNSET") else None
-        dm_channel_obj = guild.get_channel(int(dm_channel_id)) if dm_channel_id != "UNSET" else None
-
-        is_admin = ctx.author.guild_permissions.administrator
-        has_dm_role = dm_role_obj in ctx.author.roles if dm_role_obj else False
-
-        if not (is_admin or has_dm_role):
-            return await ctx.send("❌ You must be a server admin or have the DM role to use this command.")
-
-        try:
-            await ctx.message.delete()
-        except discord.Forbidden:
-            pass
-
-        # Display current DM channel and role
-        current_channel_display = dm_channel_obj.mention if dm_channel_obj else "Unset"
-        current_role_display = dm_role_obj.mention if dm_role_obj else "Unset"
-
-        main_embed = discord.Embed(
-            title="DM Setup",
-            description=(
-                f"**Current Settings:**\n"
-                f"• 📑 DM Channel: {current_channel_display}\n"
-                f"• 👤 DM Role: {current_role_display}\n\n"
-                f"**React to configure:**\n"
-                f"📑 Set **DM Channel**\n"
-                f"👤 Set **DM Role**\n"
-                f"❌ Cancel setup"
-            ),
-            color=discord.Color.blurple()
-        )
-
-        menu_msg = await ctx.send(embed=main_embed)
-        reactions = {"📑": "channel", "👤": "role", "❌": "cancel"}
-        for emoji in reactions:
-            await menu_msg.add_reaction(emoji)
-
-        def check(reaction, user):
-            return user == ctx.author and reaction.message.id == menu_msg.id and str(reaction.emoji) in reactions
-
-        try:
-            reaction, _ = await self.bot.wait_for('reaction_add', timeout=60.0, check=check)
-        except asyncio.TimeoutError:
-            return await menu_msg.edit(content="⏳ No response received. Setup cancelled.", embed=None, delete_after=10)
-
-        choice = reactions[str(reaction.emoji)]
-
-        if choice == "cancel":
-            return await menu_msg.edit(content="❌ Setup cancelled.", embed=None, delete_after=10)
-
-        # -------- DM CHANNEL SETUP --------
-        if choice == "channel":
-            channel_embed = discord.Embed(
-                title="Set DM Channel",
-                description="📁 Choose Existing Channel\n"
-                            "🆕 Create New Channel\n"
-                            "🔄 Reset to UNSET\n"
-                            "❌ Cancel",
-                color=discord.Color.green()
-            )
-            await menu_msg.edit(embed=channel_embed)
-            channel_opts = {"📁": "existing", "🆕": "create", "🔄": "reset", "❌": "cancel"}
-            await menu_msg.clear_reactions()
-            for emoji in channel_opts:
-                await menu_msg.add_reaction(emoji)
-
-            def chan_check(reaction, user):
-                return user == ctx.author and reaction.message.id == menu_msg.id and str(reaction.emoji) in channel_opts
-
-            try:
-                reaction, _ = await self.bot.wait_for('reaction_add', timeout=60.0, check=chan_check)
-            except asyncio.TimeoutError:
-                return await menu_msg.edit(content="⏳ No response. DM channel setup cancelled.", embed=None, delete_after=10)
-
-            chan_choice = channel_opts[str(reaction.emoji)]
-            if chan_choice == "cancel":
-                return await menu_msg.edit(content="❌ Channel setup cancelled.", embed=None, delete_after=10)
-            elif chan_choice == "existing":
-                await menu_msg.edit(content="💬 Mention the channel to set as DM channel:", embed=None)
-                try:
-                    msg = await self.bot.wait_for('message', timeout=60.0, check=lambda m: m.author == ctx.author)
-                except asyncio.TimeoutError:
-                    return await ctx.send("⏳ No channel mentioned. Cancelled.")
-                if msg.channel_mentions:
-                    self.config[guild_id]["dm_channel"] = str(msg.channel_mentions[0].id)
-                    self.save_config()
-                    return await ctx.send(f"✅ DM channel set to {msg.channel_mentions[0].mention}.", delete_after=10)
-                return await ctx.send("❌ No valid channel mentioned.", delete_after=10)
-            elif chan_choice == "create":
-                overwrites = {
-                    guild.default_role: discord.PermissionOverwrite(read_messages=False)
-                }
-                if dm_role:
-                    overwrites[dm_role] = discord.PermissionOverwrite(read_messages=True)
-
-                new_chan = await guild.create_text_channel("dm-rolls", overwrites=overwrites)
-                self.config[guild_id]["dm_channel"] = str(new_chan.id)
-                self.save_config()
-                return await ctx.send(f"🆕 Created and set DM channel to {new_chan.mention}.", delete_after=10)
-            elif chan_choice == "reset":
-                self.config[guild_id]["dm_channel"] = "UNSET"
-                self.save_config()
-                return await ctx.send("🔄 DM channel reset to UNSET.", delete_after=10)
-
-        # -------- DM ROLE SETUP --------
-        if choice == "role":
-            role_embed = discord.Embed(
-                title="Set DM Role",
-                description="👥 Choose Existing Role\n"
-                            "🛠️ Create New Role\n"
-                            "🔄 Reset to UNSET\n"
-                            "❌ Cancel",
-                color=discord.Color.orange()
-            )
-            await menu_msg.edit(embed=role_embed)
-            role_opts = {"👥": "existing", "🛠️": "create", "🔄": "reset", "❌": "cancel"}
-            await menu_msg.clear_reactions()
-            for emoji in role_opts:
-                await menu_msg.add_reaction(emoji)
-
-            def role_check(reaction, user):
-                return user == ctx.author and reaction.message.id == menu_msg.id and str(reaction.emoji) in role_opts
-
-            try:
-                reaction, _ = await self.bot.wait_for('reaction_add', timeout=60.0, check=role_check)
-            except asyncio.TimeoutError:
-                return await ctx.send("⏳ No response. DM role setup cancelled.", delete_after=10)
-
-            role_choice = role_opts[str(reaction.emoji)]
-            if role_choice == "cancel":
-                return await ctx.send("❌ Role setup cancelled.")
-            elif role_choice == "existing":
-                await menu_msg.edit(content="📝 Type the role name:", embed=None)
-                try:
-                    msg = await self.bot.wait_for('message', timeout=60.0, check=lambda m: m.author == ctx.author)
-                except asyncio.TimeoutError:
-                    return await ctx.send("⏳ No role name received.")
-                role = discord.utils.get(guild.roles, name=msg.content.strip())
-                if role:
-                    self.config[guild_id]["dm_role"] = role.name
-                    self.save_config()
-                    return await ctx.send(f"✅ DM role set to **{role.name}**.")
-                return await ctx.send("❌ Role not found.", delete_after=10)
-            elif role_choice == "create":
-                new_role = await guild.create_role(name="DM", permissions=discord.Permissions(0))
-                self.config[guild_id]["dm_role"] = new_role.name
-                self.save_config()
-                return await ctx.send(f"🆕 Created and set DM role to **{new_role.name}**.", delete_after=10)
-            elif role_choice == "reset":
-                self.config[guild_id]["dm_role"] = "UNSET"
-                self.save_config()
-                return await ctx.send("🔄 DM role reset to UNSET.", delete_after=10)
-
     #----------------------------
     # User Private Roll Channels
     #----------------------------
@@ -915,7 +741,7 @@ class Roll(commands.Cog):
             pass
 
     async def _send_private_roll(self, ctx, embed):
-        """Send a -dm roll to the user's private channel or direct messages."""
+        """Send a -dm roll to the configured GM channel."""
         if ctx.guild is None:
             try:
                 await ctx.author.send(embed=embed)
@@ -923,35 +749,13 @@ class Roll(commands.Cog):
             except discord.Forbidden:
                 return False
 
-        guild_id = str(ctx.guild.id)
-        user_id = str(ctx.author.id)
-        guild_config = self.config.get(guild_id, {})
-        channel_id = guild_config.get("user_channels", {}).get(user_id)
-
-        if channel_id:
-            destination = self.bot.get_channel(int(channel_id))
-            if destination:
-                await destination.send(embed=embed)
-                return True
-
-        recipients = [ctx.author]
-        dm_role_name = guild_config.get("dm_role", "UNSET")
-        if dm_role_name not in (None, "", "UNSET"):
-            role = discord.utils.get(ctx.guild.roles, name=dm_role_name)
-            if role:
-                recipients.extend(role.members)
-
-        sent_to = set()
-        for user in recipients:
-            if user.id in sent_to:
-                continue
-            try:
-                await user.send(embed=embed)
-                sent_to.add(user.id)
-            except discord.Forbidden:
-                pass
-
-        return bool(sent_to)
+        guild_config = self.config.get(str(ctx.guild.id), {})
+        channel_id = configured_dm_channel_id(guild_config)
+        destination = self.bot.get_channel(channel_id) if channel_id else None
+        if destination is None:
+            return False
+        await destination.send(embed=embed)
+        return True
 
     async def _send_blind_roll(self, ctx, embed):
         """Send a -blind roll to the configured DM destination only."""
@@ -959,33 +763,12 @@ class Roll(commands.Cog):
             return False
 
         guild_config = self.config.get(str(ctx.guild.id), {})
-        dm_channel_id = guild_config.get("dm_channel", "UNSET")
-
-        if dm_channel_id != "UNSET":
-            destination = self.bot.get_channel(int(dm_channel_id))
-            if destination:
-                await destination.send(embed=embed)
-                return True
-
-        dm_role_name = guild_config.get("dm_role", "UNSET")
-        role = (
-            discord.utils.get(ctx.guild.roles, name=dm_role_name)
-            if dm_role_name not in (None, "", "UNSET")
-            else None
-        )
-
-        sent_to = set()
-        if role:
-            for user in role.members:
-                if user.id == ctx.author.id or user.id in sent_to:
-                    continue
-                try:
-                    await user.send(embed=embed)
-                    sent_to.add(user.id)
-                except discord.Forbidden:
-                    pass
-
-        return bool(sent_to)
+        channel_id = configured_dm_channel_id(guild_config)
+        destination = self.bot.get_channel(channel_id) if channel_id else None
+        if destination is None:
+            return False
+        await destination.send(embed=embed)
+        return True
 
     @staticmethod
     def _truncate_text(value, limit):
@@ -1214,6 +997,16 @@ class Roll(commands.Cog):
                 f"{MAX_EXPRESSIONS_PER_COMMAND} expressions."
             )
 
+        if (is_dm or is_blind) and ctx.guild is not None:
+            guild_config = self.config.get(str(ctx.guild.id), {})
+            channel_id = configured_dm_channel_id(guild_config)
+            if channel_id is None or self.bot.get_channel(channel_id) is None:
+                await self._delete_roll_command(ctx)
+                return await ctx.send(
+                    "⚠️ No GM roll channel is configured for this server. "
+                    "Please contact a moderator or administrator to set up the GM channels."
+                )
+
         command_work_units = 0
         for expr in expressions:
             rollalias = None  # Initialize rollalias here
@@ -1351,12 +1144,10 @@ class Roll(commands.Cog):
                         and delivered
                     )
                 if not delivered:
-                    try:
-                        await ctx.author.send(
-                            "❌ Blind roll not delivered. Configure a DM channel or DM role with `!set_dm`."
-                        )
-                    except discord.Forbidden:
-                        pass
+                    await ctx.send(
+                        "⚠️ The blind roll could not be delivered to the configured GM channel. "
+                        "Please contact a moderator or administrator."
+                    )
             elif is_dm:
                 delivered = True
                 for embed in embeds:
@@ -1365,10 +1156,10 @@ class Roll(commands.Cog):
                         and delivered
                     )
                 if not delivered:
-                    try:
-                        await ctx.author.send("❌ Private roll could not be delivered.")
-                    except discord.Forbidden:
-                        pass
+                    await ctx.send(
+                        "⚠️ The private roll could not be delivered to the configured GM channel. "
+                        "Please contact a moderator or administrator."
+                    )
             else:
                 for embed in embeds:
                     await ctx.send(embed=embed)

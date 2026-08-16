@@ -4,8 +4,10 @@ from types import SimpleNamespace
 from adapters.discord_adapter import (
     DiscordTransportAdapter,
     request_from_discord_message,
+    resolve_discord_roll_destinations,
+    send_discord_response,
 )
-from core.command_model import CommandPlatform, CommandSurface
+from core.command_model import CommandPlatform, CommandSurface, ResponseVisibility
 from core.command_model import CommandResponse
 from core.command_router import CommandRouter
 
@@ -39,6 +41,76 @@ class DiscordRequestAdapterTests(unittest.TestCase):
 
 
 class DiscordTransportTests(unittest.IsolatedAsyncioTestCase):
+
+    async def test_dm_roll_routes_to_private_and_gm_channels(self):
+        private = SimpleNamespace(id=21)
+        gm = SimpleNamespace(id=22)
+        channels = {21: private, 22: gm}
+        bot = SimpleNamespace(get_channel=channels.get)
+        source = SimpleNamespace(
+            author=SimpleNamespace(id=7), channel=SimpleNamespace(id=8)
+        )
+        response = CommandResponse.text(
+            "roll", visibility=ResponseVisibility.REQUESTER
+        )
+
+        destinations = resolve_discord_roll_destinations(
+            bot,
+            source,
+            response,
+            {"dm_channel": "22", "user_channels": {"7": "21"}},
+        )
+
+        self.assertEqual(destinations, (private, gm))
+
+    async def test_blind_roll_routes_only_to_gm_channel(self):
+        gm = SimpleNamespace(id=22)
+        bot = SimpleNamespace(get_channel=lambda channel_id: gm if channel_id == 22 else None)
+        source = SimpleNamespace(
+            author=SimpleNamespace(id=7), channel=SimpleNamespace(id=8)
+        )
+        response = CommandResponse.text(
+            "roll", visibility=ResponseVisibility.BLIND
+        )
+
+        destinations = resolve_discord_roll_destinations(
+            bot,
+            source,
+            response,
+            {"dm_channel": "22", "user_channels": {"7": "21"}},
+        )
+
+        self.assertEqual(destinations, (gm,))
+
+    async def test_missing_gm_channel_posts_public_setup_notice(self):
+        channel = SimpleNamespace(sent=[])
+        author = SimpleNamespace(id=7, sent=[])
+
+        async def channel_send(content=None, **_kwargs):
+            channel.sent.append(content)
+
+        async def author_send(content=None, **_kwargs):
+            author.sent.append(content)
+
+        channel.send = channel_send
+        author.send = author_send
+        source = SimpleNamespace(
+            author=author,
+            channel=channel,
+            guild=SimpleNamespace(id=9),
+        )
+        response = CommandResponse.text(
+            "secret roll",
+            visibility=ResponseVisibility.BLIND,
+            metadata={"command": "roll"},
+        )
+
+        await send_discord_response(
+            source, response, destination_resolver=lambda *_args: ()
+        )
+
+        self.assertIn("No GM roll channel", channel.sent[0])
+        self.assertEqual(author.sent, [])
     async def test_dispatches_through_shared_router(self):
         router = CommandRouter()
 

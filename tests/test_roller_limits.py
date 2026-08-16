@@ -12,6 +12,22 @@ SOURCE = ROLLER_PATH.read_text(encoding="utf-8")
 TREE = ast.parse(SOURCE)
 
 
+def load_configured_dm_channel_id():
+    function = next(
+        node for node in TREE.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "configured_dm_channel_id"
+    )
+    module = ast.Module(body=[function], type_ignores=[])
+    ast.fix_missing_locations(module)
+    namespace = {}
+    exec(compile(module, str(ROLLER_PATH), "exec"), namespace)
+    return namespace["configured_dm_channel_id"]
+
+
+configured_dm_channel_id = load_configured_dm_channel_id()
+
+
 class FakeEmbed:
     def __init__(self, *, title, description, color):
         self.title = title
@@ -84,6 +100,25 @@ def load_roll_class():
 
 
 Roll, LIMITS = load_roll_class()
+
+
+class RollerDestinationConfigTests(unittest.TestCase):
+    def test_accepts_numeric_channel_ids(self):
+        self.assertEqual(configured_dm_channel_id({"dm_channel": "123"}), 123)
+        self.assertEqual(configured_dm_channel_id({"dm_channel": 456}), 456)
+
+    def test_rejects_missing_unset_and_invalid_channel_ids(self):
+        for value in (None, "", "UNSET", "not-a-channel", 0, -1):
+            self.assertIsNone(configured_dm_channel_id({"dm_channel": value}))
+
+    def test_legacy_set_dm_command_is_removed(self):
+        self.assertNotIn('@commands.command(name="set_dm")', SOURCE)
+        self.assertNotIn("async def set_dm", SOURCE)
+
+    def test_missing_gm_channel_notice_is_public_channel_output(self):
+        self.assertIn("No GM roll channel is configured for this server", SOURCE)
+        self.assertIn("Please contact a moderator or administrator", SOURCE)
+        self.assertIn("await ctx.send(", SOURCE)
 
 
 class RollerValidationTests(unittest.TestCase):

@@ -36,6 +36,15 @@ class FakeCog:
         await ctx.send(f"selected {select}")
 
 
+class DirectDeliveryCog:
+    def __init__(self):
+        self.bot = SimpleNamespace(logger=FakeLogger())
+        self.roll = FakeCommand(type(self)._roll)
+
+    async def _roll(self, _ctx, *, args=None):
+        return None
+
+
 def request(command, *arguments):
     return CommandRequest(
         platform=CommandPlatform.GENERIC,
@@ -79,6 +88,17 @@ class CogBridgeTests(unittest.IsolatedAsyncioTestCase):
             request("roll", "1d20", "-blind")
         )
         self.assertEqual(response.visibility, ResponseVisibility.BLIND)
+
+    async def test_directly_delivered_blind_roll_does_not_become_error(self):
+        spec = PortableCommandSpec(
+            "Fake", "roll", "roll", (), "optional_joined", "args", True
+        )
+        response = await LegacyCogHandler(DirectDeliveryCog(), spec)(
+            request("roll", "1d20", "-blind")
+        )
+
+        self.assertIsNone(response.error_code)
+        self.assertTrue(response.metadata["delivered_by_cog"])
 
     async def test_missing_required_argument_returns_neutral_error(self):
         spec = PortableCommandSpec(

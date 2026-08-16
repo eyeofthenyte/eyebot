@@ -26,7 +26,26 @@ class ModeratorCogTests(unittest.TestCase):
             for keyword in decorator.keywords
             if keyword.arg == "name" and isinstance(keyword.value, ast.Constant)
         }
-        self.assertEqual(commands, {"modchannel", "gm", "privateroll", "admin", "mod"})
+        self.assertEqual(
+            commands,
+            {
+                "modchannel",
+                "gm",
+                "privateroll",
+                "modrole",
+                "adminrole",
+                "gmrole",
+                "playerrole",
+                "player",
+                "playerlounge",
+                "gmchannel",
+            },
+        )
+
+    def test_only_moderator_cog_owns_the_set_group(self):
+        roleplay_source = Path("src/cogs/roleplay.py").read_text(encoding="utf-8")
+        self.assertIn("class Moderator(commands.GroupCog", MODERATOR_SOURCE)
+        self.assertNotIn("class Roleplay(commands.GroupCog", roleplay_source)
 
     def test_channel_and_role_selectors_are_native_discord_selects(self):
         self.assertIn("discord.ui.ChannelSelect", MODERATOR_SOURCE)

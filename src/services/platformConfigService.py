@@ -159,6 +159,10 @@ class PlatformConfigService(ConfigService):
             "user_channels": {},
             "mod_channel": "UNSET",
             "socialmedia_sources_channel": "UNSET",
+            "support_tickets": {
+                "enabled": True,
+                "channel_id": "UNSET",
+            },
             "timers": {},
         }
         for key, value in defaults.items():

@@ -642,7 +642,7 @@ socialmedia_sources_channel: "UNSET"
 timers: {}
 ```
 
-These entries are normally maintained by `!setprefix`, `!set_dm`, `!alias`,
+These entries are normally maintained by `!setprefix`, `/set gm`, `!alias`,
 `!privateroll`, `!setmodchannel`, `!platform ... enable`, and `!settimer`;
 manual editing is optional.
 Only numeric Discord snowflake IDs are accepted as filenames.
@@ -814,7 +814,7 @@ required for normal operation.
 | `settimer` | Manage Channels |
 | `setprefix` | Manage Server |
 | `platform` | Manage Server |
-| `set_dm` | Server Administrator or configured DM role |
+| `/set gm` | Manage Server |
 | `privateroll list` | Manage Messages, Manage Server, or Administrator |
 | `privateroll set ... @user` | Manage Messages, Manage Server, or Administrator |
 | `alias remove` | Alias creator or Manage Server |
@@ -922,7 +922,7 @@ Run `!namegen` without arguments to list the installed race libraries.
 | `!alias remove <name>` | Remove an alias with confirmation |
 | `!alias list [@user]` | List guild aliases, optionally by creator |
 | `!roll @<name>` | Roll a saved alias |
-| `!set_dm` | Configure the guild DM channel and DM role interactively |
+| `/set gm` | Configure the guild GM channel and role interactively |
 | `!privateroll set #channel [@user]` | Set a private roll channel |
 | `!privateroll disable` | Remove your private roll channel |
 | `!privateroll show` | Show your private roll channel |
@@ -951,7 +951,7 @@ Roll delivery flags must appear at the end of the command:
 ### Slash-command role setup
 
 Server members with **Manage Server** can use `/set modrole`, `/set adminrole`,
-`/set dmrole`, and `/set playerrole`. EyeBot requires **Manage Roles**; player
+`/set gmrole`, and `/set playerrole`. EyeBot requires **Manage Roles**; player
 lounge creation additionally requires **Manage Channels**. Each menu expires
 and disappears after two minutes and intentionally has no Cancel button.
 
@@ -965,6 +965,10 @@ and disappears after two minutes and intentionally has no Cancel button.
   `<username>-private-rp` with permissions synchronized from the private
   category. If the server/API cannot create a media channel, references safely
   falls back to a private text channel.
+- `/set player @member` assigns only the configured Player role and ends.
+- `/set playerlounge @member` offers lounge creation only when the member has
+  the Player role and does not already have a lounge.
+- `/set gmchannel` opens the GM-channel configuration workflow directly.
 | `!settimer <interval> [duration]` | Auto-clear the current channel; values are minutes; interval `0` disables |
 | `!setprefix <prefix>` | Set this server's 1–5 character command prefix; use `reset` for the global default |
 | `!platform <name>` | Display effective guild parameters and masked secret presence |

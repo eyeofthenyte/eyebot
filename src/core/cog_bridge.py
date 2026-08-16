@@ -206,6 +206,15 @@ class LegacyCogHandler:
                 error_code="command_failed",
             )
 
+        if not context.messages and visibility == ResponseVisibility.BLIND:
+            return CommandResponse.text(
+                "Blind response delivered directly by the platform cog.",
+                visibility=visibility,
+                metadata={
+                    "command": self.spec.command,
+                    "delivered_by_cog": True,
+                },
+            )
         if not context.messages:
             return CommandResponse.error(
                 f"Command '{self.spec.command}' produced no response.",

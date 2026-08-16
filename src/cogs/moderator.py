@@ -500,25 +500,81 @@ class Moderator(commands.GroupCog, group_name="set", group_description="Configur
             ephemeral=True,
         )
 
-    @app_commands.command(name="admin", description="Configure the EyeBot administrator role")
-    @app_commands.default_permissions(administrator=True)
-    @app_commands.guild_only()
-    async def admin(self, interaction: discord.Interaction):
-        await interaction.response.send_message(
-            "Configure the EyeBot administrator role:",
-            view=StaffRoleView(self, interaction.guild, "admin_role", "administrator", "EyeBot Admin", owner_id=interaction.user.id),
-            ephemeral=True,
-        )
+    async def open_role_setup(self, interaction, setting):
+        role_setup = self.bot.get_cog("Roleplay")
+        if role_setup is None:
+            await interaction.response.send_message(
+                "EyeBot's role setup service is unavailable. Please contact the bot administrator.",
+                ephemeral=True,
+            )
+            return
+        await role_setup.open_menu(interaction, setting)
 
-    @app_commands.command(name="mod", description="Configure the EyeBot moderator role")
-    @app_commands.default_permissions(administrator=True)
+    @app_commands.command(name="modrole", description="Configure the Moderator role")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.checks.bot_has_permissions(manage_roles=True)
     @app_commands.guild_only()
-    async def mod(self, interaction: discord.Interaction):
-        await interaction.response.send_message(
-            "Configure the EyeBot moderator role:",
-            view=StaffRoleView(self, interaction.guild, "mod_role", "moderator", "EyeBot Moderator", owner_id=interaction.user.id),
-            ephemeral=True,
-        )
+    async def modrole(self, interaction: discord.Interaction):
+        await self.open_role_setup(interaction, "mod_role")
+
+    @app_commands.command(name="adminrole", description="Configure the Admin role")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.checks.bot_has_permissions(manage_roles=True)
+    @app_commands.guild_only()
+    async def adminrole(self, interaction: discord.Interaction):
+        await self.open_role_setup(interaction, "admin_role")
+
+    @app_commands.command(name="gmrole", description="Configure the GM role")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.checks.bot_has_permissions(manage_roles=True)
+    @app_commands.guild_only()
+    async def gmrole(self, interaction: discord.Interaction):
+        await self.open_role_setup(interaction, "dm_role")
+
+    @app_commands.command(name="playerrole", description="Configure the Player role")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.checks.bot_has_permissions(manage_roles=True, manage_channels=True)
+    @app_commands.guild_only()
+    async def playerrole(self, interaction: discord.Interaction):
+        await self.open_role_setup(interaction, "player_role")
+
+    @app_commands.command(name="player", description="Assign the configured Player role to a member")
+    @app_commands.describe(member="Member who does not already have the Player role")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.checks.bot_has_permissions(manage_roles=True)
+    @app_commands.guild_only()
+    async def player(self, interaction: discord.Interaction, member: discord.Member):
+        role_setup = self.bot.get_cog("Roleplay")
+        if role_setup is None:
+            return await interaction.response.send_message(
+                "EyeBot's roleplay setup service is unavailable.", ephemeral=True
+            )
+        await role_setup.assign_player(interaction, member)
+
+    @app_commands.command(name="playerlounge", description="Create a private lounge for an existing player")
+    @app_commands.describe(member="Player who does not already have a private lounge")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.checks.bot_has_permissions(manage_channels=True)
+    @app_commands.guild_only()
+    async def playerlounge(self, interaction: discord.Interaction, member: discord.Member):
+        role_setup = self.bot.get_cog("Roleplay")
+        if role_setup is None:
+            return await interaction.response.send_message(
+                "EyeBot's roleplay setup service is unavailable.", ephemeral=True
+            )
+        await role_setup.prompt_player_lounge(interaction, member)
+
+    @app_commands.command(name="gmchannel", description="Configure the private GM roll channel")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.checks.bot_has_permissions(manage_channels=True)
+    @app_commands.guild_only()
+    async def gmchannel(self, interaction: discord.Interaction):
+        role_setup = self.bot.get_cog("Roleplay")
+        if role_setup is None:
+            return await interaction.response.send_message(
+                "EyeBot's roleplay setup service is unavailable.", ephemeral=True
+            )
+        await role_setup.open_gm_channel(interaction, self)
 
 
 async def setup(bot):

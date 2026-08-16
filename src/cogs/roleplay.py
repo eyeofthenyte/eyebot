@@ -112,7 +112,7 @@ class ExistingPlayerRoleSelect(discord.ui.RoleSelect):
 
 
 class RoleSetupView(ExpiringView):
-    def __init__(self, cog: "Set", owner_id: int, setting: str) -> None:
+    def __init__(self, cog: "Roleplay", owner_id: int, setting: str) -> None:
         super().__init__(owner_id)
         self.cog = cog
         self.setting = setting
@@ -148,7 +148,7 @@ class RoleSetupView(ExpiringView):
 
 
 class AddPlayerPrompt(ExpiringView):
-    def __init__(self, cog: "Set", owner_id: int, role: discord.Role) -> None:
+    def __init__(self, cog: "Roleplay", owner_id: int, role: discord.Role) -> None:
         super().__init__(owner_id)
         self.cog = cog
         self.role = role
@@ -205,7 +205,7 @@ class PlayerSelect(discord.ui.UserSelect):
 
 
 class PlayerSelectView(ExpiringView):
-    def __init__(self, cog: "Set", owner_id: int, role: discord.Role) -> None:
+    def __init__(self, cog: "Roleplay", owner_id: int, role: discord.Role) -> None:
         super().__init__(owner_id)
         self.cog = cog
         self.role = role
@@ -213,7 +213,7 @@ class PlayerSelectView(ExpiringView):
 
 
 class LoungePrompt(ExpiringView):
-    def __init__(self, cog: "Set", owner_id: int, member: discord.Member) -> None:
+    def __init__(self, cog: "Roleplay", owner_id: int, member: discord.Member) -> None:
         super().__init__(owner_id)
         self.cog = cog
         self.member = member
@@ -243,7 +243,8 @@ class LoungePrompt(ExpiringView):
         self.stop()
 
 
-class Set(commands.GroupCog, group_name="set", group_description="Configure EyeBot server roles"):
+class Roleplay(commands.Cog):
+    """Role-setup workflow used by the shared ``/set`` command group."""
     def __init__(self, bot) -> None:
         self.bot = bot
 
@@ -342,29 +343,102 @@ class Set(commands.GroupCog, group_name="set", group_description="Configure EyeB
         )
         view.origin = interaction
 
-    @app_commands.command(name="modrole", description="Configure the Moderator role")
-    @app_commands.checks.has_permissions(manage_guild=True)
-    @app_commands.checks.bot_has_permissions(manage_roles=True)
     async def modrole(self, interaction: discord.Interaction):
         await self.open_menu(interaction, "mod_role")
 
-    @app_commands.command(name="adminrole", description="Configure the Admin role")
-    @app_commands.checks.has_permissions(manage_guild=True)
-    @app_commands.checks.bot_has_permissions(manage_roles=True)
     async def adminrole(self, interaction: discord.Interaction):
         await self.open_menu(interaction, "admin_role")
 
-    @app_commands.command(name="dmrole", description="Configure the DM/GM role")
-    @app_commands.checks.has_permissions(manage_guild=True)
-    @app_commands.checks.bot_has_permissions(manage_roles=True)
-    async def dmrole(self, interaction: discord.Interaction):
+    async def gmrole(self, interaction: discord.Interaction):
         await self.open_menu(interaction, "dm_role")
 
-    @app_commands.command(name="playerrole", description="Configure the Player role")
-    @app_commands.checks.has_permissions(manage_guild=True)
-    @app_commands.checks.bot_has_permissions(manage_roles=True, manage_channels=True)
     async def playerrole(self, interaction: discord.Interaction):
         await self.open_menu(interaction, "player_role")
+
+    def configured_player_role(self, guild):
+        service = self.bot.platform_config_service
+        config = service.ensure_discord_guild(
+            str(guild.id), guild.name, self.bot.config.get("prefix", "!")
+        )
+        value = config.get("player_role")
+        if value in (None, "", "UNSET"):
+            return None
+        if str(value).isdigit():
+            return guild.get_role(int(value))
+        return discord.utils.get(guild.roles, name=value)
+
+    async def assign_player(self, interaction, member):
+        role = self.configured_player_role(interaction.guild)
+        if role is None:
+            return await interaction.response.send_message(
+                "Configure the Player role first with `/set playerrole`.", ephemeral=True
+            )
+        if member.bot:
+            return await interaction.response.send_message(
+                "Bot accounts cannot be assigned the Player role.", ephemeral=True
+            )
+        if role in member.roles:
+            return await interaction.response.send_message(
+                f"{member.mention} already has the {role.mention} role.", ephemeral=True
+            )
+        try:
+            await member.add_roles(role, reason=f"Player setup by {interaction.user}")
+        except discord.Forbidden:
+            return await interaction.response.send_message(
+                "I could not assign that role. Check my Manage Roles permission and role position.",
+                ephemeral=True,
+            )
+        await interaction.response.send_message(
+            f"Added {member.mention} to {role.mention}.", ephemeral=True
+        )
+
+    async def prompt_player_lounge(self, interaction, member):
+        role = self.configured_player_role(interaction.guild)
+        if role is None:
+            return await interaction.response.send_message(
+                "Configure the Player role first with `/set playerrole`.", ephemeral=True
+            )
+        if role not in member.roles:
+            return await interaction.response.send_message(
+                f"{member.mention} must have the {role.mention} role first. Use `/set player`.",
+                ephemeral=True,
+            )
+        category_name = private_lounge_name(member.name)
+        if discord.utils.get(interaction.guild.categories, name=category_name) is not None:
+            return await interaction.response.send_message(
+                f"{member.mention} already has **{category_name}**.", ephemeral=True
+            )
+        view = LoungePrompt(self, interaction.user.id, member)
+        await interaction.response.send_message(
+            f"Create **{category_name}** for {member.mention}?",
+            view=view,
+            ephemeral=True,
+        )
+        view.origin = interaction
+
+    async def open_gm_channel(self, interaction, moderator_cog):
+        from cogs.moderator import GMChannelView, GMRoleView
+
+        if moderator_cog.resolve_role(interaction.guild, "dm_role") is None:
+            return await interaction.response.send_message(
+                "A GM role must be configured before its private channel:",
+                view=GMRoleView(
+                    moderator_cog,
+                    interaction.guild,
+                    owner_id=interaction.user.id,
+                    continue_to_channel=True,
+                ),
+                ephemeral=True,
+            )
+        await interaction.response.send_message(
+            "Configure the private Game Master channel:",
+            view=GMChannelView(
+                moderator_cog,
+                interaction.guild,
+                owner_id=interaction.user.id,
+            ),
+            ephemeral=True,
+        )
 
     async def cog_app_command_error(self, interaction, error):
         if isinstance(error, app_commands.MissingPermissions):
@@ -379,4 +453,4 @@ class Set(commands.GroupCog, group_name="set", group_description="Configure EyeB
 
 
 async def setup(bot):
-    await bot.add_cog(Set(bot))
+    await bot.add_cog(Roleplay(bot))

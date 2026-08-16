@@ -4,6 +4,7 @@ import discord
 
 from adapters.discord_adapter import (
     DiscordTransportAdapter,
+    resolve_discord_roll_destinations,
 )
 from core.cog_registry import build_portable_router
 from core.command_model import ResponseVisibility
@@ -144,6 +145,11 @@ async def resolve_discord_destinations(message, response):
         if roller is not None
         else {}
     )
+    if response.metadata.get("command") == "roll":
+        return resolve_discord_roll_destinations(
+            bot, message, response, guild_config
+        )
+
     dm_channel_id = guild_config.get("dm_channel", "UNSET")
     if dm_channel_id != "UNSET":
         destination = bot.get_channel(int(dm_channel_id))

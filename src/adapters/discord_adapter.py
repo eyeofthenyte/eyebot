@@ -22,6 +22,37 @@ DestinationResolver = Callable[
 ]
 
 
+def _configured_channel(bot, value):
+    if value in (None, "", "UNSET"):
+        return None
+    try:
+        return bot.get_channel(int(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def resolve_discord_roll_destinations(bot, source_message, response, guild_config):
+    """Resolve Discord-only roll destinations without exposing private results."""
+    gm_channel = _configured_channel(bot, guild_config.get("dm_channel"))
+    if response.visibility == ResponseVisibility.BLIND:
+        return (gm_channel,) if gm_channel is not None else ()
+    if response.visibility != ResponseVisibility.REQUESTER:
+        return (source_message.channel,)
+    if gm_channel is None:
+        return ()
+
+    private_channel = _configured_channel(
+        bot,
+        guild_config.get("user_channels", {}).get(str(source_message.author.id)),
+    )
+    requester_destination = private_channel or source_message.author
+    destinations = []
+    for destination in (requester_destination, gm_channel):
+        if destination is not None and destination not in destinations:
+            destinations.append(destination)
+    return tuple(destinations)
+
+
 def request_from_discord_message(message, *, prefix: str) -> CommandRequest:
     guild = getattr(message, "guild", None)
     channel = message.channel
@@ -121,6 +152,19 @@ async def send_discord_response(
         destinations = ()
 
     if not destinations:
+        if (
+            getattr(source_message, "guild", None) is not None
+            and response.metadata.get("command") == "roll"
+            and response.visibility in {
+                ResponseVisibility.REQUESTER,
+                ResponseVisibility.BLIND,
+            }
+        ):
+            await source_message.channel.send(
+                "⚠️ No GM roll channel is configured for this server. "
+                "Please contact a moderator or administrator to set up the GM channels."
+            )
+            return
         await source_message.author.send(
             "❌ No Discord destination is configured for this response."
         )
@@ -152,6 +196,8 @@ class DiscordTransportAdapter(CommandTransportAdapter):
         return request_from_discord_message(native_message, prefix=prefix)
 
     async def send_response(self, native_message, response):
+        if response.metadata.get("delivered_by_cog"):
+            return
         await send_discord_response(
             native_message,
             response,
