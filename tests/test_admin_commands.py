@@ -1,5 +1,6 @@
 import ast
 import asyncio
+import io
 import types
 import unittest
 from pathlib import Path
@@ -15,8 +16,14 @@ ADMIN_CLASS = next(
 METHODS = [
     node
     for node in ADMIN_CLASS.body
-    if isinstance(node, ast.AsyncFunctionDef)
-    and node.name in {"servers", "restart_platform", "set_prefix"}
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    and node.name in {
+        "servers",
+        "restart_platform",
+        "set_prefix",
+        "on_message_edit",
+        "_message_edit_previews",
+    }
 ]
 for method in METHODS:
     method.decorator_list = []
@@ -35,9 +42,37 @@ class Forbidden(Exception):
     pass
 
 
+class Embed:
+    def __init__(self, *, title=None, description=None, **kwargs):
+        self.title = title
+        self.description = description
+        self.timestamp = kwargs.get("timestamp")
+        self.fields = []
+        self.footer = None
+
+    def add_field(self, *, name, value, inline=True):
+        self.fields.append(
+            types.SimpleNamespace(name=name, value=value, inline=inline)
+        )
+
+    def set_footer(self, *, text):
+        self.footer = text
+
+
+class File:
+    def __init__(self, fp, *, filename):
+        self.fp = fp
+        self.filename = filename
+
+
 namespace = {
     "asyncio": asyncio,
-    "discord": types.SimpleNamespace(Forbidden=Forbidden),
+    "io": io,
+    "discord": types.SimpleNamespace(
+        Forbidden=Forbidden,
+        Embed=Embed,
+        File=File,
+    ),
     "send_restart_command": lambda platform: f"{platform} restarted",
 }
 exec(compile(MODULE, str(ADMIN_PATH), "exec"), namespace)
@@ -219,3 +254,135 @@ class AdminRestartCommandTests(unittest.IsolatedAsyncioTestCase):
             admin.restart_platform.__globals__["send_restart_command"] = original
 
         self.assertIn("not enabled or running", channel.messages[0])
+
+
+class MessageEditHandlerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_user_content_edit_is_sent_to_mod_channel(self):
+        class ModHandler:
+            def __init__(self):
+                self.calls = []
+                self.destination = object()
+
+            def configured_channel(self, _guild):
+                return self.destination
+
+            @staticmethod
+            def sanitize_text(_guild, value):
+                return value
+
+            @staticmethod
+            def username(user):
+                return user.name
+
+            async def send(self, guild, **kwargs):
+                self.calls.append((guild, kwargs))
+
+        guild = types.SimpleNamespace(id=42)
+        author = types.SimpleNamespace(name="alice", bot=False)
+        channel = types.SimpleNamespace(name="general")
+        before = types.SimpleNamespace(content="Original", guild=guild)
+        after = types.SimpleNamespace(
+            id=100,
+            content="Revised",
+            guild=guild,
+            author=author,
+            channel=channel,
+            jump_url="https://discord.com/channels/42/99/100",
+            edited_at=None,
+        )
+        admin = Admin()
+        admin.mod_channel_handler = ModHandler()
+        admin.logger = Logger()
+
+        await admin.on_message_edit(before, after)
+
+        self.assertEqual(len(admin.mod_channel_handler.calls), 1)
+        _, kwargs = admin.mod_channel_handler.calls[0]
+        self.assertIs(kwargs["channel"], admin.mod_channel_handler.destination)
+        self.assertEqual(kwargs["embeds"][0].description, "Original")
+        self.assertEqual(kwargs["embeds"][1].description, "Revised")
+        self.assertEqual(kwargs["embeds"][0].fields[0].value, "alice")
+        self.assertEqual(kwargs["files"], [])
+
+    async def test_long_edit_attaches_complete_versions_and_uses_previews(self):
+        class ModHandler:
+            def __init__(self):
+                self.calls = []
+                self.destination = object()
+
+            def configured_channel(self, _guild):
+                return self.destination
+
+            @staticmethod
+            def sanitize_text(_guild, value):
+                return value
+
+            @staticmethod
+            def username(user):
+                return user.name
+
+            async def send(self, guild, **kwargs):
+                self.calls.append((guild, kwargs))
+
+        prefix = "a" * 4500
+        original_text = prefix + " OLD " + ("z" * 700)
+        revised_text = prefix + " NEW " + ("z" * 700)
+        guild = types.SimpleNamespace(id=42)
+        before = types.SimpleNamespace(content=original_text, guild=guild)
+        after = types.SimpleNamespace(
+            id=101,
+            content=revised_text,
+            guild=guild,
+            author=types.SimpleNamespace(name="alice", bot=False),
+            channel=types.SimpleNamespace(name="general"),
+            jump_url=None,
+            edited_at=None,
+        )
+        admin = Admin()
+        admin.mod_channel_handler = ModHandler()
+        admin.logger = Logger()
+
+        await admin.on_message_edit(before, after)
+
+        _, kwargs = admin.mod_channel_handler.calls[0]
+        self.assertLessEqual(len(kwargs["embeds"][0].description), 4096)
+        self.assertTrue(kwargs["embeds"][0].description.startswith("…"))
+        self.assertTrue(kwargs["embeds"][0].description.endswith("…"))
+        self.assertEqual(
+            [selected.filename for selected in kwargs["files"]],
+            [
+                "message-101-original.txt",
+                "message-101-revised.txt",
+            ],
+        )
+        self.assertEqual(
+            kwargs["files"][0].fp.getvalue().decode("utf-8"),
+            original_text,
+        )
+        self.assertEqual(
+            kwargs["files"][1].fp.getvalue().decode("utf-8"),
+            revised_text,
+        )
+
+    async def test_bot_and_no_content_change_are_ignored(self):
+        handler = types.SimpleNamespace(
+            configured_channel=lambda _guild: object()
+        )
+        admin = Admin()
+        admin.mod_channel_handler = handler
+        admin.logger = Logger()
+        guild = types.SimpleNamespace(id=42)
+        channel = types.SimpleNamespace(name="general")
+
+        for author, before_content, after_content in (
+            (types.SimpleNamespace(name="bot", bot=True), "a", "b"),
+            (types.SimpleNamespace(name="alice", bot=False), "same", "same"),
+        ):
+            before = types.SimpleNamespace(content=before_content, guild=guild)
+            after = types.SimpleNamespace(
+                content=after_content,
+                guild=guild,
+                author=author,
+                channel=channel,
+            )
+            await admin.on_message_edit(before, after)

@@ -119,6 +119,19 @@ class ModChannelHandlerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sent.fields[0].name, "Actor plain_username")
         self.assertEqual(sent.fields[0].value, "plain_username")
 
+    async def test_send_sanitizes_multiple_embeds(self):
+        embeds = [
+            discord.Embed(title="Before <@123>", description="<@123>"),
+            discord.Embed(title="After <@!123>", description="<@!123>"),
+        ]
+
+        await self.handler.send(self.guild, embeds=embeds)
+
+        sent = self.channel.send.await_args.kwargs["embeds"]
+        self.assertEqual(len(sent), 2)
+        self.assertEqual(sent[0].title, "Before plain_username")
+        self.assertEqual(sent[1].description, "plain_username")
+
     async def test_missing_mod_channel_skips_send(self):
         self.bot.platform_config_service.discord_guilds = lambda: {
             "42": {"mod_channel": "UNSET"}

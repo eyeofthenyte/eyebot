@@ -64,7 +64,16 @@ class ModChannelHandler:
             return None
         return guild.get_channel(channel_id)
 
-    async def send(self, guild, *, channel=None, content=None, embed=None, **kwargs):
+    async def send(
+        self,
+        guild,
+        *,
+        channel=None,
+        content=None,
+        embed=None,
+        embeds=None,
+        **kwargs,
+    ):
         """Send sanitized content to a guild's designated moderator channel."""
         destination = channel or self.configured_channel(guild)
         if destination is None:
@@ -74,8 +83,18 @@ class ModChannelHandler:
             content = self.sanitize_text(guild, content)
         if embed is not None:
             embed = self.sanitize_embed(guild, embed)
+        if embeds is not None:
+            embeds = [
+                self.sanitize_embed(guild, selected_embed)
+                for selected_embed in embeds[:10]
+            ]
 
         # Prevent user, role, and everyone notifications even if a future caller
         # passes mention syntax that this handler does not need to display.
         kwargs["allowed_mentions"] = discord.AllowedMentions.none()
-        return await destination.send(content=content, embed=embed, **kwargs)
+        return await destination.send(
+            content=content,
+            embed=embed,
+            embeds=embeds,
+            **kwargs,
+        )

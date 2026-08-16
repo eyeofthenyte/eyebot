@@ -1,4 +1,5 @@
 import asyncio
+import io
 
 import discord
 from discord.ext import commands
@@ -24,6 +25,140 @@ class Admin (commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         self.logger.info("Core functions started.")
+
+    def _message_edit_previews(
+        self,
+        before_content,
+        after_content,
+        *,
+        context=500,
+        max_length=3900,
+    ):
+        """Return matching, change-focused previews of two message versions."""
+        prefix_length = 0
+        shared_length = min(len(before_content), len(after_content))
+        while (
+            prefix_length < shared_length
+            and before_content[prefix_length] == after_content[prefix_length]
+        ):
+            prefix_length += 1
+
+        suffix_length = 0
+        before_remaining = len(before_content) - prefix_length
+        after_remaining = len(after_content) - prefix_length
+        while (
+            suffix_length < before_remaining
+            and suffix_length < after_remaining
+            and before_content[-(suffix_length + 1)]
+            == after_content[-(suffix_length + 1)]
+        ):
+            suffix_length += 1
+
+        def preview(value):
+            changed_end = len(value) - suffix_length
+            start = max(0, prefix_length - context)
+            end = min(len(value), changed_end + context)
+            selected = value[start:end]
+
+            if len(selected) > max_length:
+                selected = selected[: max_length - 14] + "\n…[truncated]"
+                end = len(value)
+
+            if start:
+                selected = "…\n" + selected
+            if end < len(value):
+                selected += "\n…"
+            return selected or "*No text in this version of the changed region.*"
+
+        return preview(before_content), preview(after_content)
+
+    @commands.Cog.listener()
+    async def on_message_edit(self, before, after):
+        """Audit cached user-message content edits in the moderator channel."""
+        guild = getattr(after, "guild", None)
+        author = getattr(after, "author", None)
+        if guild is None or author is None or getattr(author, "bot", False):
+            return
+
+        before_content = getattr(before, "content", "") or ""
+        after_content = getattr(after, "content", "") or ""
+        if before_content == after_content:
+            return
+
+        destination = self.mod_channel_handler.configured_channel(guild)
+        if destination is None:
+            return
+
+        original_content = self.mod_channel_handler.sanitize_text(
+            guild,
+            before_content,
+        )
+        revised_content = self.mod_channel_handler.sanitize_text(
+            guild,
+            after_content,
+        )
+        original_preview, revised_preview = self._message_edit_previews(
+            original_content,
+            revised_content,
+        )
+
+        channel = getattr(after, "channel", None)
+        channel_name = getattr(channel, "name", None)
+        channel_value = f"#{channel_name}" if channel_name else "Unknown channel"
+        author_value = self.mod_channel_handler.username(author)
+        jump_url = getattr(after, "jump_url", None)
+
+        original = discord.Embed(
+            title="Message edited — original",
+            description=original_preview,
+        )
+        original.add_field(name="Author", value=author_value, inline=True)
+        original.add_field(name="Channel", value=channel_value, inline=True)
+        if jump_url:
+            original.add_field(
+                name="Message",
+                value=f"[Open edited message]({jump_url})",
+                inline=False,
+            )
+
+        revised = discord.Embed(
+            title="Message edited — revised",
+            description=revised_preview,
+            timestamp=getattr(after, "edited_at", None),
+        )
+
+        files = []
+        if len(original_content) > 4096 or len(revised_content) > 4096:
+            message_id = getattr(after, "id", "unknown")
+            files = [
+                discord.File(
+                    io.BytesIO(original_content.encode("utf-8")),
+                    filename=f"message-{message_id}-original.txt",
+                ),
+                discord.File(
+                    io.BytesIO(revised_content.encode("utf-8")),
+                    filename=f"message-{message_id}-revised.txt",
+                ),
+            ]
+            revised.set_footer(
+                text="Complete original and revised messages are attached."
+            )
+
+        try:
+            await self.mod_channel_handler.send(
+                guild,
+                channel=destination,
+                embeds=[original, revised],
+                files=files,
+            )
+        except Exception as error:
+            self.logger.error(
+                "Unable to deliver message-edit audit for guild %s, "
+                "message %s: %s",
+                getattr(guild, "id", "unknown"),
+                getattr(after, "id", "unknown"),
+                error,
+            )
 
     async def cog_command_error(self, ctx, error):
         self.logger.error(f'Admin encountered error: {error}')
