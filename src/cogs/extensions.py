@@ -27,6 +27,29 @@ class Extensions(commands.Cog):
             self.bot.logger.log(f'missing argument')
             return
 
+    async def sync_slash_commands(self):
+        """Publish the current application-command tree to Discord."""
+        synced = await self.bot.tree.sync()
+        names = ", ".join(command.qualified_name for command in synced)
+        self.bot.logger.log(
+            f"Synced {len(synced)} Discord slash command(s): {names or 'none'}"
+        )
+        return synced
+
+    @commands.command(name="synccommands")
+    @commands.is_owner()
+    async def synccommands(self, ctx):
+        """Force Discord to refresh EyeBot's global slash commands."""
+        try:
+            synced = await self.sync_slash_commands()
+        except Exception as exc:
+            self.bot.logger.log(f"Discord slash-command sync failed: {exc}")
+            return await ctx.send(f"❌ Slash-command synchronization failed: `{exc}`")
+        await ctx.send(
+            f"✅ Synchronized {len(synced)} global slash command(s). "
+            "Discord may take a short time to refresh its command menu."
+        )
+
 
     #----------------------------
     # Load Command
@@ -65,6 +88,7 @@ class Extensions(commands.Cog):
 
         try:
             await self.bot.load_extension(f'cogs.{extension}')
+            await self.sync_slash_commands()
             self.bot.logger.log(f'Loaded extension - "{extension}" successfully.')
             icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/thumbs-up.png'), filename='thumbs-up.png')
             embed = discord.Embed(color=0x01f31d)
@@ -119,6 +143,7 @@ class Extensions(commands.Cog):
 
         try:
             await self.bot.unload_extension(f'cogs.{extension}')
+            await self.sync_slash_commands()
             self.bot.logger.log(f'Unloaded extension - "{extension}" successfully.')
             icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/thumbs-up.png'), filename='thumbs-up.png')
             embed = discord.Embed(color=0x01f31d)
@@ -183,6 +208,7 @@ class Extensions(commands.Cog):
 
             try:
                 await self.bot.load_extension(f'cogs.{extension}')
+                await self.sync_slash_commands()
                 self.bot.logger.log(f'    - "{extension}" has been loaded.')
                 self.bot.logger.log(f'Reloaded extension - "{extension}" successfully.')
                 icon = discord.File(os.path.join(os.path.dirname(__file__), '../../images/commands/thumbs-up.png'), filename='thumbs-up.png')

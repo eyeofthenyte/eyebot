@@ -808,6 +808,7 @@ required for normal operation.
 | Command | Caller requirement |
 | --- | --- |
 | `shutdown`, `restart`, `servers`, `load`, `unload`, `reload` | Bot owner |
+| `synccommands` | Bot owner |
 | `leave` | Server Administrator or bot owner |
 | `clear` / `purge` | Manage Messages |
 | `setmodchannel` | Manage Server |
@@ -923,6 +924,10 @@ Run `!namegen` without arguments to list the installed race libraries.
 | `!roll @<name>` | Roll a saved alias |
 | `/set gm` | Configure the guild GM channel and role interactively |
 | `/set privateroll [member]` | View, create, select, disable, or list private-roll channel assignments interactively |
+| `/set gmrole` | Configure the guild's Game Master role interactively |
+| `/set gmchannel` | Configure the private Game Master roll channel interactively |
+| `/set playerrole` | Configure the guild's Player role interactively |
+| `/set playerlounge <member>` | Create a private lounge for a configured player |
 
 Roll delivery flags must appear at the end of the command:
 
