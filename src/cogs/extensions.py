@@ -27,28 +27,64 @@ class Extensions(commands.Cog):
             self.bot.logger.log(f'missing argument')
             return
 
-    async def sync_slash_commands(self):
+    async def sync_slash_commands(self, *, guild=None):
         """Publish the current application-command tree to Discord."""
-        synced = await self.bot.tree.sync()
+        synced = await self.bot.tree.sync(guild=guild)
         names = ", ".join(
             getattr(command, "qualified_name", None)
             or getattr(command, "name", type(command).__name__)
             for command in synced
         )
+        destination = f"guild {guild.id}" if guild is not None else "globally"
         self.bot.logger.log(
-            f"Synced {len(synced)} Discord slash command(s): {names or 'none'}"
+            f"Synced {len(synced)} Discord slash command(s) {destination}: "
+            f"{names or 'none'}"
         )
         return synced
 
     @commands.command(name="synccommands")
     @commands.is_owner()
-    async def synccommands(self, ctx):
-        """Force Discord to refresh EyeBot's global slash commands."""
+    async def synccommands(self, ctx, scope: str = "global"):
+        """Synchronize global commands or create/remove immediate guild copies.
+
+        Usage:
+            !synccommands
+            !synccommands global
+            !synccommands guild
+            !synccommands clear-guild
+        """
+        selected = str(scope or "global").strip().casefold()
+        if selected not in {"global", "guild", "clear-guild"}:
+            return await ctx.send(
+                "❌ Scope must be `global`, `guild`, or `clear-guild`."
+            )
+        if selected != "global" and ctx.guild is None:
+            return await ctx.send(
+                "❌ Guild command synchronization must be run inside the target server."
+            )
         try:
-            synced = await self.sync_slash_commands()
+            if selected == "guild":
+                self.bot.tree.copy_global_to(guild=ctx.guild)
+                synced = await self.sync_slash_commands(guild=ctx.guild)
+            elif selected == "clear-guild":
+                self.bot.tree.clear_commands(guild=ctx.guild)
+                synced = await self.sync_slash_commands(guild=ctx.guild)
+            else:
+                synced = await self.sync_slash_commands()
         except Exception as exc:
             self.bot.logger.log(f"Discord slash-command sync failed: {exc}")
             return await ctx.send(f"❌ Slash-command synchronization failed: `{exc}`")
+        if selected == "guild":
+            return await ctx.send(
+                f"✅ Synchronized {len(synced)} slash command(s) immediately to "
+                f"**{ctx.guild.name}**. Guild copies override global commands with "
+                "the same names in this server."
+            )
+        if selected == "clear-guild":
+            return await ctx.send(
+                f"✅ Removed guild-specific slash commands from **{ctx.guild.name}**. "
+                "This server now uses the global command registrations."
+            )
         await ctx.send(
             f"✅ Synchronized {len(synced)} global slash command(s). "
             "Discord may take a short time to refresh its command menu."

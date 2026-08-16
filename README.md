@@ -822,6 +822,27 @@ required for normal operation.
 The bot owner is the owner of the Discord application as resolved by
 `discord.py`.
 
+### Slash-command synchronization
+
+The owner can publish the current application-command tree globally or create
+an immediate guild-scoped copy in the server where the command is invoked:
+
+```text
+!synccommands
+!synccommands global
+!synccommands guild
+!synccommands clear-guild
+```
+
+`global` is the production default. `guild` copies every currently registered
+global slash command into the current server, which makes additions such as
+`/set gmrole`, `/set gmchannel`, `/set playerrole`, and `/set playerlounge`
+available without waiting for global propagation. Guild copies override global
+commands with the same names in that server. Use `clear-guild` to remove those
+copies and return the server to global registrations. Guild synchronization
+must be invoked inside the target server and all synchronization modes remain
+restricted to the bot owner.
+
 ## Running and operating EyeBot
 
 ### Overall supervisor
