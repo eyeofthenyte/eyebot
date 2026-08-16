@@ -122,7 +122,7 @@ class SupportTicketService:
 
     @staticmethod
     def _blank() -> dict:
-        return {"next_number": 1, "tickets": {}}
+        return {"next_number": 1, "available_numbers": [], "tickets": {}}
 
     def _read(self, guild_id: str | int) -> dict:
         path = self.path(guild_id)
@@ -133,6 +133,13 @@ class SupportTicketService:
             if not isinstance(value, dict) or not isinstance(value.get("tickets"), dict):
                 raise ValueError("ticket store must contain a tickets mapping")
             value["next_number"] = max(1, int(value.get("next_number", 1)))
+            value["available_numbers"] = sorted(
+                {
+                    int(number)
+                    for number in (value.get("available_numbers") or ())
+                    if str(number).isdecimal() and int(number) > 0
+                }
+            )
             return value
         except (OSError, UnicodeError, json.JSONDecodeError, TypeError, ValueError) as error:
             backup = path.with_suffix(".json.bak")
@@ -197,7 +204,11 @@ class SupportTicketService:
         if len(selected_description) < 10:
             raise SupportTicketError("The ticket description must contain at least 10 characters.")
         if len(selected_description) > maximum:
-            raise SupportTicketError(f"The ticket description cannot exceed {maximum} characters.")
+            raise SupportTicketError(
+                f"Your ticket description contains {len(selected_description):,} "
+                f"characters, but the limit is {maximum:,}. Shorten the description "
+                "and attach any additional details as one or more image files."
+            )
         selected_link = validate_message_link(message_link, guild_id)
         with self._lock:
             store = self._read(guild_id)
@@ -210,7 +221,12 @@ class SupportTicketService:
                 raise SupportTicketError(
                     f"You may have at most {self.maximum_open_per_user} open support tickets."
                 )
-            sequence = store["next_number"]
+            available = store.setdefault("available_numbers", [])
+            if available:
+                sequence = available.pop(0)
+            else:
+                sequence = store["next_number"]
+                store["next_number"] = sequence + 1
             number = f"T-{sequence:06d}"
             timestamp = utc_now()
             ticket = SupportTicket(
@@ -223,10 +239,35 @@ class SupportTicketService:
                 opened_at=timestamp,
                 history=[{"action": "opened", "actor_id": str(opener_id), "at": timestamp}],
             )
-            store["next_number"] = sequence + 1
             store["tickets"][number] = ticket.to_dict()
             self._write(guild_id, store)
             return ticket
+
+    def discard_failed_creation(self, guild_id, number) -> None:
+        """Remove an undelivered ticket and release its sequence number."""
+        selected = str(number or "").strip().upper()
+        if not re.fullmatch(r"T-[0-9]{6}", selected):
+            raise SupportTicketError("The failed ticket number is invalid.")
+        sequence = int(selected[2:])
+        with self._lock:
+            store = self._read(guild_id)
+            ticket = store["tickets"].get(selected)
+            if not isinstance(ticket, dict):
+                return
+            if ticket.get("public_message_id") or ticket.get("thread_id"):
+                raise SupportTicketError(
+                    "A delivered ticket cannot release its ticket number."
+                )
+            store["tickets"].pop(selected, None)
+            available = set(store.setdefault("available_numbers", []))
+            available.add(sequence)
+            next_number = int(store["next_number"])
+            while next_number > 1 and next_number - 1 in available:
+                available.remove(next_number - 1)
+                next_number -= 1
+            store["next_number"] = next_number
+            store["available_numbers"] = sorted(available)
+            self._write(guild_id, store)
 
     def get(self, guild_id, number) -> SupportTicket:
         selected = str(number or "").strip().upper()

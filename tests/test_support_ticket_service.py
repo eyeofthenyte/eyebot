@@ -39,6 +39,44 @@ class SupportTicketServiceTests(unittest.TestCase):
         self.assertEqual(second.number, "T-000002")
         self.assertEqual(self.service.get("42", first.number).opener_id, "7")
 
+    def test_oversized_description_reports_count_limit_and_attachment_option(self):
+        service = SupportTicketService(
+            {"max_description_length": 100},
+            self.root,
+        )
+
+        with self.assertRaises(SupportTicketError) as raised:
+            service.create("42", "7", "x" * 101)
+
+        message = str(raised.exception)
+        self.assertIn("101 characters", message)
+        self.assertIn("limit is 100", message)
+        self.assertIn("image files", message)
+
+    def test_failed_creation_releases_ticket_number(self):
+        failed = self.service.create(
+            "42", "7", "This ticket fails during Discord delivery."
+        )
+
+        self.service.discard_failed_creation("42", failed.number)
+        replacement = self.service.create(
+            "42", "8", "This ticket succeeds after the failed attempt."
+        )
+
+        self.assertEqual(failed.number, "T-000001")
+        self.assertEqual(replacement.number, "T-000001")
+        self.assertEqual(len(self.service.list("42")), 1)
+
+    def test_failed_creation_hole_is_reused_after_a_later_ticket(self):
+        failed = self.service.create("42", "7", "The first delivery will fail.")
+        later = self.service.create("42", "8", "The second delivery succeeds.")
+
+        self.service.discard_failed_creation("42", failed.number)
+        replacement = self.service.create("42", "9", "The released number is reused.")
+
+        self.assertEqual(later.number, "T-000002")
+        self.assertEqual(replacement.number, "T-000001")
+
     def test_allows_three_open_tickets_per_user_and_releases_slot_on_close(self):
         tickets = [
             self.service.create("42", "7", f"Support issue number {index} needs help.")

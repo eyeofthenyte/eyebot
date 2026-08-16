@@ -77,12 +77,16 @@ class TicketModal(discord.ui.Modal):
         self.cog = cog
         self.guild_id = guild_id
         self.opener_id = opener_id
+        description_limit = cog.maximum_description_length
         self.description_input = discord.ui.TextInput(
             style=discord.TextStyle.paragraph,
-            placeholder="Describe the issue and what assistance you need.",
+            placeholder=(
+                "Describe the issue and what assistance you need "
+                f"(maximum {description_limit:,} characters)."
+            ),
             required=True,
             min_length=10,
-            max_length=cog.maximum_description_length,
+            max_length=description_limit,
         )
         self.link_input = discord.ui.TextInput(
             placeholder="https://discord.com/channels/server/channel/message",
@@ -91,7 +95,14 @@ class TicketModal(discord.ui.Modal):
         )
         self.images_input = None
         self.add_item(
-            discord.ui.Label(text="Issue description", component=self.description_input)
+            discord.ui.Label(
+                text="Issue description",
+                description=(
+                    f"Character limit: {description_limit:,}. Discord displays the "
+                    "live current/limit count in the text field."
+                ),
+                component=self.description_input,
+            )
         )
         self.add_item(
             discord.ui.Label(
@@ -697,6 +708,14 @@ class Support(commands.Cog, name="Support Tickets"):
         guild = interaction.guild
         if guild is None or guild.id != self._snowflake(interaction.guild_id):
             raise SupportTicketError("Support tickets must be opened from a server.")
+        selected_description = str(description or "").strip()
+        if len(selected_description) > self.maximum_description_length:
+            raise SupportTicketError(
+                f"Your ticket description contains {len(selected_description):,} "
+                f"characters, but the limit is {self.maximum_description_length:,}. "
+                "Shorten the description and attach any additional details as one or "
+                "more image files."
+            )
         channel = self.support_channel(guild)
         mod_channel = self.mod_channel(guild)
         if channel is None or mod_channel is None:
@@ -719,7 +738,7 @@ class Support(commands.Cog, name="Support Tickets"):
         ticket = self.service.create(
             guild.id,
             interaction.user.id,
-            description,
+            selected_description,
             message_link,
             image_count=len(images),
         )
@@ -761,13 +780,6 @@ class Support(commands.Cog, name="Support Tickets"):
                 f"{self.safe_error(error)}",
                 guild_id=guild.id,
             )
-            self.service.close(
-                guild.id,
-                ticket.number,
-                getattr(self.bot.user, "id", 0),
-                "canceled",
-                "EyeBot canceled ticket creation after Discord delivery failed.",
-            )
             try:
                 if public_message is not None:
                     await public_message.delete()
@@ -775,6 +787,14 @@ class Support(commands.Cog, name="Support Tickets"):
                     await thread.edit(locked=True, archived=True)
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 pass
+            try:
+                self.service.discard_failed_creation(guild.id, ticket.number)
+            except SupportTicketError as cleanup_error:
+                self.logger.error(
+                    f"Support ticket {ticket.number} number release failed: "
+                    f"{self.safe_error(cleanup_error)}",
+                    guild_id=guild.id,
+                )
             raise SupportTicketError(
                 f"EyeBot could not finish {delivery_stage}. No ticket was opened. "
                 "A moderator can check EyeBot's permissions and error log for details."

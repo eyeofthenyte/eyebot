@@ -85,6 +85,11 @@ class SupportTicketCogTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(modal.images_input.required)
         self.assertEqual(modal.images_input.min_values, 0)
         self.assertEqual(modal.images_input.max_values, 4)
+        description_label = modal.children[0]
+        self.assertEqual(modal.description_input.max_length, 4000)
+        self.assertIn("4,000", description_label.description)
+        self.assertIn("current/limit", description_label.description)
+        self.assertIn("maximum 4,000 characters", modal.description_input.placeholder)
 
     async def test_modal_images_are_downloaded_immediately(self):
         attachment = FakeAttachment()
