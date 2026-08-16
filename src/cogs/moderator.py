@@ -316,6 +316,22 @@ class PrivateRollView(ManagedView):
         self.cog.set_user_channel(self.guild, self.target.id, None)
         await self.finish(interaction, f"✅ Private-roll routing disabled for **{self.target.display_name}**.")
 
+    @discord.ui.button(label="List Assignments", style=discord.ButtonStyle.secondary, row=3)
+    async def list_assignments(self, interaction, _button):
+        assignments = self.cog.guild_config(self.guild).get("user_channels", {})
+        lines = []
+        for user_id, channel_id in assignments.items():
+            member = self.guild.get_member(int(user_id)) if str(user_id).isdigit() else None
+            channel = self.guild.get_channel(int(channel_id)) if str(channel_id).isdigit() else None
+            if member is not None and channel is not None:
+                lines.append(f"• **{member.display_name}** → {channel.mention}")
+        content = (
+            "🔒 **Private-roll channel assignments**\n" + "\n".join(lines)
+            if lines
+            else "📭 No private-roll channels are configured in this server."
+        )
+        await interaction.response.send_message(content[:2000], ephemeral=True)
+
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary, row=2)
     async def cancel(self, interaction, _button):
         await self.finish(interaction, "Private-roll setup cancelled.")
@@ -494,8 +510,11 @@ class Moderator(commands.GroupCog, group_name="set", group_description="Configur
     @app_commands.guild_only()
     async def privateroll(self, interaction: discord.Interaction, member: discord.Member | None = None):
         target = member or interaction.user
+        channel_id = self.guild_config(interaction.guild).get("user_channels", {}).get(str(target.id))
+        channel = interaction.guild.get_channel(int(channel_id)) if str(channel_id).isdigit() else None
+        current = channel.mention if channel is not None else "not configured"
         await interaction.response.send_message(
-            f"Configure the private-roll channel for **{target.display_name}**:",
+            f"Configure the private-roll channel for **{target.display_name}**. Current: {current}.",
             view=PrivateRollView(self, interaction.guild, target),
             ephemeral=True,
         )

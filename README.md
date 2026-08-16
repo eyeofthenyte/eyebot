@@ -642,8 +642,8 @@ socialmedia_sources_channel: "UNSET"
 timers: {}
 ```
 
-These entries are normally maintained by `!setprefix`, `/set gm`, `!alias`,
-`!privateroll`, `!setmodchannel`, `!platform ... enable`, and `!settimer`;
+These entries are normally maintained by `!setprefix`, `/set gm`,
+`/set privateroll`, `!alias`, `!setmodchannel`, `!platform ... enable`, and `!settimer`;
 manual editing is optional.
 Only numeric Discord snowflake IDs are accepted as filenames.
 
@@ -815,8 +815,7 @@ required for normal operation.
 | `setprefix` | Manage Server |
 | `platform` | Manage Server |
 | `/set gm` | Manage Server |
-| `privateroll list` | Manage Messages, Manage Server, or Administrator |
-| `privateroll set ... @user` | Manage Messages, Manage Server, or Administrator |
+| `/set privateroll [member]` | Manage Server |
 | `alias remove` | Alias creator or Manage Server |
 
 The bot owner is the owner of the Discord application as resolved by
@@ -923,10 +922,7 @@ Run `!namegen` without arguments to list the installed race libraries.
 | `!alias list [@user]` | List guild aliases, optionally by creator |
 | `!roll @<name>` | Roll a saved alias |
 | `/set gm` | Configure the guild GM channel and role interactively |
-| `!privateroll set #channel [@user]` | Set a private roll channel |
-| `!privateroll disable` | Remove your private roll channel |
-| `!privateroll show` | Show your private roll channel |
-| `!privateroll list` | List assignments; moderators only |
+| `/set privateroll [member]` | View, create, select, disable, or list private-roll channel assignments interactively |
 
 Roll delivery flags must appear at the end of the command:
 
