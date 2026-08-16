@@ -798,10 +798,18 @@ Grant only what the enabled commands need:
 | Manage Messages | `clear`/`purge`, platform-command cleanup, invoking-message cleanup, reaction cleanup |
 | Manage Channels | Creating DM/mod channels and timer administration |
 | Manage Roles | Creating the configured DM role |
+| Create Private Threads | Opening private support-ticket threads |
+| Send Messages in Threads | Posting ticket details and allowing thread conversations |
+| Manage Threads | Adding ticket participants and archiving resolved tickets |
 
 If EyeBot creates roles or channels, place its role high enough in the server
 role hierarchy to perform those operations. Administrator permission is not
 required for normal operation.
+
+For support tickets, the requesting member must have **View Channel** and
+**Send Messages in Threads** in the configured support channel. EyeBot checks
+the member's effective permissions before reserving a ticket number and reports
+the missing permission directly.
 
 ### Command caller permissions
 

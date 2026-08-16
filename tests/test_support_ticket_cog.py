@@ -162,6 +162,59 @@ class SupportTicketCogTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(Support.plain_username(member), "plain\\_user")
 
+    def test_ticket_permission_check_rejects_user_without_parent_visibility(self):
+        bot_permissions = SimpleNamespace(
+            view_channel=True,
+            send_messages=True,
+            create_private_threads=True,
+            send_messages_in_threads=True,
+            manage_threads=True,
+            attach_files=True,
+        )
+        user_permissions = SimpleNamespace(
+            view_channel=False,
+            send_messages_in_threads=True,
+        )
+        bot_member = object()
+        user = object()
+        channel = SimpleNamespace(
+            mention="#support_tickets",
+            permissions_for=lambda member: (
+                bot_permissions if member is bot_member else user_permissions
+            ),
+        )
+
+        problem = Support.ticket_permission_problem(
+            channel,
+            SimpleNamespace(me=bot_member),
+            user,
+        )
+
+        self.assertIn("cannot view", problem)
+        self.assertIn("View Channel", problem)
+
+    def test_ticket_permission_check_reports_missing_bot_thread_permission(self):
+        bot_permissions = SimpleNamespace(
+            view_channel=True,
+            send_messages=True,
+            create_private_threads=False,
+            send_messages_in_threads=True,
+            manage_threads=True,
+            attach_files=True,
+        )
+        channel = SimpleNamespace(
+            mention="#support_tickets",
+            permissions_for=lambda _member: bot_permissions,
+        )
+
+        problem = Support.ticket_permission_problem(
+            channel,
+            SimpleNamespace(me=object()),
+            object(),
+        )
+
+        self.assertIn("Create Private Threads", problem)
+
 
 if __name__ == "__main__":
     unittest.main()

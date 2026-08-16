@@ -372,6 +372,43 @@ class Support(commands.Cog, name="Support Tickets"):
         except (TypeError, ValueError):
             return None
 
+    @staticmethod
+    def ticket_permission_problem(channel, guild, user, *, has_images=False):
+        """Return an actionable permission failure before ticket creation."""
+        bot_permissions = channel.permissions_for(guild.me)
+        required_bot_permissions = (
+            ("view_channel", "View Channel"),
+            ("send_messages", "Send Messages"),
+            ("create_private_threads", "Create Private Threads"),
+            ("send_messages_in_threads", "Send Messages in Threads"),
+            ("manage_threads", "Manage Threads"),
+        )
+        if has_images:
+            required_bot_permissions += (("attach_files", "Attach Files"),)
+        missing = [
+            label
+            for attribute, label in required_bot_permissions
+            if not getattr(bot_permissions, attribute, False)
+        ]
+        if missing:
+            return (
+                "EyeBot is missing required permissions in "
+                f"{channel.mention}: {', '.join(missing)}."
+            )
+
+        user_permissions = channel.permissions_for(user)
+        if not getattr(user_permissions, "view_channel", False):
+            return (
+                f"You cannot view the configured support channel {channel.mention}. "
+                "A moderator must grant your role View Channel permission there."
+            )
+        if not getattr(user_permissions, "send_messages_in_threads", False):
+            return (
+                f"You cannot participate in threads in {channel.mention}. "
+                "A moderator must grant your role Send Messages in Threads permission there."
+            )
+        return None
+
     async def resolve_thread(self, guild, thread_id):
         if not thread_id:
             return None
@@ -671,6 +708,14 @@ class Support(commands.Cog, name="Support Tickets"):
                 if linked_channel is None or not linked_channel.permissions_for(interaction.user).view_channel:
                     raise SupportTicketError("You may only link to a message you can view.")
         images = await download_ticket_images(self.service, attachments)
+        permission_problem = self.ticket_permission_problem(
+            channel,
+            guild,
+            interaction.user,
+            has_images=bool(images),
+        )
+        if permission_problem:
+            raise SupportTicketError(permission_problem)
         ticket = self.service.create(
             guild.id,
             interaction.user.id,
@@ -680,6 +725,7 @@ class Support(commands.Cog, name="Support Tickets"):
         )
         thread = None
         public_message = None
+        delivery_stage = "creating the private thread"
         try:
             thread = await channel.create_thread(
                 name=f"{ticket.number.lower()}-support",
@@ -688,6 +734,7 @@ class Support(commands.Cog, name="Support Tickets"):
                 auto_archive_duration=self.thread_archive_minutes,
                 reason=f"Support ticket {ticket.number} opened",
             )
+            delivery_stage = "adding the requester to the private thread"
             await thread.add_user(interaction.user)
             text = f"## {ticket.number}\n{ticket.description}"
             if ticket.message_link:
@@ -696,17 +743,24 @@ class Support(commands.Cog, name="Support Tickets"):
                 discord.File(io.BytesIO(image.data), filename=image.filename)
                 for image in images
             ]
+            delivery_stage = "posting the ticket contents"
             await thread.send(
                 text,
                 files=files,
                 suppress_embeds=True,
                 allowed_mentions=discord.AllowedMentions.none(),
             )
+            delivery_stage = "posting the public ticket status"
             public_message = await channel.send(
                 view=TicketControlView(self, ticket),
                 content=f"🎫 Ticket `{ticket.number}` has been opened.",
             )
         except (discord.Forbidden, discord.HTTPException) as error:
+            self.logger.error(
+                f"Support ticket {ticket.number} failed while {delivery_stage}: "
+                f"{self.safe_error(error)}",
+                guild_id=guild.id,
+            )
             self.service.close(
                 guild.id,
                 ticket.number,
@@ -722,7 +776,8 @@ class Support(commands.Cog, name="Support Tickets"):
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 pass
             raise SupportTicketError(
-                "EyeBot could not create the private ticket thread. No ticket was opened."
+                f"EyeBot could not finish {delivery_stage}. No ticket was opened. "
+                "A moderator can check EyeBot's permissions and error log for details."
             ) from error
         ticket = self.service.update_delivery(
             guild.id,
