@@ -811,6 +811,11 @@ For support tickets, the requesting member must have **View Channel** and
 the member's effective permissions before reserving a ticket number and reports
 the missing permission directly.
 
+Ticket descriptions are delivered in a Discord embed so the configured
+4,000-character description limit remains below Discord's 4,096-character
+embed-description limit. Delivery failures are written to the terminal and the
+configured moderator audit channel with the failed stage and Discord error.
+
 ### Command caller permissions
 
 | Command | Caller requirement |

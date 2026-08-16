@@ -340,6 +340,24 @@ class Support(commands.Cog, name="Support Tickets"):
     def safe_error(self, error):
         return f"{type(error).__name__}: {error}"[:500]
 
+    def ticket_delivery_failure_message(self, error, stage):
+        details = str(error)
+        if (
+            getattr(error, "code", None) == 50035
+            and "content" in details.casefold()
+            and "2000" in details
+        ):
+            return (
+                "EyeBot could not post the ticket description because Discord treated "
+                "it as message content with a 2,000-character limit. EyeBot now uses "
+                f"an embed for descriptions up to the configured "
+                f"{self.maximum_description_length:,}-character limit. Please retry."
+            )
+        return (
+            f"EyeBot could not finish {stage}. No ticket was opened. "
+            "A moderator has been notified with the Discord error details."
+        )
+
     async def cog_app_command_error(self, interaction, error):
         self.logger.error(
             "Support ticket application command failed: " + self.safe_error(error),
@@ -755,18 +773,14 @@ class Support(commands.Cog, name="Support Tickets"):
             )
             delivery_stage = "adding the requester to the private thread"
             await thread.add_user(interaction.user)
-            text = f"## {ticket.number}\n{ticket.description}"
-            if ticket.message_link:
-                text += f"\n\nMessage link: {ticket.message_link}"
             files = [
                 discord.File(io.BytesIO(image.data), filename=image.filename)
                 for image in images
             ]
             delivery_stage = "posting the ticket contents"
             await thread.send(
-                text,
+                embed=self.ticket_embed(ticket, opener=interaction.user),
                 files=files,
-                suppress_embeds=True,
                 allowed_mentions=discord.AllowedMentions.none(),
             )
             delivery_stage = "posting the public ticket status"
@@ -775,10 +789,18 @@ class Support(commands.Cog, name="Support Tickets"):
                 content=f"🎫 Ticket `{ticket.number}` has been opened.",
             )
         except (discord.Forbidden, discord.HTTPException) as error:
+            safe_details = self.safe_error(error)
             self.logger.error(
-                f"Support ticket {ticket.number} failed while {delivery_stage}: "
-                f"{self.safe_error(error)}",
+                f"Support ticket {ticket.number} failed while "
+                f"{delivery_stage}: {safe_details}",
                 guild_id=guild.id,
+            )
+            await self.audit(
+                guild,
+                f"Ticket `{ticket.number}` opened by "
+                f"{self.plain_username(interaction.user)} failed while "
+                f"**{delivery_stage}**. Discord error: `{safe_details}`. "
+                "The ticket number will be released for reuse.",
             )
             try:
                 if public_message is not None:
@@ -796,8 +818,7 @@ class Support(commands.Cog, name="Support Tickets"):
                     guild_id=guild.id,
                 )
             raise SupportTicketError(
-                f"EyeBot could not finish {delivery_stage}. No ticket was opened. "
-                "A moderator can check EyeBot's permissions and error log for details."
+                self.ticket_delivery_failure_message(error, delivery_stage)
             ) from error
         ticket = self.service.update_delivery(
             guild.id,

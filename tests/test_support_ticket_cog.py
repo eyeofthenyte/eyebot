@@ -117,6 +117,39 @@ class SupportTicketCogTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(open_view.children[0].disabled)
         self.assertTrue(all(item.disabled for item in closed_view.children))
 
+    def test_ticket_embed_supports_configured_4000_character_description(self):
+        ticket = SupportTicket(
+            number="T-000001",
+            guild_id="42",
+            opener_id="7",
+            description="x" * 4000,
+            opened_at="2026-08-16T00:00:00+00:00",
+        )
+
+        embed = Support.ticket_embed(None, ticket)
+
+        self.assertEqual(len(embed.description), 4000)
+        self.assertLessEqual(len(embed.description), 4096)
+
+    def test_content_limit_failure_has_specific_ephemeral_message(self):
+        class ContentLimitError:
+            code = 50035
+
+            def __str__(self):
+                return "Invalid Form Body In content: Must be 2000 or fewer in length."
+
+        cog = SimpleNamespace(maximum_description_length=4000)
+
+        message = Support.ticket_delivery_failure_message(
+            cog,
+            ContentLimitError(),
+            "posting the ticket contents",
+        )
+
+        self.assertIn("2,000-character limit", message)
+        self.assertIn("4,000-character limit", message)
+        self.assertIn("Please retry", message)
+
     async def test_close_modal_requires_a_brief_note(self):
         cog = FakeCog()
         cog.maximum_close_note_length = 1000
