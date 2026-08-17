@@ -22,6 +22,8 @@ METHODS = [
         "restart_platform",
         "set_prefix",
         "on_message_edit",
+        "on_message_delete",
+        "_resolve_message_deleter",
         "_message_edit_previews",
     }
 ]
@@ -39,6 +41,10 @@ ast.fix_missing_locations(MODULE)
 
 
 class Forbidden(Exception):
+    pass
+
+
+class HTTPException(Exception):
     pass
 
 
@@ -70,9 +76,17 @@ namespace = {
     "io": io,
     "discord": types.SimpleNamespace(
         Forbidden=Forbidden,
+        HTTPException=HTTPException,
         Embed=Embed,
         File=File,
+        AuditLogAction=types.SimpleNamespace(message_delete="message_delete"),
+        utils=types.SimpleNamespace(
+            utcnow=lambda: __import__("datetime").datetime.now(
+                (__import__("datetime").timezone.utc)
+            )
+        ),
     ),
+    "timedelta": __import__("datetime").timedelta,
     "send_restart_command": lambda platform: f"{platform} restarted",
 }
 exec(compile(MODULE, str(ADMIN_PATH), "exec"), namespace)
@@ -386,3 +400,114 @@ class MessageEditHandlerTests(unittest.IsolatedAsyncioTestCase):
                 channel=channel,
             )
             await admin.on_message_edit(before, after)
+
+
+class MessageDeleteHandlerTests(unittest.IsolatedAsyncioTestCase):
+    @staticmethod
+    def message(*, content="Original message", audit_entries=()):
+        class Guild:
+            id = 42
+
+            def audit_logs(self, **_kwargs):
+                async def entries():
+                    for entry in audit_entries:
+                        yield entry
+
+                return entries()
+
+        guild = Guild()
+        author = types.SimpleNamespace(id=7, name="alice", bot=False)
+        channel = types.SimpleNamespace(id=99, name="general")
+        return types.SimpleNamespace(
+            id=100,
+            content=content,
+            guild=guild,
+            author=author,
+            channel=channel,
+            attachments=(types.SimpleNamespace(filename="map.png"),),
+        )
+
+    @staticmethod
+    def handler():
+        class ModHandler:
+            def __init__(self):
+                self.calls = []
+                self.destination = object()
+
+            def configured_channel(self, _guild):
+                return self.destination
+
+            @staticmethod
+            def sanitize_text(_guild, value):
+                return value
+
+            @staticmethod
+            def username(user):
+                return user.name
+
+            async def send(self, guild, **kwargs):
+                self.calls.append((guild, kwargs))
+
+        return ModHandler()
+
+    async def test_moderator_deletion_uses_matching_audit_entry(self):
+        moderator = types.SimpleNamespace(id=8, name="moderator")
+        entry = types.SimpleNamespace(
+            user=moderator,
+            target=types.SimpleNamespace(id=7),
+            extra=types.SimpleNamespace(
+                channel=types.SimpleNamespace(id=99)
+            ),
+        )
+        message = self.message(audit_entries=(entry,))
+        admin = Admin()
+        admin.mod_channel_handler = self.handler()
+        admin.logger = Logger()
+
+        await admin.on_message_delete(message)
+
+        self.assertEqual(len(admin.mod_channel_handler.calls), 1)
+        _, kwargs = admin.mod_channel_handler.calls[0]
+        embed = kwargs["embed"]
+        fields = {field.name: field.value for field in embed.fields}
+        self.assertEqual(embed.description, "Original message")
+        self.assertEqual(fields["Author"], "alice")
+        self.assertEqual(fields["Deleted by"], "moderator")
+        self.assertIn("audit log", fields["Deletion identification"])
+        self.assertIn("map.png", fields["Attachments"])
+
+    async def test_long_deleted_message_is_attached_in_full(self):
+        content = "x" * 5000
+        message = self.message(content=content)
+        admin = Admin()
+        admin.mod_channel_handler = self.handler()
+        admin.logger = Logger()
+
+        original_sleep = admin._resolve_message_deleter.__globals__["asyncio"].sleep
+
+        async def no_wait(_delay):
+            return None
+
+        admin._resolve_message_deleter.__globals__["asyncio"].sleep = no_wait
+        try:
+            await admin.on_message_delete(message)
+        finally:
+            admin._resolve_message_deleter.__globals__["asyncio"].sleep = (
+                original_sleep
+            )
+
+        _, kwargs = admin.mod_channel_handler.calls[0]
+        self.assertLessEqual(len(kwargs["embed"].description), 4096)
+        self.assertEqual(
+            kwargs["files"][0].filename,
+            "message-100-deleted.txt",
+        )
+        self.assertEqual(
+            kwargs["files"][0].fp.getvalue().decode("utf-8"),
+            content,
+        )
+        fields = {
+            field.name: field.value for field in kwargs["embed"].fields
+        }
+        self.assertEqual(fields["Deleted by"], "alice")
+        self.assertIn("self-deleted", fields["Deletion identification"])

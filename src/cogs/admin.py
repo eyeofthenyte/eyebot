@@ -1,5 +1,6 @@
 import asyncio
 import io
+from datetime import timedelta
 
 import discord
 from discord.ext import commands
@@ -157,6 +158,143 @@ class Admin (commands.Cog):
                 "message %s: %s",
                 getattr(guild, "id", "unknown"),
                 getattr(after, "id", "unknown"),
+                error,
+            )
+
+    async def _resolve_message_deleter(self, message):
+        """Best-effort lookup of a moderator who deleted a cached message."""
+        guild = message.guild
+        detected_at = discord.utils.utcnow()
+        author_id = getattr(message.author, "id", None)
+        channel_id = getattr(message.channel, "id", None)
+
+        for attempt in range(3):
+            if attempt:
+                await asyncio.sleep(0.75)
+            try:
+                async for entry in guild.audit_logs(
+                    limit=6,
+                    action=discord.AuditLogAction.message_delete,
+                    after=detected_at - timedelta(seconds=15),
+                ):
+                    target_id = getattr(getattr(entry, "target", None), "id", None)
+                    entry_channel_id = getattr(
+                        getattr(getattr(entry, "extra", None), "channel", None),
+                        "id",
+                        None,
+                    )
+                    if target_id == author_id and entry_channel_id == channel_id:
+                        return (
+                            self.mod_channel_handler.username(entry.user),
+                            "Identified from Discord's audit log.",
+                        )
+            except (discord.Forbidden, discord.HTTPException) as error:
+                self.logger.warning(
+                    "Unable to inspect the Discord audit log for deleted "
+                    "message %s in guild %s: %s",
+                    getattr(message, "id", "unknown"),
+                    getattr(guild, "id", "unknown"),
+                    error,
+                )
+                return "Unknown", "Discord audit log unavailable to EyeBot."
+
+        return (
+            self.mod_channel_handler.username(message.author),
+            "Likely self-deleted; Discord does not audit self-deletions.",
+        )
+
+    @commands.Cog.listener()
+    async def on_message_delete(self, message):
+        """Record cached user-message deletions in the moderator channel."""
+        guild = getattr(message, "guild", None)
+        author = getattr(message, "author", None)
+        if guild is None or author is None or getattr(author, "bot", False):
+            return
+
+        destination = self.mod_channel_handler.configured_channel(guild)
+        if destination is None:
+            return
+
+        content = self.mod_channel_handler.sanitize_text(
+            guild,
+            getattr(message, "content", "") or "",
+        )
+        if content:
+            preview = content
+            if len(preview) > 4096:
+                preview = preview[:4083] + "\n…[truncated]"
+        else:
+            preview = "*No text content.*"
+
+        deleter, deletion_note = await self._resolve_message_deleter(message)
+        channel = getattr(message, "channel", None)
+        channel_name = getattr(channel, "name", None)
+        channel_value = f"#{channel_name}" if channel_name else "Unknown channel"
+
+        embed = discord.Embed(
+            title="Message deleted",
+            description=preview,
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.add_field(
+            name="Author",
+            value=self.mod_channel_handler.username(author),
+            inline=True,
+        )
+        embed.add_field(name="Channel", value=channel_value, inline=True)
+        embed.add_field(name="Deleted by", value=deleter, inline=True)
+        embed.add_field(
+            name="Deletion identification",
+            value=deletion_note,
+            inline=False,
+        )
+        embed.add_field(
+            name="Message ID",
+            value=str(getattr(message, "id", "Unknown")),
+            inline=False,
+        )
+
+        attachment_names = [
+            getattr(attachment, "filename", "unnamed attachment")
+            for attachment in getattr(message, "attachments", ())
+        ]
+        if attachment_names:
+            attachment_summary = "\n".join(
+                f"• {name}" for name in attachment_names
+            )
+            if len(attachment_summary) > 1024:
+                attachment_summary = attachment_summary[:1011] + "\n…[truncated]"
+            embed.add_field(
+                name="Attachments",
+                value=attachment_summary,
+                inline=False,
+            )
+
+        files = []
+        if len(content) > 4096:
+            files.append(
+                discord.File(
+                    io.BytesIO(content.encode("utf-8")),
+                    filename=(
+                        f"message-{getattr(message, 'id', 'unknown')}-deleted.txt"
+                    ),
+                )
+            )
+            embed.set_footer(text="The complete deleted message is attached.")
+
+        try:
+            await self.mod_channel_handler.send(
+                guild,
+                channel=destination,
+                embed=embed,
+                files=files,
+            )
+        except Exception as error:
+            self.logger.error(
+                "Unable to deliver message-deletion audit for guild %s, "
+                "message %s: %s",
+                getattr(guild, "id", "unknown"),
+                getattr(message, "id", "unknown"),
                 error,
             )
 
