@@ -78,7 +78,10 @@ class CharacterSectionSelect(discord.ui.Select):
             discord.SelectOption(label="Skills & Saves", value="skills", emoji="🎯"),
             discord.SelectOption(label="Actions", value="actions", emoji="⚔️"),
             discord.SelectOption(label="Spells", value="spells", emoji="✨"),
-            discord.SelectOption(label="Imported Details", value="details", emoji="📖"),
+            discord.SelectOption(label="Equipment", value="equipment", emoji="🎒"),
+            discord.SelectOption(label="Features & Traits", value="features", emoji="📖"),
+            discord.SelectOption(label="Background", value="background", emoji="🪶"),
+            discord.SelectOption(label="Notes", value="notes", emoji="📝"),
         ]
         super().__init__(
             placeholder="Select a character-sheet section",
@@ -358,6 +361,14 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
     def section_embeds(self, character, section):
         if section == "summary":
             return [self.summary_embed(character)]
+        structured_sections = {
+            "equipment": "Equipment",
+            "features": "Features and Traits",
+            "background": "Background",
+            "notes": "Notes",
+        }
+        if section in structured_sections:
+            return self._structured_section_embeds(character, structured_sections[section])
         title = f"{_display_name(character, markdown=False)} — {section.title()}"
         page_fields = []
         if section == "skills":
@@ -468,6 +479,63 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
                 embed.add_field(name=name, value=value, inline=False)
             embeds.append(embed)
         return embeds
+
+    def _structured_section_embeds(self, character, main_section):
+        value = character.get("sections", {}).get(main_section, {})
+        if not isinstance(value, dict):
+            value = {"Other": value}
+        pages = []
+        for subsection, items in value.items():
+            lines = []
+            if isinstance(items, dict):
+                for name, detail in items.items():
+                    lines.append(f"**{name}**")
+                    if isinstance(detail, list):
+                        lines.extend(
+                            f"  - {_plain(value, 2800)}" for value in detail
+                        )
+                    else:
+                        lines.append(f"  - {_plain(detail, 3000)}")
+            elif isinstance(items, list):
+                for item in items:
+                    if isinstance(item, dict):
+                        name = _plain(item.get("name") or "Item", 200)
+                        lines.append(f"**{name}**")
+                        if main_section == "Features and Traits":
+                            for detail in item.get("details") or []:
+                                lines.append(f"  - {_plain(detail, 2800)}")
+                        elif item.get("quantity") not in (None, ""):
+                            lines.append(f"  - **Quantity:** {item['quantity']}")
+                    else:
+                        readable = _plain(item, 3000)
+                        if main_section == "Features and Traits" and " • " in readable:
+                            feature_name, detail = readable.split(" • ", 1)
+                            lines.append(f"**{feature_name}**")
+                            lines.append(f"  - {detail}")
+                        else:
+                            lines.append(f"- {readable}")
+            elif str(items or "").strip():
+                lines.extend(_plain(items, 12000).splitlines())
+            if not lines:
+                lines = ["*None recorded.*"]
+            chunks = self._split_lines(lines, 3500)
+            for index, chunk in enumerate(chunks, start=1):
+                suffix = f" ({index}/{len(chunks)})" if len(chunks) > 1 else ""
+                embed = discord.Embed(
+                    title=_display_name(character, markdown=False)[:256],
+                    description=(
+                        f"# __{main_section}__\n"
+                        f"## {str(subsection)[:100]}{suffix}\n"
+                        f"{chunk}"
+                    )[:4096],
+                    color=0x7A2E8E,
+                )
+                pages.append(embed)
+        return pages or [discord.Embed(
+            title=_display_name(character, markdown=False)[:256],
+            description=f"# __{main_section}__\n*None recorded.*",
+            color=0x7A2E8E,
+        )]
 
     def section_embed(self, character, section):
         return self.section_embeds(character, section)[0]

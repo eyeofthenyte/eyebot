@@ -74,6 +74,7 @@ class CharacterMathTests(unittest.TestCase):
 
     def test_documented_template_is_valid_and_importable(self):
         template = json.loads(character_template_json())
+        self.assertEqual(template["schema_version"], 2)
         self.assertIn("_instructions", template)
         self.assertIn("_action_example", template)
         self.assertIn("_spell_example", template)
@@ -81,6 +82,34 @@ class CharacterMathTests(unittest.TestCase):
         self.assertEqual(imported["name"], "Example Character")
         self.assertEqual(imported["actions"], [])
         self.assertEqual(imported["spells"], [])
+        self.assertEqual(imported["schema_version"], 2)
+        self.assertEqual(
+            list(imported["sections"]),
+            ["Equipment", "Features and Traits", "Background", "Notes"],
+        )
+        self.assertIn("Backpack", imported["sections"]["Equipment"])
+        self.assertIn(
+            "Class Features", imported["sections"]["Features and Traits"]
+        )
+
+    def test_legacy_json_sections_are_migrated_to_schema_two(self):
+        payload = sample_character()
+        payload["sections"] = {
+            "Inventory": ["Rope", "Torch"],
+            "Features": ["Second Wind"],
+            "Traits": ["Darkvision"],
+            "Notes": "A legacy note.",
+        }
+        imported = normalize_character(payload, "123", source="json")
+        self.assertEqual(imported["schema_version"], 2)
+        self.assertEqual(
+            imported["sections"]["Equipment"]["Other"], ["Rope", "Torch"]
+        )
+        self.assertEqual(
+            imported["sections"]["Features and Traits"]["Class Features"],
+            ["Second Wind"],
+        )
+        self.assertEqual(imported["sections"]["Notes"]["Other"], ["A legacy note."])
 
     def test_imported_pdf_legal_boilerplate_is_removed(self):
         from services.characterService import _strip_import_legal_boilerplate
@@ -96,6 +125,47 @@ class CharacterMathTests(unittest.TestCase):
         self.assertEqual(cleaned, "Nysari character notes\nEquipment and features")
         self.assertNotIn("Wizards of the Coast", cleaned)
         self.assertNotIn("All Rights Reserved", cleaned)
+
+    def test_flattened_import_builds_requested_detail_sections(self):
+        from services.characterService import (
+            _flattened_biography_sections,
+            _flattened_equipment_sections,
+            _flattened_feature_sections,
+        )
+
+        feature_page = {"blocks": [
+            {"x0": 38, "y0": 140, "text": "=== FIGHTER FEATURES ==="},
+            {"x0": 38, "y0": 160, "text": "* Second Wind • PHB 72 | Recover hit points."},
+            {"x0": 221, "y0": 190, "text": "=== ELF SPECIES TRAITS ==="},
+            {"x0": 221, "y0": 210, "text": "* Darkvision • BR 23 | See in darkness."},
+            {"x0": 402, "y0": 140, "text": "=== FEATS ==="},
+            {"x0": 402, "y0": 160, "text": "* Alert • PHB 165 | Initiative bonus."},
+        ]}
+        features = _flattened_feature_sections(feature_page)
+        self.assertIn("Second Wind", features["Class Features"][0])
+        self.assertIn("Darkvision", features["Species Traits"][0])
+        self.assertIn("Alert", features["Feats"][0])
+
+        empty_page = {"blocks": []}
+        equipment_page = {"blocks": [
+            {"x0": 114, "y0": 527, "text": "Backpack | 1 | 5 lb."},
+            {"x0": 114, "y0": 542, "text": "Rope | 1 | 10 lb."},
+            {"x0": 351, "y0": 706, "text": "Ring | 1 | --"},
+        ]}
+        equipment = _flattened_equipment_sections([empty_page, equipment_page])
+        self.assertEqual(equipment["Backpack"][0]["name"], "Rope")
+        self.assertEqual(equipment["Attuned Items"][0]["name"], "Ring")
+
+        biography = {"blocks": [
+            {"x0": 421, "y0": 131, "text": "Always prepared."},
+            {"x0": 230, "y0": 128, "text": "=== Allies ==="},
+            {"x0": 230, "y0": 145, "text": "Lin"},
+            {"x0": 39, "y0": 386, "text": "A long backstory."},
+        ]}
+        background, notes = _flattened_biography_sections(biography, "Acolyte")
+        self.assertEqual(background["Background"], "Acolyte")
+        self.assertEqual(notes["Allies"], ["Lin"])
+        self.assertEqual(notes["Backstory"], "A long backstory.")
 
     def test_normalization_preserves_roll_data(self):
         value = normalize_character(sample_character(), "123", source="manual")
@@ -135,6 +205,11 @@ class CharacterServiceTests(unittest.TestCase):
         self.service.update("123", original["id"], nickname="Moon")
         exported = self.service.export("123", original["id"])
         payload = json.loads(exported)
+        self.assertEqual(payload["schema_version"], 2)
+        self.assertEqual(
+            list(payload["sections"]),
+            ["Equipment", "Features and Traits", "Background", "Notes"],
+        )
         payload["armor_class"] = 19
 
         refreshed = self.service.import_json(

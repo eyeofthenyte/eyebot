@@ -80,6 +80,7 @@ def signed(value: int) -> str:
 def character_template_json() -> bytes:
     """Return an importable, self-documenting character JSON template."""
     template = {
+        "schema_version": 2,
         "_instructions": {
             "general": (
                 "Replace the example values, retain valid JSON syntax, and import this "
@@ -99,7 +100,11 @@ def character_template_json() -> bytes:
                 "Spell level is 0 through 9. damage_rolls_by_level maps a character or slot "
                 "level to a list of bounded dice expressions."
             ),
-            "sections": "Add free-form JSON sections such as Inventory, Features, Traits, Notes, or Currencies.",
+            "sections": (
+                "Keep the four named sections and their documented subsections. "
+                "Equipment containers may be added as new keys alongside Personal "
+                "Belongings, Attuned Items, and Other."
+            ),
             "avatar_url": "Optional direct HTTPS portrait URL. You may instead use /character image after import.",
         },
         "name": "Example Character",
@@ -117,11 +122,36 @@ def character_template_json() -> bytes:
         "actions": [],
         "spells": [],
         "sections": {
-            "Inventory": [],
-            "Features": [],
-            "Traits": [],
-            "Notes": "",
-            "Currencies": {"cp": 0, "sp": 0, "ep": 0, "gp": 0, "pp": 0},
+            "Equipment": {
+                "Backpack": [{"name": "Rope, Hempen (50 feet)", "quantity": 1}],
+                "Personal Belongings": [],
+                "Attuned Items": [],
+                "Other": [],
+            },
+            "Features and Traits": {
+                "Class Features": [
+                    {"name": "Second Wind", "details": ["Source: PHB 72", "Recover hit points as a bonus action."]}
+                ],
+                "Species Traits": [],
+                "Feats": [],
+            },
+            "Background": {
+                "Background": "Soldier",
+                "Characteristics": {
+                    "Personality Traits": "",
+                    "Ideals": "",
+                    "Bonds": "",
+                    "Flaws": "",
+                },
+                "Appearance": "",
+            },
+            "Notes": {
+                "Organizations": [],
+                "Allies": [],
+                "Enemies": [],
+                "Backstory": "",
+                "Other": [],
+            },
         },
         "_action_example": {
             "name": "Longsword",
@@ -347,6 +377,79 @@ def _section_value(value, depth=0):
     return _text(value)
 
 
+def _as_section_list(value):
+    if value in (None, "", {}, []):
+        return []
+    return value if isinstance(value, list) else [value]
+
+
+def _canonical_character_sections(payload, supplied):
+    """Return schema-v2 sections while accepting legacy JSON exports."""
+    sections = deepcopy(supplied) if isinstance(supplied, dict) else {}
+
+    equipment = sections.get("Equipment")
+    if not isinstance(equipment, dict):
+        legacy_inventory = sections.pop("Inventory", None)
+        if legacy_inventory in (None, "", {}, []):
+            legacy_inventory = payload.get("inventory")
+        equipment = {
+            "Personal Belongings": [],
+            "Attuned Items": [],
+            "Other": _as_section_list(legacy_inventory),
+        }
+    equipment.setdefault("Personal Belongings", [])
+    equipment.setdefault("Attuned Items", [])
+    equipment.setdefault("Other", [])
+
+    features = sections.get("Features and Traits")
+    if not isinstance(features, dict):
+        features = {
+            "Class Features": _as_section_list(
+                sections.pop("Features", None) or payload.get("features")
+            ),
+            "Species Traits": _as_section_list(
+                sections.pop("Traits", None) or payload.get("traits")
+            ),
+            "Feats": _as_section_list(payload.get("feats")),
+        }
+    for key in ("Class Features", "Species Traits", "Feats"):
+        features.setdefault(key, [])
+
+    background = sections.get("Background")
+    if not isinstance(background, dict):
+        background = {
+            "Background": background or payload.get("background") or "",
+            "Characteristics": payload.get("characteristics") or {},
+            "Appearance": payload.get("appearance") or "",
+        }
+    background.setdefault("Background", "")
+    background.setdefault("Characteristics", {})
+    background.setdefault("Appearance", "")
+
+    notes = sections.get("Notes")
+    if not isinstance(notes, dict):
+        legacy_notes = notes or payload.get("notes")
+        notes = {
+            "Organizations": _as_section_list(payload.get("organizations")),
+            "Allies": _as_section_list(payload.get("allies")),
+            "Enemies": _as_section_list(payload.get("enemies")),
+            "Backstory": payload.get("backstory") or "",
+            "Other": _as_section_list(legacy_notes),
+        }
+    for key, default in (
+        ("Organizations", []), ("Allies", []), ("Enemies", []),
+        ("Backstory", ""), ("Other", []),
+    ):
+        notes.setdefault(key, default)
+
+    return {
+        "Equipment": equipment,
+        "Features and Traits": features,
+        "Background": background,
+        "Notes": notes,
+    }
+
+
 def normalize_character(value: dict, owner_id: str, *, source="json") -> dict:
     """Normalize EyeBot or manually supplied D&D-like JSON."""
     if not isinstance(value, dict):
@@ -426,36 +529,9 @@ def normalize_character(value: dict, owner_id: str, *, source="json") -> dict:
     identifier = _text(payload.get("id"), maximum=80)
     if not re.fullmatch(r"[a-zA-Z0-9_-]{1,80}", identifier):
         identifier = f"{_slug(name)}-{uuid.uuid4().hex[:8]}"
-    sections = (
-        deepcopy(payload.get("sections"))
-        if isinstance(payload.get("sections"), dict)
-        else {}
-    )
-    supplementary = {
-        "Overview": {
-            "species": payload.get("species") or payload.get("race"),
-            "background": payload.get("background"),
-            "alignment": payload.get("alignment"),
-            "experience": payload.get("experience") or payload.get("currentXp"),
-            "inspiration": payload.get("inspiration"),
-        },
-        "Inventory": payload.get("inventory"),
-        "Features": payload.get("features") or payload.get("feats"),
-        "Traits": payload.get("traits"),
-        "Notes": payload.get("notes") or payload.get("backstory"),
-        "Currencies": payload.get("currencies"),
-    }
-    for section_name, section_value in supplementary.items():
-        if section_name not in sections and section_value not in (None, {}, [], ""):
-            if isinstance(section_value, dict):
-                section_value = {
-                    key: item for key, item in section_value.items()
-                    if item not in (None, {}, [], "")
-                }
-            if section_value not in (None, {}, [], ""):
-                sections[section_name] = section_value
+    sections = _canonical_character_sections(payload, payload.get("sections"))
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "id": identifier,
         "owner_id": str(owner_id),
         "name": name,
@@ -609,6 +685,190 @@ def _flat_number(value, default=""):
     return match.group(0) if match else default
 
 
+def _flat_readable(value):
+    return " ".join(part.strip() for part in str(value or "").split("|") if part.strip())
+
+
+def _flattened_feature_sections(page):
+    result = {"Class Features": [], "Species Traits": [], "Feats": []}
+    for section_name in result:
+        current_index = None
+        candidates = []
+        for item in page["blocks"]:
+            if not 125 <= item["y0"] < 480:
+                continue
+            if section_name == "Class Features" and (
+                item["x0"] < 200
+                or (200 <= item["x0"] < 390 and item["y0"] < 185)
+            ):
+                candidates.append(item)
+            elif (
+                section_name == "Species Traits"
+                and 200 <= item["x0"] < 390
+                and item["y0"] >= 185
+            ):
+                candidates.append(item)
+            elif section_name == "Feats" and item["x0"] >= 390:
+                candidates.append(item)
+        for item in sorted(candidates, key=lambda value: value["y0"]):
+            text = item["text"].strip()
+            if re.search(r"===\s*(.+?)\s*===", text):
+                current_index = None
+                continue
+            readable = _flat_readable(text).lstrip("* ").strip()
+            if not readable:
+                continue
+            if text.lstrip().startswith("*"):
+                result[section_name].append(readable)
+                current_index = len(result[section_name]) - 1
+            elif current_index is not None:
+                result[section_name][current_index] += " " + readable.lstrip("| ")
+    return result
+
+
+def _looks_like_container(name):
+    selected = str(name or "").casefold()
+    return selected == "personal belongings" or any(
+        word in selected
+        for word in ("bag of holding", "backpack", "quiver", "pouch", "sack", "chest", "case,")
+    )
+
+
+def _flattened_equipment_sections(pages):
+    result = {"Personal Belongings": [], "Attuned Items": [], "Other": []}
+    seen = set()
+    inventory_pages = pages[1:4]
+    for page_index, page in enumerate(inventory_pages):
+        columns = {}
+        for item in page["blocks"]:
+            if item["y0"] < 510:
+                continue
+            parts = [part.strip() for part in item["text"].split("|") if part.strip()]
+            if len(parts) < 3 or not re.fullmatch(r"\d+", parts[-2]):
+                continue
+            column = int(item["x0"] // 180)
+            columns.setdefault(column, []).append((item, parts))
+        for column, values in columns.items():
+            current = "Other"
+            for item, parts in sorted(values, key=lambda value: value[0]["y0"]):
+                name, quantity, weight = parts[0], parts[-2], parts[-1]
+                if page_index == 0 and column >= 1 and item["y0"] >= 695:
+                    current = "Attuned Items"
+                if _looks_like_container(name):
+                    current = "Personal Belongings" if name.casefold() == "personal belongings" else name
+                    result.setdefault(current, [])
+                    continue
+                key = (current.casefold(), name.casefold(), quantity, weight.casefold())
+                if key in seen:
+                    continue
+                seen.add(key)
+                result.setdefault(current, []).append({
+                    "name": name,
+                    "quantity": quantity,
+                    "weight": weight,
+                })
+    attuned_names = {
+        item["name"].casefold() for item in result.get("Attuned Items", [])
+    }
+    containers = {
+        key: value for key, value in result.items()
+        if key not in {"Personal Belongings", "Attuned Items", "Other"}
+    }
+    ordered = {
+        **containers,
+        "Personal Belongings": result.get("Personal Belongings", []),
+        "Attuned Items": result.get("Attuned Items", []),
+        "Other": result.get("Other", []),
+    }
+    claimed = set()
+    final = {}
+    for section in [*containers, "Personal Belongings", "Attuned Items", "Other"]:
+        items = []
+        for item in ordered.get(section, []):
+            identity = (
+                item["name"].casefold(), item["quantity"], item["weight"].casefold()
+            )
+            if identity in claimed or (
+                section != "Attuned Items" and item["name"].casefold() in attuned_names
+            ):
+                continue
+            if section != "Attuned Items":
+                claimed.add(identity)
+            items.append(item)
+        if items:
+            final[section] = items
+    return final
+
+
+def _flattened_biography_sections(page, background):
+    blocks = page["blocks"]
+    characteristics = {}
+    characteristic_labels = (
+        ("Personality Traits", 120, 190),
+        ("Ideals", 190, 245),
+        ("Bonds", 245, 300),
+        ("Flaws", 300, 370),
+    )
+    for label, y0, y1 in characteristic_labels:
+        values = [
+            _flat_readable(item["text"])
+            for item in blocks
+            if item["x0"] >= 400 and y0 <= item["y0"] < y1
+            and _flat_readable(item["text"]).casefold() != label.casefold()
+        ]
+        if values:
+            characteristics[label] = " ".join(values)
+
+    identity = [
+        _flat_readable(item["text"])
+        for item in blocks
+        if 250 <= item["x0"] < 560 and 40 <= item["y0"] < 115
+    ]
+    appearance = " ".join(value for value in identity if value)
+    backstory = " ".join(
+        _flat_readable(item["text"])
+        for item in blocks
+        if item["x0"] < 220 and item["y0"] >= 380
+    )
+    right_notes = [
+        _flat_readable(item["text"])
+        for item in blocks
+        if 220 <= item["x0"] < 400 and 120 <= item["y0"] < 370
+    ]
+    organizations, allies, enemies, other = [], [], [], []
+    destination = other
+    for value in right_notes:
+        heading = re.fullmatch(r"===\s*(.+?)\s*===", value)
+        if heading:
+            label = heading.group(1).casefold()
+            destination = (
+                organizations if "organization" in label else
+                allies if "allies" in label else
+                enemies if "enem" in label else other
+            )
+        elif value:
+            destination.append(value)
+    other.extend(
+        _flat_readable(item["text"])
+        for item in blocks
+        if 220 <= item["x0"] < 400 and item["y0"] >= 370
+        and _flat_readable(item["text"])
+    )
+    background_sections = {
+        "Background": background or "None recorded.",
+        "Characteristics": characteristics,
+        "Appearance": appearance or "None recorded.",
+    }
+    note_sections = {
+        "Organizations": organizations,
+        "Allies": allies,
+        "Enemies": enemies,
+        "Backstory": backstory,
+        "Other": other,
+    }
+    return background_sections, note_sections
+
+
 def _flattened_pdf_payload(pages):
     """Map positioned text from a flattened D&D Beyond PDF to EyeBot data."""
     if not pages:
@@ -627,7 +887,15 @@ def _flattened_pdf_payload(pages):
         return None
     class_name, level = class_match.group(1).strip(), int(class_match.group(2))
 
-    identity = _first_flat_block(blocks, x0=220, y0=76, y1=100)
+    identity = next(
+        (
+            item["text"] for item in blocks
+            if item["x0"] >= 220 and 65 <= item["y0"] < 90
+            and "|" in item["text"]
+            and "class & level" not in item["text"].casefold()
+        ),
+        "",
+    )
     identity_parts = [part.strip() for part in identity.split("|") if part.strip()]
     species = identity_parts[0] if identity_parts else ""
     background = identity_parts[1] if len(identity_parts) > 1 else ""
@@ -725,16 +993,18 @@ def _flattened_pdf_payload(pages):
             (value.strip() for value in subclass_matches if value.casefold() != "divine domain"),
             "",
         )
-    section_names = [
-        "Character Summary", "Features and Equipment", "Additional Equipment",
-        "Background and Notes", "Spells - Cantrips and Level 1",
-        "Spells - Level 2", "Spells - Levels 2 and 3", "Spells - Levels 3 and 4",
-        "Spells - Levels 4 and 5", "Spells - Level 5",
-    ]
+    feature_sections = _flattened_feature_sections(pages[1]) if len(pages) > 1 else {}
+    equipment_sections = _flattened_equipment_sections(pages)
+    background_sections, note_sections = (
+        _flattened_biography_sections(pages[4], background)
+        if len(pages) > 4 else
+        ({"Background": background}, {})
+    )
     sections = {
-        section_names[index] if index < len(section_names) else f"PDF Page {index + 1}": _strip_import_legal_boilerplate(page["text"])
-        for index, page in enumerate(pages)
-        if _strip_import_legal_boilerplate(page["text"])
+        "Equipment": equipment_sections,
+        "Features and Traits": feature_sections,
+        "Background": background_sections,
+        "Notes": note_sections,
     }
     return {
         "name": name,
@@ -1033,7 +1303,11 @@ class CharacterService:
         character = self.resolve(owner_id, selector)
         exported = deepcopy(character)
         exported["image_path"] = ""
-        return (json.dumps(exported, indent=2, sort_keys=True) + "\n").encode("utf-8")
+        exported["schema_version"] = 2
+        exported["sections"] = _canonical_character_sections(
+            exported, exported.get("sections")
+        )
+        return (json.dumps(exported, indent=2) + "\n").encode("utf-8")
 
     def store_image(self, owner_id, selector, data: bytes, content_type: str) -> dict:
         maximum = int(self.settings.get("max_image_bytes", MAX_IMAGE_BYTES))

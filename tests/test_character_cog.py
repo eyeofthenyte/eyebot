@@ -102,6 +102,19 @@ class CharacterCogStructureTests(unittest.TestCase):
             r"interaction\.followup\.send\([\s\S]{0,300}?delete_after=",
         )
 
+    def test_imported_details_have_structured_markdown_sections(self):
+        source = COG_PATH.read_text(encoding="utf-8")
+        for label in ("Equipment", "Features & Traits", "Background", "Notes"):
+            self.assertIn(f'label="{label}"', source)
+        self.assertIn('f"# __{main_section}__\\n"', source)
+        self.assertIn('f"## {str(subsection)[:100]}{suffix}\\n"', source)
+        self.assertIn('f"  - **Quantity:** {item[\'quantity\']}"', source)
+        self.assertNotIn('f"  - **Weight:** {item[\'weight\']}"', source)
+        self.assertIn('lines.append(f"**{name}**")', source)
+        self.assertIn('lines.append(f"**{feature_name}**")', source)
+        self.assertIn('lines.append(f"  - {detail}")', source)
+        self.assertIn('for detail in item.get("details") or []', source)
+
 
 if __name__ == "__main__":
     unittest.main()
