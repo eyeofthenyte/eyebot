@@ -173,12 +173,15 @@ class CharacterMathTests(unittest.TestCase):
             {"x0": 421, "y0": 131, "text": "Always prepared."},
             {"x0": 230, "y0": 128, "text": "=== Allies ==="},
             {"x0": 230, "y0": 145, "text": "Lin"},
+            {"x0": 83, "y0": 756, "text": "CHARACTER BACKSTORY | ADDITIONAL NOTES"},
             {"x0": 39, "y0": 386, "text": "A long backstory."},
         ]}
         background, notes = _flattened_biography_sections(biography, "Acolyte")
         self.assertEqual(background["Background"], "Acolyte")
         self.assertEqual(notes["Allies"], ["Lin"])
         self.assertEqual(notes["Backstory"], "A long backstory.")
+        self.assertNotIn("CHARACTER BACKSTORY", notes["Backstory"])
+        self.assertNotIn("ADDITIONAL NOTES", notes["Backstory"])
         self.assertEqual(background["Appearance"]["Alignment"], "Chaotic Neutral")
         self.assertEqual(background["Appearance"]["Weight"], "95 lb")
         self.assertEqual(background["Appearance"]["Eyes"], "Bright Royal Blue")

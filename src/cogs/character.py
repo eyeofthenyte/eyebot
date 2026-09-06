@@ -48,6 +48,19 @@ SECTION_CHOICES = [
     app_commands.Choice(name="Background", value="Background"),
     app_commands.Choice(name="Notes", value="Notes"),
 ]
+SHOW_SECTION_CHOICES = [
+    app_commands.Choice(name="Summary", value="summary"),
+    app_commands.Choice(name="Skills (Skills & Saves)", value="skills"),
+    app_commands.Choice(name="Actions", value="actions"),
+    app_commands.Choice(name="Spells", value="spells"),
+    app_commands.Choice(name="Equipment", value="equipment"),
+    app_commands.Choice(name="Feats (Features & Traits)", value="features"),
+    app_commands.Choice(name="Background", value="background"),
+    app_commands.Choice(name="Notes", value="notes"),
+]
+SHOW_ALL_SECTION_ORDER = (
+    "skills", "actions", "spells", "equipment", "features", "background", "notes"
+)
 
 
 def _plain(value, limit=4000):
@@ -607,6 +620,12 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             embed.set_thumbnail(url=f"attachment://{filename}")
         await interaction.response.send_message(**kwargs)
 
+    async def _send_section_pages(self, interaction, character, section):
+        pages = self.section_embeds(character, section)
+        await interaction.response.send_message(embed=pages[0])
+        for embed in pages[1:]:
+            await interaction.followup.send(embed=embed)
+
     async def _character_webhook(self, interaction):
         channel = interaction.channel
         webhook_channel = channel.parent if isinstance(channel, discord.Thread) else channel
@@ -672,10 +691,30 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             delete_after=EPHEMERAL_DELETE_AFTER,
         )
 
-    @app_commands.command(name="show", description="Display one of your character sheets")
+    @app_commands.command(name="show", description="Display a section from one of your character sheets")
     @app_commands.autocomplete(character=character_autocomplete)
-    async def show(self, interaction: discord.Interaction, character: str):
-        await self._send_sheet(interaction, self.service.resolve(interaction.user.id, character))
+    @app_commands.choices(section=SHOW_SECTION_CHOICES)
+    async def show(
+        self,
+        interaction: discord.Interaction,
+        character: str,
+        section: app_commands.Choice[str] | None = None,
+    ):
+        selected = self.service.resolve(interaction.user.id, character)
+        selected_section = section.value if section else "summary"
+        if selected_section == "summary":
+            await self._send_sheet(interaction, selected)
+        else:
+            await self._send_section_pages(interaction, selected, selected_section)
+
+    @app_commands.command(name="show-all", description="Post every section of one of your character sheets")
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def show_all(self, interaction: discord.Interaction, character: str):
+        selected = self.service.resolve(interaction.user.id, character)
+        await self._send_sheet(interaction, selected)
+        for section in SHOW_ALL_SECTION_ORDER:
+            for embed in self.section_embeds(selected, section):
+                await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="import-pdf", description="Import your editable D&D character-sheet PDF")
     async def import_pdf(self, interaction: discord.Interaction, file: discord.Attachment):

@@ -717,6 +717,16 @@ def _strip_book_references(value):
     return re.sub(r"\s{2,}", " ", selected).strip(" •")
 
 
+def _strip_biography_section_titles(value):
+    selected = re.sub(
+        r"\b(?:CHARACTER BACKSTORY|ADDITIONAL NOTES)\b",
+        "",
+        str(value or ""),
+        flags=re.I,
+    )
+    return re.sub(r"\s{2,}", " ", selected).strip()
+
+
 def _flattened_feature_sections(page):
     result = {"Class Features": [], "Species Traits": [], "Feats": []}
     for section_name in result:
@@ -876,9 +886,10 @@ def _flattened_biography_sections(page, background):
         "Hair": fields.get("HAIR") or "NONE",
     }
     backstory = " ".join(
-        _flat_readable(item["text"])
+        _strip_biography_section_titles(_flat_readable(item["text"]))
         for item in blocks
         if item["x0"] < 220 and item["y0"] >= 380
+        and _strip_biography_section_titles(_flat_readable(item["text"]))
     )
     right_notes = [
         _flat_readable(item["text"])

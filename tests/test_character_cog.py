@@ -32,7 +32,7 @@ class CharacterCogStructureTests(unittest.TestCase):
             if isinstance(method, (ast.FunctionDef, ast.AsyncFunctionDef))
         }
         expected = {
-            "list", "template", "show", "import-pdf", "import-json", "create", "refresh",
+            "list", "template", "show", "show-all", "import-pdf", "import-json", "create", "refresh",
             "nickname", "image", "post", "download", "delete", "check",
             "skill", "save", "action", "spell", "modifier", "action-add",
             "spell-add", "set", "container", "item",
@@ -80,7 +80,18 @@ class CharacterCogStructureTests(unittest.TestCase):
         )
         source = ast.get_source_segment(COG_PATH.read_text(encoding="utf-8"), show)
         self.assertIn("_send_sheet", source)
+        self.assertIn("_send_section_pages", source)
+        self.assertIn('selected_section = section.value if section else "summary"', source)
         self.assertNotIn("ephemeral=True", source)
+
+    def test_show_all_posts_sections_in_requested_order(self):
+        source = COG_PATH.read_text(encoding="utf-8")
+        self.assertIn('app_commands.Choice(name="Skills (Skills & Saves)"', source)
+        self.assertIn('app_commands.Choice(name="Feats (Features & Traits)"', source)
+        expected = '(\n    "skills", "actions", "spells", "equipment", "features", "background", "notes"\n)'
+        self.assertIn(expected, source)
+        self.assertIn('@app_commands.command(name="show-all"', source)
+        self.assertIn("for section in SHOW_ALL_SECTION_ORDER", source)
 
     def test_character_posts_use_named_webhook_with_character_avatar(self):
         source = COG_PATH.read_text(encoding="utf-8")
