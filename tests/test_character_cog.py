@@ -66,6 +66,31 @@ class CharacterCogStructureTests(unittest.TestCase):
         self.assertIn("image.read(use_cached=False)", source)
         self.assertNotIn("read(use_cached=True)", source)
 
+    def test_ephemeral_character_responses_expire_after_thirty_seconds(self):
+        source = COG_PATH.read_text(encoding="utf-8")
+        self.assertIn("EPHEMERAL_DELETE_AFTER = 30", source)
+        self.assertNotRegex(source, r"ephemeral=True\s*\)")
+        self.assertNotRegex(source, r"ephemeral=True,\s*\)")
+
+    def test_show_command_posts_character_sheet_publicly(self):
+        show = next(
+            method
+            for method in CHARACTER.body
+            if isinstance(method, ast.AsyncFunctionDef) and method.name == "show"
+        )
+        source = ast.get_source_segment(COG_PATH.read_text(encoding="utf-8"), show)
+        self.assertIn("_send_sheet", source)
+        self.assertNotIn("ephemeral=True", source)
+
+    def test_character_posts_use_named_webhook_with_character_avatar(self):
+        source = COG_PATH.read_text(encoding="utf-8")
+        self.assertIn('CHARACTER_WEBHOOK_NAME = "EyeBot Characters"', source)
+        self.assertIn("webhook_channel.permissions_for(bot_member).manage_webhooks", source)
+        self.assertIn('"username": username[:80]', source)
+        self.assertIn('kwargs["avatar_url"] = avatar_url', source)
+        self.assertIn("discord.AllowedMentions.none()", source)
+        self.assertIn("await webhook.send(**kwargs)", source)
+
 
 if __name__ == "__main__":
     unittest.main()

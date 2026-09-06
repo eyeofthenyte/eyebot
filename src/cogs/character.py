@@ -24,6 +24,9 @@ from services.characterService import (
     signed,
 )
 
+EPHEMERAL_DELETE_AFTER = 30
+CHARACTER_WEBHOOK_NAME = "EyeBot Characters"
+
 
 MODE_CHOICES = [
     app_commands.Choice(name="Normal", value="normal"),
@@ -87,7 +90,9 @@ class CharacterSectionSelect(discord.ui.Select):
         view: CharacterView = self.view
         if interaction.user.id != view.owner_id:
             return await interaction.response.send_message(
-                "Only the character owner can use this menu.", ephemeral=True
+                "Only the character owner can use this menu.",
+                ephemeral=True,
+                delete_after=EPHEMERAL_DELETE_AFTER,
             )
         view.section = self.values[0]
         view.page = 0
@@ -108,7 +113,9 @@ class CharacterView(discord.ui.View):
         if interaction.user.id == self.owner_id:
             return True
         await interaction.response.send_message(
-            "Only the character owner can use this menu.", ephemeral=True
+            "Only the character owner can use this menu.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
         )
         return False
 
@@ -151,7 +158,9 @@ class DeleteCharacterView(discord.ui.View):
         if interaction.user.id == self.owner_id:
             return True
         await interaction.response.send_message(
-            "Only the character owner can confirm this deletion.", ephemeral=True
+            "Only the character owner can confirm this deletion.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
         )
         return False
 
@@ -194,7 +203,11 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             if interaction.response.is_done()
             else interaction.response.send_message
         )
-        await sender(message, ephemeral=True)
+        await sender(
+            message,
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
 
     async def character_autocomplete(self, interaction, current):
         current = str(current or "").casefold()
@@ -445,6 +458,37 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             embed.set_thumbnail(url=f"attachment://{filename}")
         await interaction.response.send_message(**kwargs)
 
+    async def _character_webhook(self, interaction):
+        channel = interaction.channel
+        webhook_channel = channel.parent if isinstance(channel, discord.Thread) else channel
+        if interaction.guild is None or webhook_channel is None or not hasattr(webhook_channel, "webhooks"):
+            raise CharacterError("Character posts can only be sent in a Discord server channel.")
+
+        bot_member = interaction.guild.me
+        if bot_member is None or not webhook_channel.permissions_for(bot_member).manage_webhooks:
+            raise CharacterError(
+                "EyeBot needs the Manage Webhooks permission in this channel to post as a character."
+            )
+
+        bot_user_id = getattr(getattr(self.bot, "user", None), "id", None)
+        webhooks = await webhook_channel.webhooks()
+        webhook = next(
+            (
+                item
+                for item in webhooks
+                if item.name == CHARACTER_WEBHOOK_NAME
+                and item.token
+                and getattr(getattr(item, "user", None), "id", None) == bot_user_id
+            ),
+            None,
+        )
+        if webhook is None:
+            webhook = await webhook_channel.create_webhook(
+                name=CHARACTER_WEBHOOK_NAME,
+                reason="EyeBot character posts",
+            )
+        return webhook, channel if isinstance(channel, discord.Thread) else None
+
     @app_commands.command(name="list", description="List characters linked to your Discord account")
     async def list_characters(self, interaction: discord.Interaction):
         characters = self.service.list(interaction.user.id)
@@ -453,12 +497,17 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
                 "You have no imported characters. Use `/character import-pdf`, "
                 "`/character import-json`, or `/character create`.",
                 ephemeral=True,
+                delete_after=EPHEMERAL_DELETE_AFTER,
             )
         lines = [
             f"• **{_display_name(item)}** — level {item['level']} {_class_summary(item)}"
             for item in characters
         ]
-        await interaction.response.send_message("\n".join(lines)[:4000], ephemeral=True)
+        await interaction.response.send_message(
+            "\n".join(lines)[:4000],
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
 
     @app_commands.command(name="template", description="Download a documented character JSON template")
     async def template(self, interaction: discord.Interaction):
@@ -471,6 +520,7 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             "`/character import-json`. Instruction keys beginning with `_` are ignored.",
             file=attachment,
             ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
         )
 
     @app_commands.command(name="show", description="Display one of your character sheets")
@@ -483,14 +533,22 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         await interaction.response.defer(ephemeral=True, thinking=True)
         data = await self._read_import_attachment(file)
         character = self.service.import_pdf(interaction.user.id, data)
-        await interaction.followup.send(f"✅ Imported **{character['name']}** from PDF.", ephemeral=True)
+        await interaction.followup.send(
+            f"✅ Imported **{character['name']}** from PDF.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
 
     @app_commands.command(name="import-json", description="Import an EyeBot or manually supplied character JSON file")
     async def import_json(self, interaction: discord.Interaction, file: discord.Attachment):
         await interaction.response.defer(ephemeral=True, thinking=True)
         data = await self._read_import_attachment(file)
         character = self.service.import_json(interaction.user.id, data)
-        await interaction.followup.send(f"✅ Imported **{character['name']}** from JSON.", ephemeral=True)
+        await interaction.followup.send(
+            f"✅ Imported **{character['name']}** from JSON.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
 
     @app_commands.command(name="create", description="Create a character manually")
     async def create(
@@ -525,7 +583,11 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             "source": "manual",
         }
         character = self.service.save(interaction.user.id, normalize_character(payload, str(interaction.user.id), source="manual"))
-        await interaction.response.send_message(f"✅ Created **{character['name']}**.", ephemeral=True)
+        await interaction.response.send_message(
+            f"✅ Created **{character['name']}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
 
     @app_commands.command(name="refresh", description="Replace a character from a new PDF or JSON file")
     @app_commands.autocomplete(character=character_autocomplete)
@@ -539,14 +601,22 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             refreshed = self.service.import_json(interaction.user.id, data, replace_selector=character)
         else:
             raise CharacterError("Refresh files must use the `.pdf` or `.json` extension.")
-        await interaction.followup.send(f"✅ Refreshed **{refreshed['name']}**.", ephemeral=True)
+        await interaction.followup.send(
+            f"✅ Refreshed **{refreshed['name']}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
 
     @app_commands.command(name="nickname", description="Set or clear a character nickname")
     @app_commands.autocomplete(character=character_autocomplete)
     async def nickname(self, interaction: discord.Interaction, character: str, nickname: app_commands.Range[str, 0, 100] = ""):
         updated = self.service.update(interaction.user.id, character, nickname=nickname)
         message = f"✅ Nickname updated for **{updated['name']}**." if nickname else f"✅ Nickname cleared for **{updated['name']}**."
-        await interaction.response.send_message(message, ephemeral=True)
+        await interaction.response.send_message(
+            message,
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
 
     @app_commands.command(name="image", description="Replace a character portrait")
     @app_commands.autocomplete(character=character_autocomplete)
@@ -564,28 +634,39 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             await image.read(use_cached=False),
             content_type,
         )
-        await interaction.followup.send(f"✅ Updated the portrait for **{updated['name']}**.", ephemeral=True)
+        await interaction.followup.send(
+            f"✅ Updated the portrait for **{updated['name']}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
 
     @app_commands.command(name="post", description="Post in character using the character's name and portrait")
     @app_commands.autocomplete(character=character_autocomplete)
     async def post(self, interaction: discord.Interaction, character: str, text: app_commands.Range[str, 1, 1800]):
+        await interaction.response.defer(ephemeral=True, thinking=True)
         selected = self.service.resolve(interaction.user.id, character)
-        display = discord.utils.escape_markdown(_display_name(selected, markdown=False))
         nickname = str(selected.get("nickname") or "").strip()
-        heading = f"**{discord.utils.escape_markdown(selected['name'])}**"
+        username = str(selected["name"])
         if nickname:
-            heading += f" *({discord.utils.escape_markdown(nickname)})*"
-        embed = discord.Embed(description=text, color=0x7A2E8E)
-        embed.set_author(name=display[:256])
-        kwargs = {"content": heading, "embed": embed, "allowed_mentions": discord.AllowedMentions.none()}
-        image_path = selected.get("image_path")
-        if image_path and Path(image_path).is_file():
-            filename = f"character-{selected['id']}.png"
-            kwargs["file"] = discord.File(image_path, filename=filename)
-            embed.set_thumbnail(url=f"attachment://{filename}")
-        elif str(selected.get("avatar_url", "")).startswith("https://"):
-            embed.set_thumbnail(url=selected["avatar_url"])
-        await interaction.response.send_message(**kwargs)
+            username += f" ({nickname})"
+        avatar_url = str(selected.get("avatar_url") or "").strip()
+        webhook, thread = await self._character_webhook(interaction)
+        kwargs = {
+            "content": text,
+            "username": username[:80],
+            "allowed_mentions": discord.AllowedMentions.none(),
+            "wait": True,
+        }
+        if avatar_url.startswith("https://"):
+            kwargs["avatar_url"] = avatar_url
+        if thread is not None:
+            kwargs["thread"] = thread
+        await webhook.send(**kwargs)
+        await interaction.followup.send(
+            f"✅ Posted as **{discord.utils.escape_markdown(username)}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
 
     @app_commands.command(name="download", description="Download one of your characters as EyeBot JSON")
     @app_commands.autocomplete(character=character_autocomplete)
@@ -595,7 +676,11 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             io.BytesIO(self.service.export(interaction.user.id, character)),
             filename=f"{re.sub(r'[^a-zA-Z0-9_-]+', '-', selected['name']).strip('-') or 'character'}.json",
         )
-        await interaction.response.send_message(file=file, ephemeral=True)
+        await interaction.response.send_message(
+            file=file,
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
 
     @app_commands.command(name="delete", description="Delete one of your characters after confirmation")
     @app_commands.autocomplete(character=character_autocomplete)
@@ -605,6 +690,7 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             f"Delete **{selected['name']}** permanently?",
             view=DeleteCharacterView(self, interaction.user.id, selected),
             ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
         )
 
     def _roller(self):
@@ -741,7 +827,11 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
                 raise CharacterError("Saving throws must use STR, DEX, CON, INT, WIS, or CHA.")
             payload["saving_throws"][key] = value
         self.service.save(interaction.user.id, payload, replace_selector=character)
-        await interaction.response.send_message(f"✅ Set {name} to {signed(value)} for **{selected['name']}**.", ephemeral=True)
+        await interaction.response.send_message(
+            f"✅ Set {name} to {signed(value)} for **{selected['name']}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
 
     @app_commands.command(name="action-add", description="Add or replace a character action")
     @app_commands.autocomplete(character=character_autocomplete)
@@ -751,7 +841,11 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         selected["actions"] = [item for item in selected["actions"] if item["name"].casefold() != name.casefold()]
         selected["actions"].append({"name": name, "description": description, "attack_bonus": attack_bonus, "damage_rolls": damage_rolls})
         self.service.save(interaction.user.id, selected, replace_selector=character)
-        await interaction.response.send_message(f"✅ Saved action **{name}**.", ephemeral=True)
+        await interaction.response.send_message(
+            f"✅ Saved action **{name}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
 
     @app_commands.command(name="spell-add", description="Add or replace a character spell")
     @app_commands.autocomplete(character=character_autocomplete)
@@ -765,7 +859,11 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         selected["spells"] = [item for item in selected["spells"] if item["name"].casefold() != name.casefold()]
         selected["spells"].append({"name": name, "level": level, "description": description, "attack_bonus": attack_bonus, "save_ability": save_ability, "save_dc": save_dc, "damage_rolls": damage_rolls})
         self.service.save(interaction.user.id, selected, replace_selector=character)
-        await interaction.response.send_message(f"✅ Saved spell **{name}**.", ephemeral=True)
+        await interaction.response.send_message(
+            f"✅ Saved spell **{name}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
 
 
 async def setup(bot):
