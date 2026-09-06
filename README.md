@@ -948,6 +948,66 @@ Name generation examples:
 
 Run `!namegen` without arguments to list the installed race libraries.
 
+### Discord character sheets
+
+EyeBot supports owner-scoped character sheets without contacting D&D Beyond's
+undocumented internal character service. Each Discord user can see, roll, edit,
+download, and delete only characters linked to their own Discord account.
+
+Characters may be created through an editable character-sheet PDF, EyeBot JSON,
+or manual entry:
+
+| Command | Description |
+| --- | --- |
+| `/character import-pdf <file>` | Import an editable D&D character-sheet PDF |
+| `/character import-json <file>` | Import EyeBot JSON or manually supplied compatible character JSON |
+| `/character template` | Privately download a documented, importable JSON character template |
+| `/character create ...` | Create the core character statistics manually |
+| `/character refresh <character> <file>` | Replace a character from a new PDF or JSON while preserving its nickname and image |
+| `/character list` | Privately list characters linked to your Discord account |
+| `/character show <character>` | Post the summary sheet with a menu for skills, saves, actions, spells, and imported details |
+| `/character nickname <character> [nickname]` | Set a nickname or omit it to clear the current nickname |
+| `/character image <character> <image>` | Set a PNG, JPEG, or WebP portrait |
+| `/character post <character> <text>` | Post text under the character's name and optional italicized nickname |
+| `/character download <character>` | Privately download portable EyeBot JSON |
+| `/character delete <character>` | Permanently delete a character after interactive confirmation |
+
+Character roll commands reuse the bounded dice engine from `roller.py`:
+
+| Command | Description |
+| --- | --- |
+| `/character check <character> <stat> [modifier] [mode]` | Roll a STR, DEX, CON, INT, WIS, or CHA check |
+| `/character skill <character> <skill> [modifier] [mode]` | Roll an imported skill modifier |
+| `/character save <character> <stat> [modifier] [mode]` | Roll an imported saving-throw modifier |
+| `/character action <character> <action> [modifier] [mode]` | Use an imported action and roll its attack and damage expressions |
+| `/character spell <character> <spell> [level]` | Show spell description, attack/save information, and level-appropriate damage expressions |
+| `/character modifier <character> <category> <name> <value>` | Correct a skill or saving-throw modifier |
+| `/character action-add ...` | Add or replace a manually entered action |
+| `/character spell-add ...` | Add or replace a manually entered spell |
+
+Roll modes are **Normal** (default), **Advantage**, and **Disadvantage**. The
+optional modifier is added after the stored character modifier. Character,
+skill, action, and spell selectors autocomplete only from the invoking user's
+records.
+
+PDF layouts vary. EyeBot reads standard editable form fields and supports the
+positioned text layer used by flattened D&D Beyond PDF exports. Each flattened
+page is retained as a separate bounded Imported Details section. When a PDF does not expose a
+structured action, spell, skill, or saving-throw value, correct it with the
+manual character commands or export, edit, and re-import EyeBot JSON. PDF
+portraits are not reliably extractable; set one afterward with `/character image`.
+
+Flattened D&D Beyond spell-list pages contain spell names and casting metadata,
+but do not contain full spell descriptions or damage formulas. EyeBot imports
+the information present in the PDF; use `/character spell-add` to supply missing
+descriptions or damage expressions needed for automated rolls.
+
+Character files are stored under `characters.storage_path` with private file
+permissions and atomic recovery backups. Override the path with
+`EYEBOT_CHARACTER_DIR`. Docker Compose persists this directory in the dedicated
+`character-data` volume. EyeBot never stores D&D Beyond account cookies or
+credentials.
+
 ### Discord roll aliases and delivery
 
 | Command | Description |

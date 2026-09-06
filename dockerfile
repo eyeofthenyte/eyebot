@@ -22,11 +22,11 @@ RUN apt-get update \
 COPY requirements.txt ./
 RUN python -m pip install --requirement requirements.txt
 RUN python -m pip check
-RUN python -c "import aiohttp, atproto, cryptography, discord, facebook, feedparser, googleapiclient, google_auth_oauthlib, gspread, instagrapi, kickapi, PIL, requests, substack_api, TikTokApi, tweepy, twitchio, yaml"
+RUN python -c "import aiohttp, atproto, cryptography, discord, facebook, feedparser, googleapiclient, google_auth_oauthlib, gspread, instagrapi, kickapi, PIL, pymupdf, pypdf, requests, substack_api, TikTokApi, tweepy, twitchio, yaml"
 
 COPY . .
 
-RUN mkdir -p /app/data/guilds /app/data/secrets /app/data/public_media \
+RUN mkdir -p /app/data/characters /app/data/guilds /app/data/secrets /app/data/public_media \
     && groupadd --system --gid 10001 eyebot \
     && useradd --system --uid 10001 --gid eyebot --home-dir /app eyebot \
     && chown --recursive eyebot:eyebot /app

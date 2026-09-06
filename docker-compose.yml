@@ -14,6 +14,7 @@ services:
     environment:
       EYEBOT_PROCESS: src/eyebot.py
       EYEBOT_GUILD_CONFIG_DIR: /app/data/guilds
+      EYEBOT_CHARACTER_DIR: /app/data/characters
       EYEBOT_SECRET_DIR: /app/data/secrets
       EYEBOT_MASTER_KEY_FILE: /run/secrets/eyebot_master_key
       EYEBOT_PUBLIC_MEDIA_DIR: /app/data/public_media
@@ -39,6 +40,9 @@ services:
       - type: volume
         source: guild-data
         target: /app/data/guilds
+      - type: volume
+        source: character-data
+        target: /app/data/characters
       - type: volume
         source: secret-data
         target: /app/data/secrets
@@ -71,6 +75,7 @@ services:
       start_period: 20s
 
 volumes:
+  character-data:
   guild-data:
   secret-data:
   public-media:
