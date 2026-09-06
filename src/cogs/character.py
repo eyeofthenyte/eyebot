@@ -42,6 +42,12 @@ CATEGORY_CHOICES = [
     app_commands.Choice(name="Skill", value="skill"),
     app_commands.Choice(name="Saving Throw", value="save"),
 ]
+SECTION_CHOICES = [
+    app_commands.Choice(name="Equipment", value="Equipment"),
+    app_commands.Choice(name="Features and Traits", value="Features and Traits"),
+    app_commands.Choice(name="Background", value="Background"),
+    app_commands.Choice(name="Notes", value="Notes"),
+]
 
 
 def _plain(value, limit=4000):
@@ -185,6 +191,11 @@ class DeleteCharacterView(discord.ui.View):
 
 
 class Character(commands.GroupCog, group_name="character", group_description="Import and use your characters"):
+    add = app_commands.Group(
+        name="add",
+        description="Add containers and equipment to a character",
+    )
+
     def __init__(self, bot):
         self.bot = bot
         self.logger = bot.logger
@@ -289,6 +300,44 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             for item in (character or {}).get("actions", ())
             if current in item["name"].casefold()
         ][:25]
+
+    async def subsection_autocomplete(self, interaction, current):
+        character = self._selected_character(interaction)
+        section = getattr(getattr(interaction, "namespace", None), "section", None)
+        section = getattr(section, "value", section)
+        values = (character or {}).get("sections", {}).get(str(section), {})
+        current = str(current or "").casefold()
+        return [
+            app_commands.Choice(name=str(name)[:100], value=str(name)[:100])
+            for name in values
+            if current in str(name).casefold()
+        ][:25] if isinstance(values, dict) else []
+
+    async def section_item_autocomplete(self, interaction, current):
+        character = self._selected_character(interaction)
+        section = getattr(getattr(interaction, "namespace", None), "section", None)
+        section = getattr(section, "value", section)
+        subsection = getattr(getattr(interaction, "namespace", None), "subsection", None)
+        value = (character or {}).get("sections", {}).get(str(section), {}).get(str(subsection))
+        names = value.keys() if isinstance(value, dict) else [
+            item.get("name", "") if isinstance(item, dict) else str(item)
+            for item in (value or [])
+        ] if isinstance(value, list) else []
+        current = str(current or "").casefold()
+        return [
+            app_commands.Choice(name=str(name)[:100], value=str(name)[:100])
+            for name in names if name and current in str(name).casefold()
+        ][:25]
+
+    async def container_autocomplete(self, interaction, current):
+        character = self._selected_character(interaction)
+        containers = (character or {}).get("sections", {}).get("Equipment", {})
+        current = str(current or "").casefold()
+        return [
+            app_commands.Choice(name=str(name)[:100], value=str(name)[:100])
+            for name in containers
+            if current in str(name).casefold()
+        ][:25] if isinstance(containers, dict) else []
 
     async def spell_autocomplete(self, interaction, current):
         character = self._selected_character(interaction)
@@ -489,23 +538,30 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             lines = []
             if isinstance(items, dict):
                 for name, detail in items.items():
-                    lines.append(f"**{name}**")
-                    if isinstance(detail, list):
+                    if main_section == "Background" and subsection == "Appearance":
+                        lines.append(f"**{name}:** {_plain(detail or 'NONE', 3000)}")
+                    else:
+                        lines.append(f"**{name}**")
+                    if isinstance(detail, list) and not (
+                        main_section == "Background" and subsection == "Appearance"
+                    ):
                         lines.extend(
                             f"  - {_plain(value, 2800)}" for value in detail
                         )
-                    else:
+                    elif not (main_section == "Background" and subsection == "Appearance"):
                         lines.append(f"  - {_plain(detail, 3000)}")
             elif isinstance(items, list):
                 for item in items:
                     if isinstance(item, dict):
                         name = _plain(item.get("name") or "Item", 200)
-                        lines.append(f"**{name}**")
+                        quantity = item.get("quantity")
+                        quantity_text = f" x {quantity}" if quantity not in (None, "") else ""
+                        lines.append(f"**{name}**{quantity_text}")
                         if main_section == "Features and Traits":
                             for detail in item.get("details") or []:
                                 lines.append(f"  - {_plain(detail, 2800)}")
-                        elif item.get("quantity") not in (None, ""):
-                            lines.append(f"  - **Quantity:** {item['quantity']}")
+                        elif item.get("description"):
+                            lines.append(f"  - {_plain(item['description'], 2800)}")
                     else:
                         readable = _plain(item, 3000)
                         if main_section == "Features and Traits" and " • " in readable:
@@ -517,7 +573,7 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             elif str(items or "").strip():
                 lines.extend(_plain(items, 12000).splitlines())
             if not lines:
-                lines = ["*None recorded.*"]
+                lines = ["**BLANK**"]
             chunks = self._split_lines(lines, 3500)
             for index, chunk in enumerate(chunks, start=1):
                 suffix = f" ({index}/{len(chunks)})" if len(chunks) > 1 else ""
@@ -917,6 +973,117 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         self.service.save(interaction.user.id, payload, replace_selector=character)
         await interaction.response.send_message(
             f"✅ Set {name} to {signed(value)} for **{selected['name']}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    @app_commands.command(name="set", description="Edit a character section value")
+    @app_commands.autocomplete(
+        character=character_autocomplete,
+        subsection=subsection_autocomplete,
+        item=section_item_autocomplete,
+    )
+    @app_commands.choices(section=SECTION_CHOICES)
+    async def set_section_value(
+        self,
+        interaction: discord.Interaction,
+        character: str,
+        section: app_commands.Choice[str],
+        subsection: app_commands.Range[str, 1, 100],
+        value: app_commands.Range[str, 1, 2000],
+        item: app_commands.Range[str, 0, 100] = "",
+    ):
+        selected = self.service.resolve(interaction.user.id, character)
+        section_data = selected.get("sections", {}).get(section.value)
+        if not isinstance(section_data, dict) or subsection not in section_data:
+            raise CharacterError("Select an existing subsection for that character.")
+        target = section_data[subsection]
+        if isinstance(target, dict):
+            if not item:
+                raise CharacterError("Specify the characteristic or parameter to update.")
+            target[item] = value
+        elif isinstance(target, list):
+            if not item:
+                raise CharacterError("Specify the item or feature to update.")
+            match = next(
+                (
+                    entry for entry in target
+                    if isinstance(entry, dict)
+                    and str(entry.get("name", "")).casefold() == item.casefold()
+                ),
+                None,
+            )
+            if match is not None:
+                if section.value == "Features and Traits":
+                    match["details"] = [value]
+                else:
+                    match["description"] = value
+            else:
+                index = next(
+                    (i for i, entry in enumerate(target) if str(entry).casefold() == item.casefold()),
+                    None,
+                )
+                if index is None:
+                    raise CharacterError("That item is not recorded in the selected subsection.")
+                target[index] = value
+        else:
+            section_data[subsection] = value
+        self.service.save(interaction.user.id, selected, replace_selector=character)
+        await interaction.response.send_message(
+            f"✅ Updated **{subsection}** for **{selected['name']}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    @add.command(name="container", description="Add an equipment container to a character")
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def add_container(
+        self,
+        interaction: discord.Interaction,
+        character: str,
+        name: app_commands.Range[str, 1, 100],
+    ):
+        selected = self.service.resolve(interaction.user.id, character)
+        equipment = selected["sections"]["Equipment"]
+        if any(existing.casefold() == name.casefold() for existing in equipment):
+            raise CharacterError("That equipment container already exists.")
+        equipment[name] = []
+        self.service.save(interaction.user.id, selected, replace_selector=character)
+        await interaction.response.send_message(
+            f"✅ Added equipment container **{name}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    @add.command(name="item", description="Add an item to a character equipment container")
+    @app_commands.autocomplete(character=character_autocomplete, container=container_autocomplete)
+    async def add_item(
+        self,
+        interaction: discord.Interaction,
+        character: str,
+        container: app_commands.Range[str, 1, 100],
+        item_name: app_commands.Range[str, 1, 100],
+        quantity: app_commands.Range[int, 1, 10000] = 1,
+        description: app_commands.Range[str, 0, 1000] = "",
+    ):
+        selected = self.service.resolve(interaction.user.id, character)
+        equipment = selected["sections"]["Equipment"]
+        selected_container = next(
+            (name for name in equipment if name.casefold() == container.casefold()),
+            None,
+        )
+        if selected_container is None:
+            raise CharacterError("Select an existing equipment container.")
+        if not isinstance(equipment[selected_container], list):
+            raise CharacterError("The selected equipment container is invalid.")
+        equipment[selected_container].append({
+            "name": item_name,
+            "quantity": quantity,
+            "description": description,
+        })
+        self.service.save(interaction.user.id, selected, replace_selector=character)
+        await interaction.response.send_message(
+            f"✅ Added **{item_name} x {quantity}** to **{selected_container}**.",
             ephemeral=True,
             delete_after=EPHEMERAL_DELETE_AFTER,
         )

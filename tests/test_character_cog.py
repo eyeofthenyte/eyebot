@@ -35,7 +35,7 @@ class CharacterCogStructureTests(unittest.TestCase):
             "list", "template", "show", "import-pdf", "import-json", "create", "refresh",
             "nickname", "image", "post", "download", "delete", "check",
             "skill", "save", "action", "spell", "modifier", "action-add",
-            "spell-add",
+            "spell-add", "set", "container", "item",
         }
         self.assertTrue(expected.issubset(commands))
 
@@ -108,12 +108,23 @@ class CharacterCogStructureTests(unittest.TestCase):
             self.assertIn(f'label="{label}"', source)
         self.assertIn('f"# __{main_section}__\\n"', source)
         self.assertIn('f"## {str(subsection)[:100]}{suffix}\\n"', source)
-        self.assertIn('f"  - **Quantity:** {item[\'quantity\']}"', source)
+        self.assertIn('quantity_text = f" x {quantity}"', source)
         self.assertNotIn('f"  - **Weight:** {item[\'weight\']}"', source)
         self.assertIn('lines.append(f"**{name}**")', source)
         self.assertIn('lines.append(f"**{feature_name}**")', source)
         self.assertIn('lines.append(f"  - {detail}")', source)
         self.assertIn('for detail in item.get("details") or []', source)
+        self.assertIn('f"**{name}:** {_plain(detail or \'NONE\'', source)
+        self.assertIn('lines = ["**BLANK**"]', source)
+
+    def test_character_sections_and_equipment_are_editable(self):
+        source = COG_PATH.read_text(encoding="utf-8")
+        self.assertIn('name="add"', source)
+        self.assertIn('@add.command(name="container"', source)
+        self.assertIn('@add.command(name="item"', source)
+        self.assertIn('@app_commands.command(name="set"', source)
+        self.assertIn("subsection=subsection_autocomplete", source)
+        self.assertIn("container=container_autocomplete", source)
 
 
 if __name__ == "__main__":

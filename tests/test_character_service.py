@@ -135,6 +135,7 @@ class CharacterMathTests(unittest.TestCase):
 
         feature_page = {"blocks": [
             {"x0": 38, "y0": 140, "text": "=== FIGHTER FEATURES ==="},
+            {"x0": 38, "y0": 150, "text": "* Hit Points • PHB 71"},
             {"x0": 38, "y0": 160, "text": "* Second Wind • PHB 72 | Recover hit points."},
             {"x0": 221, "y0": 190, "text": "=== ELF SPECIES TRAITS ==="},
             {"x0": 221, "y0": 210, "text": "* Darkvision • BR 23 | See in darkness."},
@@ -142,9 +143,11 @@ class CharacterMathTests(unittest.TestCase):
             {"x0": 402, "y0": 160, "text": "* Alert • PHB 165 | Initiative bonus."},
         ]}
         features = _flattened_feature_sections(feature_page)
-        self.assertIn("Second Wind", features["Class Features"][0])
-        self.assertIn("Darkvision", features["Species Traits"][0])
-        self.assertIn("Alert", features["Feats"][0])
+        self.assertEqual(features["Class Features"][0]["name"], "Second Wind")
+        self.assertEqual(features["Species Traits"][0]["name"], "Darkvision")
+        self.assertEqual(features["Feats"][0]["name"], "Alert")
+        self.assertNotIn("PHB 72", str(features))
+        self.assertNotIn("Hit Points", str(features))
 
         empty_page = {"blocks": []}
         equipment_page = {"blocks": [
@@ -156,7 +159,17 @@ class CharacterMathTests(unittest.TestCase):
         self.assertEqual(equipment["Backpack"][0]["name"], "Rope")
         self.assertEqual(equipment["Attuned Items"][0]["name"], "Ring")
 
-        biography = {"blocks": [
+        biography = {"fields": {
+            "ALIGNMENT": "Chaotic Neutral",
+            "GENDER": "Female",
+            "AGE": "65",
+            "SIZE": "Medium",
+            "HEIGHT": "4'9\"",
+            "WEIGHT": "95",
+            "EYES": "Bright Royal Blue",
+            "SKIN": "Porcelain White with light blue glittering snow pa",
+            "FAITH": "Lin (Winter Warden)",
+        }, "blocks": [
             {"x0": 421, "y0": 131, "text": "Always prepared."},
             {"x0": 230, "y0": 128, "text": "=== Allies ==="},
             {"x0": 230, "y0": 145, "text": "Lin"},
@@ -166,6 +179,11 @@ class CharacterMathTests(unittest.TestCase):
         self.assertEqual(background["Background"], "Acolyte")
         self.assertEqual(notes["Allies"], ["Lin"])
         self.assertEqual(notes["Backstory"], "A long backstory.")
+        self.assertEqual(background["Appearance"]["Alignment"], "Chaotic Neutral")
+        self.assertEqual(background["Appearance"]["Weight"], "95 lb")
+        self.assertEqual(background["Appearance"]["Eyes"], "Bright Royal Blue")
+        self.assertEqual(background["Appearance"]["Faith"], "Lin (Winter Warden)")
+        self.assertEqual(background["Appearance"]["Hair"], "NONE")
 
     def test_normalization_preserves_roll_data(self):
         value = normalize_character(sample_character(), "123", source="manual")

@@ -105,6 +105,10 @@ def character_template_json() -> bytes:
                 "Equipment containers may be added as new keys alongside Personal "
                 "Belongings, Attuned Items, and Other."
             ),
+            "editing": (
+                "Use /character set to edit section values, /character add container "
+                "to create an equipment container, and /character add item to add equipment."
+            ),
             "avatar_url": "Optional direct HTTPS portrait URL. You may instead use /character image after import.",
         },
         "name": "Example Character",
@@ -123,7 +127,11 @@ def character_template_json() -> bytes:
         "spells": [],
         "sections": {
             "Equipment": {
-                "Backpack": [{"name": "Rope, Hempen (50 feet)", "quantity": 1}],
+                "Backpack": [{
+                    "name": "Rope, Hempen (50 feet)",
+                    "quantity": 1,
+                    "description": "Optional item details.",
+                }],
                 "Personal Belongings": [],
                 "Attuned Items": [],
                 "Other": [],
@@ -143,7 +151,18 @@ def character_template_json() -> bytes:
                     "Bonds": "",
                     "Flaws": "",
                 },
-                "Appearance": "",
+                "Appearance": {
+                    "Alignment": "",
+                    "Gender": "",
+                    "Age": "",
+                    "Size": "",
+                    "Height": "",
+                    "Weight": "",
+                    "Eyes": "",
+                    "Skin": "",
+                    "Faith": "",
+                    "Hair": "",
+                },
             },
             "Notes": {
                 "Organizations": [],
@@ -689,6 +708,15 @@ def _flat_readable(value):
     return " ".join(part.strip() for part in str(value or "").split("|") if part.strip())
 
 
+def _strip_book_references(value):
+    selected = re.sub(
+        r"\s*•\s*[A-Za-z][A-Za-z0-9]{1,9}\s+\d{1,4}\b",
+        "",
+        str(value or ""),
+    )
+    return re.sub(r"\s{2,}", " ", selected).strip(" •")
+
+
 def _flattened_feature_sections(page):
     result = {"Class Features": [], "Species Traits": [], "Feats": []}
     for section_name in result:
@@ -715,14 +743,29 @@ def _flattened_feature_sections(page):
             if re.search(r"===\s*(.+?)\s*===", text):
                 current_index = None
                 continue
-            readable = _flat_readable(text).lstrip("* ").strip()
+            parts = [part.strip() for part in text.split("|") if part.strip()]
+            readable = _strip_book_references(parts[0].lstrip("* ")) if parts else ""
+            details = [
+                _strip_book_references(part) for part in parts[1:]
+                if _strip_book_references(part)
+            ]
             if not readable:
                 continue
             if text.lstrip().startswith("*"):
-                result[section_name].append(readable)
+                result[section_name].append({"name": readable, "details": details})
                 current_index = len(result[section_name]) - 1
             elif current_index is not None:
-                result[section_name][current_index] += " " + readable.lstrip("| ")
+                result[section_name][current_index]["details"].append(
+                    _strip_book_references(_flat_readable(text).lstrip("| "))
+                )
+        if section_name == "Class Features":
+            removable = {
+                "additional warlock spells", "ability score improvement", "hit points"
+            }
+            result[section_name] = [
+                item for item in result[section_name]
+                if item["name"].casefold() not in removable or item["details"]
+            ]
     return result
 
 
@@ -802,6 +845,7 @@ def _flattened_equipment_sections(pages):
 
 def _flattened_biography_sections(page, background):
     blocks = page["blocks"]
+    fields = page.get("fields", {})
     characteristics = {}
     characteristic_labels = (
         ("Personality Traits", 120, 190),
@@ -819,12 +863,18 @@ def _flattened_biography_sections(page, background):
         if values:
             characteristics[label] = " ".join(values)
 
-    identity = [
-        _flat_readable(item["text"])
-        for item in blocks
-        if 250 <= item["x0"] < 560 and 40 <= item["y0"] < 115
-    ]
-    appearance = " ".join(value for value in identity if value)
+    appearance = {
+        "Alignment": fields.get("ALIGNMENT") or "NONE",
+        "Gender": fields.get("GENDER") or "NONE",
+        "Age": fields.get("AGE") or "NONE",
+        "Size": fields.get("SIZE") or "NONE",
+        "Height": fields.get("HEIGHT") or "NONE",
+        "Weight": (f"{fields['WEIGHT']} lb" if fields.get("WEIGHT") else "NONE"),
+        "Eyes": fields.get("EYES") or "NONE",
+        "Skin": fields.get("SKIN") or "NONE",
+        "Faith": fields.get("FAITH") or "NONE",
+        "Hair": fields.get("HAIR") or "NONE",
+    }
     backstory = " ".join(
         _flat_readable(item["text"])
         for item in blocks
@@ -857,7 +907,7 @@ def _flattened_biography_sections(page, background):
     background_sections = {
         "Background": background or "None recorded.",
         "Characteristics": characteristics,
-        "Appearance": appearance or "None recorded.",
+        "Appearance": appearance,
     }
     note_sections = {
         "Organizations": organizations,
@@ -1032,8 +1082,14 @@ def _extract_flattened_pdf(data):
         pages = []
         for page in document:
             page_text = _strip_import_legal_boilerplate(page.get_text("text") or "")
+            fields = {
+                str(widget.field_name or "").strip().upper(): str(widget.field_value or "").strip()
+                for widget in (page.widgets() or [])
+                if str(widget.field_name or "").strip()
+            }
             pages.append({
                 "text": page_text,
+                "fields": fields,
                 "blocks": [
                     _flat_block((*block[:4], cleaned, *block[5:]))
                     for block in page.get_text("blocks")
