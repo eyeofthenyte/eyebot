@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import html
 import io
 import mimetypes
@@ -190,6 +191,32 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             guild_root = Path(bot.platform_config_service.guild_config_dir)
             root = guild_root.parent / "characters"
         self.service = CharacterService(root, settings=settings, logger=self.logger)
+        self._ephemeral_deletion_tasks = set()
+
+    def cog_unload(self):
+        for task in self._ephemeral_deletion_tasks:
+            task.cancel()
+        self._ephemeral_deletion_tasks.clear()
+
+    async def _delete_followup_after(self, message, delay):
+        try:
+            await asyncio.sleep(delay)
+            await message.delete()
+        except (asyncio.CancelledError, discord.HTTPException):
+            pass
+
+    async def _send_ephemeral_followup(self, interaction, content):
+        message = await interaction.followup.send(
+            content,
+            ephemeral=True,
+            wait=True,
+        )
+        task = asyncio.create_task(
+            self._delete_followup_after(message, EPHEMERAL_DELETE_AFTER)
+        )
+        self._ephemeral_deletion_tasks.add(task)
+        task.add_done_callback(self._ephemeral_deletion_tasks.discard)
+        return message
 
     async def cog_app_command_error(self, interaction, error):
         selected = getattr(error, "original", error)
@@ -198,16 +225,14 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         else:
             self.logger.error(f"Character command failed: {selected}")
             message = "❌ EyeBot could not complete that character command."
-        sender = (
-            interaction.followup.send
-            if interaction.response.is_done()
-            else interaction.response.send_message
-        )
-        await sender(
-            message,
-            ephemeral=True,
-            delete_after=EPHEMERAL_DELETE_AFTER,
-        )
+        if interaction.response.is_done():
+            await self._send_ephemeral_followup(interaction, message)
+        else:
+            await interaction.response.send_message(
+                message,
+                ephemeral=True,
+                delete_after=EPHEMERAL_DELETE_AFTER,
+            )
 
     async def character_autocomplete(self, interaction, current):
         current = str(current or "").casefold()
@@ -533,10 +558,9 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         await interaction.response.defer(ephemeral=True, thinking=True)
         data = await self._read_import_attachment(file)
         character = self.service.import_pdf(interaction.user.id, data)
-        await interaction.followup.send(
+        await self._send_ephemeral_followup(
+            interaction,
             f"✅ Imported **{character['name']}** from PDF.",
-            ephemeral=True,
-            delete_after=EPHEMERAL_DELETE_AFTER,
         )
 
     @app_commands.command(name="import-json", description="Import an EyeBot or manually supplied character JSON file")
@@ -544,10 +568,9 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         await interaction.response.defer(ephemeral=True, thinking=True)
         data = await self._read_import_attachment(file)
         character = self.service.import_json(interaction.user.id, data)
-        await interaction.followup.send(
+        await self._send_ephemeral_followup(
+            interaction,
             f"✅ Imported **{character['name']}** from JSON.",
-            ephemeral=True,
-            delete_after=EPHEMERAL_DELETE_AFTER,
         )
 
     @app_commands.command(name="create", description="Create a character manually")
@@ -601,10 +624,9 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             refreshed = self.service.import_json(interaction.user.id, data, replace_selector=character)
         else:
             raise CharacterError("Refresh files must use the `.pdf` or `.json` extension.")
-        await interaction.followup.send(
+        await self._send_ephemeral_followup(
+            interaction,
             f"✅ Refreshed **{refreshed['name']}**.",
-            ephemeral=True,
-            delete_after=EPHEMERAL_DELETE_AFTER,
         )
 
     @app_commands.command(name="nickname", description="Set or clear a character nickname")
@@ -634,10 +656,9 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             await image.read(use_cached=False),
             content_type,
         )
-        await interaction.followup.send(
+        await self._send_ephemeral_followup(
+            interaction,
             f"✅ Updated the portrait for **{updated['name']}**.",
-            ephemeral=True,
-            delete_after=EPHEMERAL_DELETE_AFTER,
         )
 
     @app_commands.command(name="post", description="Post in character using the character's name and portrait")
@@ -662,10 +683,9 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         if thread is not None:
             kwargs["thread"] = thread
         await webhook.send(**kwargs)
-        await interaction.followup.send(
+        await self._send_ephemeral_followup(
+            interaction,
             f"✅ Posted as **{discord.utils.escape_markdown(username)}**.",
-            ephemeral=True,
-            delete_after=EPHEMERAL_DELETE_AFTER,
         )
 
     @app_commands.command(name="download", description="Download one of your characters as EyeBot JSON")

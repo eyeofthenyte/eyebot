@@ -91,6 +91,17 @@ class CharacterCogStructureTests(unittest.TestCase):
         self.assertIn("discord.AllowedMentions.none()", source)
         self.assertIn("await webhook.send(**kwargs)", source)
 
+    def test_followup_expiration_is_compatible_with_discord_webhooks(self):
+        source = COG_PATH.read_text(encoding="utf-8")
+        self.assertIn("async def _send_ephemeral_followup", source)
+        self.assertIn("wait=True", source)
+        self.assertIn("asyncio.create_task", source)
+        self.assertIn("await message.delete()", source)
+        self.assertNotRegex(
+            source,
+            r"interaction\.followup\.send\([\s\S]{0,300}?delete_after=",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
