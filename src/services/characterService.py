@@ -518,6 +518,35 @@ PDF_ALIASES = {
     "max_hit_points": ("HPMax", "Max HP", "Hit Point Maximum", "max_hp"),
 }
 
+LEGAL_BOILERPLATE_PATTERNS = (
+    re.compile(
+        r"(?:™|\bTM\b|©|\(c\)|\bcopyright\b).*?"
+        r"(?:Wizards of the Coast|D&D Beyond)",
+        re.I,
+    ),
+    re.compile(
+        r"(?:Wizards of the Coast|D&D Beyond).*?"
+        r"(?:™|\bTM\b|©|\(c\)|\bcopyright\b|all rights reserved)",
+        re.I,
+    ),
+    re.compile(r"\ball rights reserved\b", re.I),
+    re.compile(
+        r"\bpermission is granted to photo\s*copy this document for personal use\b",
+        re.I,
+    ),
+)
+
+
+def _strip_import_legal_boilerplate(value):
+    """Remove publisher legal footer lines without altering character content."""
+    retained = []
+    for line in str(value or "").splitlines():
+        normalized = " ".join(line.split())
+        if normalized and any(pattern.search(normalized) for pattern in LEGAL_BOILERPLATE_PATTERNS):
+            continue
+        retained.append(line)
+    return "\n".join(retained).strip()
+
 
 def _pdf_field_value(fields, aliases):
     folded = {str(key).casefold(): value for key, value in fields.items()}
@@ -703,9 +732,9 @@ def _flattened_pdf_payload(pages):
         "Spells - Levels 4 and 5", "Spells - Level 5",
     ]
     sections = {
-        section_names[index] if index < len(section_names) else f"PDF Page {index + 1}": page["text"]
+        section_names[index] if index < len(section_names) else f"PDF Page {index + 1}": _strip_import_legal_boilerplate(page["text"])
         for index, page in enumerate(pages)
-        if page["text"].strip()
+        if _strip_import_legal_boilerplate(page["text"])
     }
     return {
         "name": name,
@@ -732,9 +761,14 @@ def _extract_flattened_pdf(data):
         document = pymupdf.open(stream=data, filetype="pdf")
         pages = []
         for page in document:
+            page_text = _strip_import_legal_boilerplate(page.get_text("text") or "")
             pages.append({
-                "text": page.get_text("text") or "",
-                "blocks": [_flat_block(block) for block in page.get_text("blocks") if str(block[4]).strip()],
+                "text": page_text,
+                "blocks": [
+                    _flat_block((*block[:4], cleaned, *block[5:]))
+                    for block in page.get_text("blocks")
+                    if (cleaned := _strip_import_legal_boilerplate(block[4]))
+                ],
             })
         document.close()
         return _flattened_pdf_payload(pages)
@@ -750,7 +784,9 @@ def character_from_pdf(data: bytes, owner_id: str) -> dict:
         if reader.is_encrypted and reader.decrypt("") == 0:
             raise CharacterError("Encrypted character PDFs are not supported.")
         fields = reader.get_fields() or {}
-        page_text = "\n".join((page.extract_text() or "") for page in reader.pages)
+        page_text = _strip_import_legal_boilerplate(
+            "\n".join((page.extract_text() or "") for page in reader.pages)
+        )
     except CharacterError:
         raise
     except Exception as error:

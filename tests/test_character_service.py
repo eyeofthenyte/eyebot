@@ -82,6 +82,21 @@ class CharacterMathTests(unittest.TestCase):
         self.assertEqual(imported["actions"], [])
         self.assertEqual(imported["spells"], [])
 
+    def test_imported_pdf_legal_boilerplate_is_removed(self):
+        from services.characterService import _strip_import_legal_boilerplate
+
+        text = (
+            "Nysari character notes\n"
+            "TM & © 2018 Wizards of the Coast LLC. ©2018 D&D Beyond | "
+            "All Rights Reserved. Permission is granted to photo copy this "
+            "document for personal use.\n"
+            "Equipment and features"
+        )
+        cleaned = _strip_import_legal_boilerplate(text)
+        self.assertEqual(cleaned, "Nysari character notes\nEquipment and features")
+        self.assertNotIn("Wizards of the Coast", cleaned)
+        self.assertNotIn("All Rights Reserved", cleaned)
+
     def test_normalization_preserves_roll_data(self):
         value = normalize_character(sample_character(), "123", source="manual")
 
