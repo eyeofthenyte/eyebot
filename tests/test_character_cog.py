@@ -60,6 +60,12 @@ class CharacterCogStructureTests(unittest.TestCase):
         self.assertNotIn("aiohttp", source)
         self.assertNotIn("requests.get", source)
 
+    def test_attachments_use_original_discord_cdn_instead_of_media_proxy(self):
+        source = COG_PATH.read_text(encoding="utf-8")
+        self.assertIn("attachment.read(use_cached=False)", source)
+        self.assertIn("image.read(use_cached=False)", source)
+        self.assertNotIn("read(use_cached=True)", source)
+
 
 if __name__ == "__main__":
     unittest.main()

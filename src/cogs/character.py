@@ -220,7 +220,15 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             raise CharacterError(
                 f"Character imports must be no larger than {maximum:,} bytes."
             )
-        return await attachment.read(use_cached=True)
+        # Interaction attachments are still available from Discord's original CDN.
+        # The cached proxy URL can reject non-image assets such as PDFs with 415
+        # "failed to get asset", so do not route imports through the media proxy.
+        data = await attachment.read(use_cached=False)
+        if len(data) > maximum:
+            raise CharacterError(
+                f"Character imports must be no larger than {maximum:,} bytes."
+            )
+        return data
 
     async def skill_autocomplete(self, interaction, current):
         character = self._selected_character(interaction)
@@ -553,7 +561,7 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         updated = self.service.store_image(
             interaction.user.id,
             character,
-            await image.read(use_cached=True),
+            await image.read(use_cached=False),
             content_type,
         )
         await interaction.followup.send(f"✅ Updated the portrait for **{updated['name']}**.", ephemeral=True)
