@@ -143,11 +143,11 @@ class CharacterCogStructureTests(unittest.TestCase):
     def test_only_skill_and_save_section_headings_are_underlined(self):
         source = COG_PATH.read_text(encoding="utf-8")
         self.assertIn(
-            'f"  - {name.title()} ({SKILL_ABILITIES.get(name, \'???\').title()}): "',
+            'f"- {name.title()} ({SKILL_ABILITIES.get(name, \'???\').title()}): "',
             source,
         )
         self.assertIn(
-            'f"  - {ABILITY_NAMES[key]} ({key.title()}): {signed(value)}"', source
+            'f"- {ABILITY_NAMES[key]} ({key.title()}): {signed(value)}"', source
         )
         self.assertNotIn('**__{name.title()}:__**', source)
         self.assertNotIn('**__{ABILITY_NAMES[key]}:__**', source)

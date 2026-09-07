@@ -777,12 +777,12 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         page_fields = []
         if section == "skills":
             skill_lines = [
-                f"  - {name.title()} ({SKILL_ABILITIES.get(name, '???').title()}): "
+                f"- {name.title()} ({SKILL_ABILITIES.get(name, '???').title()}): "
                 f"{signed(value)}"
                 for name, value in sorted(character.get("skills", {}).items())
             ]
             save_lines = [
-                f"  - {ABILITY_NAMES[key]} ({key.title()}): {signed(value)}"
+                f"- {ABILITY_NAMES[key]} ({key.title()}): {signed(value)}"
                 for key, value in character.get("saving_throws", {}).items()
             ]
             for index, value in enumerate(self._split_lines(skill_lines), start=1):
