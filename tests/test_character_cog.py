@@ -93,6 +93,23 @@ class CharacterCogStructureTests(unittest.TestCase):
         self.assertIn('@app_commands.command(name="show-all"', source)
         self.assertIn("for section in SHOW_ALL_SECTION_ORDER", source)
 
+    def test_skill_and_save_modifiers_have_clickable_roll_controls(self):
+        source = COG_PATH.read_text(encoding="utf-8")
+        self.assertIn("class CharacterSkillRollSelect", source)
+        self.assertIn("class CharacterSaveRollSelect", source)
+        self.assertIn('placeholder="Roll a skill check"', source)
+        self.assertIn('placeholder="Roll a saving throw"', source)
+        self.assertIn('f"{name.title()} ({signed(modifier)})"', source)
+        self.assertIn('f"{ABILITY_NAMES[key]} ({signed(modifier)})"', source)
+        self.assertIn("self.cog._roll_embed", source)
+        self.assertIn('if self.section == "skills"', source)
+
+    def test_skill_and_save_labels_are_underlined(self):
+        source = COG_PATH.read_text(encoding="utf-8")
+        self.assertIn('f"**__{name.title()}:__** {signed(value)}"', source)
+        self.assertIn('f"**__{ABILITY_NAMES[key]}:__** {signed(value)}"', source)
+        self.assertIn('("__Saving Throws__"', source)
+
     def test_character_posts_use_named_webhook_with_character_avatar(self):
         source = COG_PATH.read_text(encoding="utf-8")
         self.assertIn('CHARACTER_WEBHOOK_NAME = "EyeBot Characters"', source)

@@ -107,6 +107,7 @@ class CharacterSectionSelect(discord.ui.Select):
             min_values=1,
             max_values=1,
             options=options,
+            row=0,
         )
 
     async def callback(self, interaction):
@@ -122,6 +123,70 @@ class CharacterSectionSelect(discord.ui.Select):
         await view.render(interaction)
 
 
+class CharacterSkillRollSelect(discord.ui.Select):
+    def __init__(self, cog, character):
+        self.cog = cog
+        self.character = character
+        options = [
+            discord.SelectOption(
+                label=f"{name.title()} ({signed(modifier)})"[:100],
+                value=name,
+            )
+            for name, modifier in sorted(character.get("skills", {}).items())
+        ][:25]
+        super().__init__(
+            placeholder="Roll a skill check",
+            min_values=1,
+            max_values=1,
+            options=options,
+            row=2,
+        )
+
+    async def callback(self, interaction):
+        skill = self.values[0]
+        modifier = self.character["skills"][skill]
+        embed = self.cog._roll_embed(
+            self.character,
+            f"{skill.title()} Check",
+            modifier,
+            0,
+            "normal",
+        )
+        await interaction.response.send_message(embed=embed)
+
+
+class CharacterSaveRollSelect(discord.ui.Select):
+    def __init__(self, cog, character):
+        self.cog = cog
+        self.character = character
+        options = [
+            discord.SelectOption(
+                label=f"{ABILITY_NAMES[key]} ({signed(modifier)})"[:100],
+                value=key,
+            )
+            for key, modifier in character.get("saving_throws", {}).items()
+        ][:25]
+        super().__init__(
+            placeholder="Roll a saving throw",
+            min_values=1,
+            max_values=1,
+            options=options,
+            row=3,
+        )
+
+    async def callback(self, interaction):
+        ability = self.values[0]
+        modifier = self.character["saving_throws"][ability]
+        embed = self.cog._roll_embed(
+            self.character,
+            f"{ABILITY_NAMES[ability]} Save",
+            modifier,
+            0,
+            "normal",
+        )
+        await interaction.response.send_message(embed=embed)
+
+
 class CharacterView(discord.ui.View):
     def __init__(self, cog, character, owner_id):
         super().__init__(timeout=600)
@@ -131,6 +196,14 @@ class CharacterView(discord.ui.View):
         self.section = "summary"
         self.page = 0
         self.add_item(CharacterSectionSelect(cog, character))
+
+    def sync_section_controls(self):
+        for child in tuple(self.children):
+            if isinstance(child, (CharacterSkillRollSelect, CharacterSaveRollSelect)):
+                self.remove_item(child)
+        if self.section == "skills":
+            self.add_item(CharacterSkillRollSelect(self.cog, self.character))
+            self.add_item(CharacterSaveRollSelect(self.cog, self.character))
 
     async def interaction_check(self, interaction):
         if interaction.user.id == self.owner_id:
@@ -147,6 +220,7 @@ class CharacterView(discord.ui.View):
         self.page = max(0, min(self.page, len(pages) - 1))
         self.previous.disabled = self.page == 0
         self.next.disabled = self.page >= len(pages) - 1
+        self.sync_section_controls()
         await interaction.response.edit_message(embed=pages[self.page], view=self)
 
     @discord.ui.button(
@@ -435,19 +509,19 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         page_fields = []
         if section == "skills":
             skill_lines = [
-                f"**{name.title()}:** {signed(value)}"
+                f"**__{name.title()}:__** {signed(value)}"
                 for name, value in sorted(character.get("skills", {}).items())
             ]
             save_lines = [
-                f"**{ABILITY_NAMES[key]}:** {signed(value)}"
+                f"**__{ABILITY_NAMES[key]}:__** {signed(value)}"
                 for key, value in character.get("saving_throws", {}).items()
             ]
             for index, value in enumerate(self._split_lines(skill_lines), start=1):
                 page_fields.append(
-                    ("Skills" if index == 1 else "Skills continued", value)
+                    ("__Skills__" if index == 1 else "__Skills continued__", value)
                 )
             page_fields.append(
-                ("Saving Throws", "\n".join(save_lines) or "None recorded.")
+                ("__Saving Throws__", "\n".join(save_lines) or "None recorded.")
             )
         elif section == "actions":
             for item in character.get("actions", ()):
@@ -622,7 +696,10 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
 
     async def _send_section_pages(self, interaction, character, section):
         pages = self.section_embeds(character, section)
-        await interaction.response.send_message(embed=pages[0])
+        view = CharacterView(self, character, interaction.user.id)
+        view.section = section
+        view.sync_section_controls()
+        await interaction.response.send_message(embed=pages[0], view=view)
         for embed in pages[1:]:
             await interaction.followup.send(embed=embed)
 
@@ -713,8 +790,14 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         selected = self.service.resolve(interaction.user.id, character)
         await self._send_sheet(interaction, selected)
         for section in SHOW_ALL_SECTION_ORDER:
-            for embed in self.section_embeds(selected, section):
-                await interaction.followup.send(embed=embed)
+            for index, embed in enumerate(self.section_embeds(selected, section)):
+                kwargs = {"embed": embed}
+                if section == "skills" and index == 0:
+                    view = CharacterView(self, selected, interaction.user.id)
+                    view.section = "skills"
+                    view.sync_section_controls()
+                    kwargs["view"] = view
+                await interaction.followup.send(**kwargs)
 
     @app_commands.command(name="import-pdf", description="Import your editable D&D character-sheet PDF")
     async def import_pdf(self, interaction: discord.Interaction, file: discord.Attachment):
