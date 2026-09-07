@@ -95,6 +95,13 @@ class CharacterMathTests(unittest.TestCase):
         self.assertEqual(
             imported["proficiencies"][0], {"name": "Light", "type": "Armor"}
         )
+        self.assertEqual(
+            list(imported["sections"]["Notes"]),
+            ["Backstory", "Organizations", "Allies", "Enemies", "Other"],
+        )
+        self.assertEqual(
+            imported["sections"]["Equipment"]["Backpack"][0]["gp_value"], 1
+        )
 
     def test_summary_data_is_normalized_and_removed_from_features(self):
         payload = sample_character()
@@ -212,11 +219,12 @@ class CharacterMathTests(unittest.TestCase):
         empty_page = {"blocks": []}
         equipment_page = {"blocks": [
             {"x0": 114, "y0": 527, "text": "Backpack | 1 | 5 lb."},
-            {"x0": 114, "y0": 542, "text": "Rope | 1 | 10 lb."},
+            {"x0": 114, "y0": 542, "text": "Rope | 1 gp | 1 | 10 lb."},
             {"x0": 351, "y0": 706, "text": "Ring | 1 | --"},
         ]}
         equipment = _flattened_equipment_sections([empty_page, equipment_page])
         self.assertEqual(equipment["Backpack"][0]["name"], "Rope")
+        self.assertEqual(equipment["Backpack"][0]["gp_value"], "1")
         self.assertEqual(equipment["Attuned Items"][0]["name"], "Ring")
 
         biography = {"fields": {

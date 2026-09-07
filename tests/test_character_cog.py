@@ -34,8 +34,8 @@ class CharacterCogStructureTests(unittest.TestCase):
         expected = {
             "list", "template", "show", "show-all", "import-pdf", "import-json", "create", "refresh",
             "nickname", "image", "post", "download", "delete", "check",
-            "skill", "save", "action", "spell", "modifier", "action-add",
-            "spell-add", "set", "container", "item",
+            "skill", "save", "action", "spell", "modifier", "set",
+            "container", "item",
         }
         self.assertTrue(expected.issubset(commands))
 
@@ -224,6 +224,76 @@ class CharacterCogStructureTests(unittest.TestCase):
         self.assertIn('@app_commands.command(name="set"', source)
         self.assertIn("subsection=subsection_autocomplete", source)
         self.assertIn("container=container_autocomplete", source)
+
+    def test_proficiencies_can_be_added_and_removed(self):
+        source = COG_PATH.read_text(encoding="utf-8")
+        self.assertIn('remove = app_commands.Group(', source)
+        self.assertIn('@add.command(name="proficiency"', source)
+        self.assertIn('@remove.command(name="proficiency"', source)
+        self.assertIn("proficiency_type=PROFICIENCY_TYPE_CHOICES", source)
+        self.assertIn("proficiency=proficiency_autocomplete", source)
+        self.assertIn('proficiencies.append({"name": name, "type": proficiency_type.value})', source)
+        self.assertIn("del proficiencies[index]", source)
+        self.assertIn("That proficiency is already recorded", source)
+
+    def test_features_can_be_added_removed_and_edited(self):
+        source = COG_PATH.read_text(encoding="utf-8")
+        self.assertIn('edit = app_commands.Group(', source)
+        self.assertIn('@add.command(name="feature"', source)
+        self.assertIn('@remove.command(name="feature"', source)
+        self.assertIn('@edit.command(name="feature"', source)
+        self.assertIn("feature_type=FEATURE_TYPE_CHOICES", source)
+        self.assertIn("feature=feature_autocomplete", source)
+        self.assertIn('features.append({"name": name, "details": detail_lines})', source)
+        self.assertIn("detail_lines = self._feature_detail_lines(details)", source)
+        self.assertIn("del features[index]", source)
+        self.assertIn('item["name"] = name', source)
+        self.assertIn('item["details"] = detail_lines', source)
+
+    def test_feature_detail_lines_render_as_markdown_bullets(self):
+        source = COG_PATH.read_text(encoding="utf-8")
+        self.assertIn('for line in str(details or "").splitlines()', source)
+        self.assertIn('lines.append(f"  - {_plain(detail, 2800)}")', source)
+
+    def test_all_addable_entry_types_have_edit_and_remove_commands(self):
+        source = COG_PATH.read_text(encoding="utf-8")
+        for entry_type in ("container", "item", "proficiency", "feature", "action", "spell"):
+            self.assertIn(f'@edit.command(name="{entry_type}"', source)
+            self.assertIn(f'@remove.command(name="{entry_type}"', source)
+        self.assertIn("item=equipment_item_autocomplete", source)
+        self.assertIn("action=action_entry_autocomplete", source)
+        self.assertIn("spell=spell_entry_autocomplete", source)
+        self.assertIn("Remove the items from that container before removing it.", source)
+        self.assertIn('selected_item["quantity"] = quantity', source)
+        self.assertIn('item.update({"name": new_name, "type": new_type})', source)
+        self.assertIn('item["damage_rolls"] = rolls', source)
+        self.assertIn('item["save_dc"] = save_dc', source)
+
+    def test_backstory_and_note_entries_have_command_parity(self):
+        source = COG_PATH.read_text(encoding="utf-8")
+        for entry_type in ("backstory", "organization", "ally", "enemy", "other-note"):
+            self.assertIn(f'@add.command(name="{entry_type}"', source)
+            self.assertIn(f'@edit.command(name="{entry_type}"', source)
+            self.assertIn(f'@remove.command(name="{entry_type}"', source)
+        self.assertIn('selected["sections"]["Notes"]["Backstory"] = "NONE"', source)
+        self.assertIn("organization_autocomplete", source)
+        self.assertIn("ally_autocomplete", source)
+        self.assertIn("enemy_autocomplete", source)
+        self.assertIn("other_note_autocomplete", source)
+
+    def test_equipment_items_support_optional_gp_values(self):
+        source = COG_PATH.read_text(encoding="utf-8")
+        self.assertIn("gp_value: app_commands.Range[float, 0, 1000000000]", source)
+        self.assertIn('"gp_value": gp_value', source)
+        self.assertIn('selected_item["gp_value"] = gp_value', source)
+        self.assertIn("f\" — {gp_value:g} gp\"", source)
+
+    def test_actions_and_spells_use_the_add_command_group(self):
+        source = COG_PATH.read_text(encoding="utf-8")
+        self.assertIn('@add.command(name="action"', source)
+        self.assertIn('@add.command(name="spell"', source)
+        self.assertNotIn('@app_commands.command(name="action-add"', source)
+        self.assertNotIn('@app_commands.command(name="spell-add"', source)
 
 
 if __name__ == "__main__":

@@ -42,6 +42,17 @@ CATEGORY_CHOICES = [
     app_commands.Choice(name="Skill", value="skill"),
     app_commands.Choice(name="Saving Throw", value="save"),
 ]
+PROFICIENCY_TYPE_CHOICES = [
+    app_commands.Choice(name="Armor", value="Armor"),
+    app_commands.Choice(name="Weapons", value="Weapons"),
+    app_commands.Choice(name="Language", value="Language"),
+    app_commands.Choice(name="Tool", value="Tool"),
+]
+FEATURE_TYPE_CHOICES = [
+    app_commands.Choice(name="Class", value="Class Features"),
+    app_commands.Choice(name="Feat", value="Feats"),
+    app_commands.Choice(name="Species", value="Species Traits"),
+]
 SECTION_CHOICES = [
     app_commands.Choice(name="Equipment", value="Equipment"),
     app_commands.Choice(name="Features and Traits", value="Features and Traits"),
@@ -339,7 +350,15 @@ class DeleteCharacterView(discord.ui.View):
 class Character(commands.GroupCog, group_name="character", group_description="Import and use your characters"):
     add = app_commands.Group(
         name="add",
-        description="Add containers and equipment to a character",
+        description="Add equipment and proficiencies to a character",
+    )
+    remove = app_commands.Group(
+        name="remove",
+        description="Remove structured information from a character",
+    )
+    edit = app_commands.Group(
+        name="edit",
+        description="Edit structured character information",
     )
 
     def __init__(self, bot):
@@ -486,6 +505,138 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             if current in str(name).casefold()
         ][:25] if isinstance(containers, dict) else []
 
+    async def proficiency_autocomplete(self, interaction, current):
+        character = self._selected_character(interaction)
+        current = str(current or "").casefold()
+        choices = []
+        for index, item in enumerate((character or {}).get("proficiencies", ())):
+            label = f"{item['name']} ({item['type']})"
+            if current in label.casefold():
+                choices.append(
+                    app_commands.Choice(
+                        name=label[:100],
+                        value=str(index),
+                    )
+                )
+        return choices[:25]
+
+    async def equipment_item_autocomplete(self, interaction, current):
+        character = self._selected_character(interaction)
+        container = getattr(getattr(interaction, "namespace", None), "container", None)
+        equipment = (character or {}).get("sections", {}).get("Equipment", {})
+        selected_container = next(
+            (name for name in equipment if name.casefold() == str(container or "").casefold()),
+            None,
+        )
+        items = equipment.get(selected_container, []) if selected_container else []
+        current = str(current or "").casefold()
+        return [
+            app_commands.Choice(
+                name=str(item.get("name", "Item"))[:100], value=str(index)
+            )
+            for index, item in enumerate(items)
+            if isinstance(item, dict)
+            and current in str(item.get("name", "")).casefold()
+        ][:25]
+
+    async def feature_autocomplete(self, interaction, current):
+        character = self._selected_character(interaction)
+        current = str(current or "").casefold()
+        choices = []
+        feature_sections = (
+            (character or {}).get("sections", {}).get("Features and Traits", {})
+        )
+        labels = {
+            "Class Features": "Class",
+            "Feats": "Feat",
+            "Species Traits": "Species",
+        }
+        for subsection, category_label in labels.items():
+            for index, item in enumerate(feature_sections.get(subsection, ())):
+                name = item.get("name", "") if isinstance(item, dict) else str(item)
+                label = f"{name} ({category_label})"
+                if name and current in label.casefold():
+                    choices.append(
+                        app_commands.Choice(
+                            name=label[:100], value=f"{subsection}|{index}"
+                        )
+                    )
+        return choices[:25]
+
+    async def _note_entry_autocomplete(self, interaction, current, subsection):
+        character = self._selected_character(interaction)
+        entries = (
+            (character or {}).get("sections", {}).get("Notes", {}).get(subsection, [])
+        )
+        current = str(current or "").casefold()
+        return [
+            app_commands.Choice(name=_plain(entry, 100), value=str(index))
+            for index, entry in enumerate(entries)
+            if current in str(entry).casefold()
+        ][:25]
+
+    async def organization_autocomplete(self, interaction, current):
+        return await self._note_entry_autocomplete(interaction, current, "Organizations")
+
+    async def ally_autocomplete(self, interaction, current):
+        return await self._note_entry_autocomplete(interaction, current, "Allies")
+
+    async def enemy_autocomplete(self, interaction, current):
+        return await self._note_entry_autocomplete(interaction, current, "Enemies")
+
+    async def other_note_autocomplete(self, interaction, current):
+        return await self._note_entry_autocomplete(interaction, current, "Other")
+
+    @staticmethod
+    def _resolve_note_entry(character, subsection, selector):
+        entries = character["sections"]["Notes"][subsection]
+        try:
+            index = int(selector)
+            if index < 0:
+                raise IndexError
+            return entries, index, entries[index]
+        except (KeyError, TypeError, ValueError, IndexError):
+            raise CharacterError(
+                f"Select an entry currently recorded under {subsection}."
+            )
+
+    @staticmethod
+    def _feature_detail_lines(details):
+        return [
+            re.sub(r"^\s*(?:[-*•]\s+)", "", line).strip()
+            for line in str(details or "").splitlines()
+            if re.sub(r"^\s*(?:[-*•]\s+)", "", line).strip()
+        ]
+
+    @staticmethod
+    def _resolve_feature(character, selector):
+        try:
+            subsection, raw_index = selector.rsplit("|", 1)
+            index = int(raw_index)
+            if subsection not in {"Class Features", "Feats", "Species Traits"} or index < 0:
+                raise ValueError
+            features = character["sections"]["Features and Traits"][subsection]
+            return subsection, features, index, features[index]
+        except (KeyError, TypeError, ValueError, IndexError):
+            raise CharacterError("Select a feature currently recorded for this character.")
+
+    @staticmethod
+    def _resolve_equipment_item(character, container, selector):
+        equipment = character["sections"]["Equipment"]
+        selected_container = next(
+            (name for name in equipment if name.casefold() == container.casefold()), None
+        )
+        if selected_container is None or not isinstance(equipment[selected_container], list):
+            raise CharacterError("Select an existing equipment container.")
+        try:
+            index = int(selector)
+            if index < 0:
+                raise IndexError
+            item = equipment[selected_container][index]
+        except (ValueError, IndexError):
+            raise CharacterError("Select an item currently recorded in that container.")
+        return selected_container, equipment[selected_container], index, item
+
     async def spell_autocomplete(self, interaction, current):
         character = self._selected_character(interaction)
         current = str(current or "").casefold()
@@ -498,6 +649,39 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             seen.add(name.casefold())
             choices.append(app_commands.Choice(name=name[:100], value=name[:100]))
         return choices[:25]
+
+    async def action_entry_autocomplete(self, interaction, current):
+        character = self._selected_character(interaction)
+        current = str(current or "").casefold()
+        return [
+            app_commands.Choice(name=item["name"][:100], value=str(index))
+            for index, item in enumerate((character or {}).get("actions", ()))
+            if current in item["name"].casefold()
+        ][:25]
+
+    async def spell_entry_autocomplete(self, interaction, current):
+        character = self._selected_character(interaction)
+        current = str(current or "").casefold()
+        return [
+            app_commands.Choice(
+                name=f"{item['name']} (Level {item['level']})"[:100], value=str(index)
+            )
+            for index, item in enumerate((character or {}).get("spells", ()))
+            if current in item["name"].casefold()
+        ][:25]
+
+    @staticmethod
+    def _resolve_list_entry(character, collection, selector, label):
+        try:
+            index = int(selector)
+            if index < 0:
+                raise IndexError
+            items = character[collection]
+            return items, index, items[index]
+        except (KeyError, TypeError, ValueError, IndexError):
+            raise CharacterError(
+                f"Select {label} currently recorded for this character."
+            )
 
     @staticmethod
     def _split_lines(lines, limit=1000):
@@ -728,7 +912,12 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
                         name = _plain(item.get("name") or "Item", 200)
                         quantity = item.get("quantity")
                         quantity_text = f" x {quantity}" if quantity not in (None, "") else ""
-                        lines.append(f"**{name}**{quantity_text}")
+                        gp_value = item.get("gp_value")
+                        gp_text = f" — {gp_value:g} gp" if isinstance(gp_value, (int, float)) else (
+                            f" — {gp_value}{'' if str(gp_value).casefold().endswith('gp') else ' gp'}"
+                            if gp_value not in (None, "") else ""
+                        )
+                        lines.append(f"**{name}**{quantity_text}{gp_text}")
                         if main_section == "Features and Traits":
                             for detail in item.get("details") or []:
                                 lines.append(f"  - {_plain(detail, 2800)}")
@@ -1299,6 +1488,7 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         container: app_commands.Range[str, 1, 100],
         item_name: app_commands.Range[str, 1, 100],
         quantity: app_commands.Range[int, 1, 10000] = 1,
+        gp_value: app_commands.Range[float, 0, 1000000000] | None = None,
         description: app_commands.Range[str, 0, 1000] = "",
     ):
         selected = self.service.resolve(interaction.user.id, character)
@@ -1314,6 +1504,7 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         equipment[selected_container].append({
             "name": item_name,
             "quantity": quantity,
+            "gp_value": gp_value,
             "description": description,
         })
         self.service.save(interaction.user.id, selected, replace_selector=character)
@@ -1323,7 +1514,458 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             delete_after=EPHEMERAL_DELETE_AFTER,
         )
 
-    @app_commands.command(name="action-add", description="Add or replace a character action")
+    @add.command(name="proficiency", description="Add a typed proficiency to a character")
+    @app_commands.autocomplete(character=character_autocomplete)
+    @app_commands.choices(proficiency_type=PROFICIENCY_TYPE_CHOICES)
+    async def add_proficiency(
+        self,
+        interaction: discord.Interaction,
+        character: str,
+        proficiency_type: app_commands.Choice[str],
+        name: app_commands.Range[str, 1, 100],
+    ):
+        selected = self.service.resolve(interaction.user.id, character)
+        proficiencies = selected.setdefault("proficiencies", [])
+        duplicate = next(
+            (
+                item for item in proficiencies
+                if item["name"].casefold() == name.casefold()
+                and item["type"].casefold() == proficiency_type.value.casefold()
+            ),
+            None,
+        )
+        if duplicate is not None:
+            raise CharacterError("That proficiency is already recorded for this character.")
+        proficiencies.append({"name": name, "type": proficiency_type.value})
+        self.service.save(interaction.user.id, selected, replace_selector=character)
+        await interaction.response.send_message(
+            f"✅ Added **{name} ({proficiency_type.value})**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    @add.command(name="feature", description="Add a class feature, feat, or species trait")
+    @app_commands.autocomplete(character=character_autocomplete)
+    @app_commands.choices(feature_type=FEATURE_TYPE_CHOICES)
+    async def add_feature(
+        self,
+        interaction: discord.Interaction,
+        character: str,
+        feature_type: app_commands.Choice[str],
+        name: app_commands.Range[str, 1, 100],
+        details: app_commands.Range[str, 1, 4000],
+    ):
+        selected = self.service.resolve(interaction.user.id, character)
+        features = selected["sections"]["Features and Traits"][feature_type.value]
+        if any(
+            isinstance(item, dict)
+            and str(item.get("name", "")).casefold() == name.casefold()
+            for item in features
+        ):
+            raise CharacterError("That feature is already recorded in the selected category.")
+        detail_lines = self._feature_detail_lines(details)
+        if not detail_lines:
+            raise CharacterError("Enter at least one nonblank feature detail line.")
+        features.append({"name": name, "details": detail_lines})
+        self.service.save(interaction.user.id, selected, replace_selector=character)
+        await interaction.response.send_message(
+            f"✅ Added **{name}** to **{feature_type.value}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    @remove.command(name="proficiency", description="Remove a proficiency from a character")
+    @app_commands.autocomplete(
+        character=character_autocomplete,
+        proficiency=proficiency_autocomplete,
+    )
+    async def remove_proficiency(
+        self,
+        interaction: discord.Interaction,
+        character: str,
+        proficiency: str,
+    ):
+        selected = self.service.resolve(interaction.user.id, character)
+        proficiencies = selected.get("proficiencies", [])
+        try:
+            index = int(proficiency)
+            if index < 0:
+                raise IndexError
+            removed = proficiencies[index]
+        except (ValueError, IndexError):
+            raise CharacterError("Select a proficiency currently recorded for this character.")
+        del proficiencies[index]
+        self.service.save(interaction.user.id, selected, replace_selector=character)
+        await interaction.response.send_message(
+            f"✅ Removed **{removed['name']} ({removed['type']})**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    @remove.command(name="feature", description="Remove a class feature, feat, or species trait")
+    @app_commands.autocomplete(
+        character=character_autocomplete,
+        feature=feature_autocomplete,
+    )
+    async def remove_feature(
+        self,
+        interaction: discord.Interaction,
+        character: str,
+        feature: str,
+    ):
+        selected = self.service.resolve(interaction.user.id, character)
+        subsection, features, index, item = self._resolve_feature(selected, feature)
+        removed_name = item.get("name", "Feature") if isinstance(item, dict) else str(item)
+        del features[index]
+        self.service.save(interaction.user.id, selected, replace_selector=character)
+        await interaction.response.send_message(
+            f"✅ Removed **{removed_name}** from **{subsection}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    @edit.command(name="feature", description="Edit a class feature, feat, or species trait")
+    @app_commands.autocomplete(
+        character=character_autocomplete,
+        feature=feature_autocomplete,
+    )
+    async def edit_feature(
+        self,
+        interaction: discord.Interaction,
+        character: str,
+        feature: str,
+        name: app_commands.Range[str, 1, 100] | None = None,
+        details: app_commands.Range[str, 1, 4000] | None = None,
+    ):
+        if name is None and details is None:
+            raise CharacterError("Provide a new name, new detail text, or both.")
+        selected = self.service.resolve(interaction.user.id, character)
+        subsection, features, index, item = self._resolve_feature(selected, feature)
+        if not isinstance(item, dict):
+            item = {"name": str(item), "details": []}
+            features[index] = item
+        if name is not None:
+            duplicate = any(
+                position != index
+                and isinstance(candidate, dict)
+                and str(candidate.get("name", "")).casefold() == name.casefold()
+                for position, candidate in enumerate(features)
+            )
+            if duplicate:
+                raise CharacterError("That feature name is already recorded in this category.")
+            item["name"] = name
+        if details is not None:
+            detail_lines = self._feature_detail_lines(details)
+            if not detail_lines:
+                raise CharacterError("Enter at least one nonblank feature detail line.")
+            item["details"] = detail_lines
+        self.service.save(interaction.user.id, selected, replace_selector=character)
+        await interaction.response.send_message(
+            f"✅ Updated **{item['name']}** in **{subsection}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    @remove.command(name="container", description="Remove an empty equipment container")
+    @app_commands.autocomplete(character=character_autocomplete, container=container_autocomplete)
+    async def remove_container(
+        self, interaction: discord.Interaction, character: str, container: str
+    ):
+        selected = self.service.resolve(interaction.user.id, character)
+        equipment = selected["sections"]["Equipment"]
+        selected_container = next(
+            (name for name in equipment if name.casefold() == container.casefold()), None
+        )
+        if selected_container is None:
+            raise CharacterError("Select an existing equipment container.")
+        if equipment[selected_container]:
+            raise CharacterError("Remove the items from that container before removing it.")
+        del equipment[selected_container]
+        self.service.save(interaction.user.id, selected, replace_selector=character)
+        await interaction.response.send_message(
+            f"✅ Removed equipment container **{selected_container}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    @edit.command(name="container", description="Rename an equipment container")
+    @app_commands.autocomplete(character=character_autocomplete, container=container_autocomplete)
+    async def edit_container(
+        self,
+        interaction: discord.Interaction,
+        character: str,
+        container: str,
+        name: app_commands.Range[str, 1, 100],
+    ):
+        selected = self.service.resolve(interaction.user.id, character)
+        equipment = selected["sections"]["Equipment"]
+        selected_container = next(
+            (value for value in equipment if value.casefold() == container.casefold()), None
+        )
+        if selected_container is None:
+            raise CharacterError("Select an existing equipment container.")
+        if any(
+            value != selected_container and value.casefold() == name.casefold()
+            for value in equipment
+        ):
+            raise CharacterError("That equipment container already exists.")
+        renamed = {}
+        for key, value in equipment.items():
+            renamed[name if key == selected_container else key] = value
+        selected["sections"]["Equipment"] = renamed
+        self.service.save(interaction.user.id, selected, replace_selector=character)
+        await interaction.response.send_message(
+            f"✅ Renamed **{selected_container}** to **{name}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    @remove.command(name="item", description="Remove an equipment item")
+    @app_commands.autocomplete(
+        character=character_autocomplete,
+        container=container_autocomplete,
+        item=equipment_item_autocomplete,
+    )
+    async def remove_item(
+        self, interaction: discord.Interaction, character: str, container: str, item: str
+    ):
+        selected = self.service.resolve(interaction.user.id, character)
+        selected_container, items, index, removed = self._resolve_equipment_item(
+            selected, container, item
+        )
+        del items[index]
+        self.service.save(interaction.user.id, selected, replace_selector=character)
+        await interaction.response.send_message(
+            f"✅ Removed **{removed.get('name', 'Item')}** from **{selected_container}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    @edit.command(name="item", description="Edit an equipment item")
+    @app_commands.autocomplete(
+        character=character_autocomplete,
+        container=container_autocomplete,
+        item=equipment_item_autocomplete,
+    )
+    async def edit_item(
+        self,
+        interaction: discord.Interaction,
+        character: str,
+        container: str,
+        item: str,
+        name: app_commands.Range[str, 1, 100] | None = None,
+        quantity: app_commands.Range[int, 1, 10000] | None = None,
+        gp_value: app_commands.Range[float, 0, 1000000000] | None = None,
+        description: app_commands.Range[str, 0, 1000] | None = None,
+    ):
+        if name is None and quantity is None and gp_value is None and description is None:
+            raise CharacterError(
+                "Provide a new name, quantity, GP value, description, or a combination."
+            )
+        selected = self.service.resolve(interaction.user.id, character)
+        selected_container, _items, _index, selected_item = self._resolve_equipment_item(
+            selected, container, item
+        )
+        if name is not None:
+            selected_item["name"] = name
+        if quantity is not None:
+            selected_item["quantity"] = quantity
+        if gp_value is not None:
+            selected_item["gp_value"] = gp_value
+        if description is not None:
+            selected_item["description"] = description
+        self.service.save(interaction.user.id, selected, replace_selector=character)
+        await interaction.response.send_message(
+            f"✅ Updated **{selected_item['name']}** in **{selected_container}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    @edit.command(name="proficiency", description="Edit a character proficiency")
+    @app_commands.autocomplete(
+        character=character_autocomplete,
+        proficiency=proficiency_autocomplete,
+    )
+    @app_commands.choices(proficiency_type=PROFICIENCY_TYPE_CHOICES)
+    async def edit_proficiency(
+        self,
+        interaction: discord.Interaction,
+        character: str,
+        proficiency: str,
+        name: app_commands.Range[str, 1, 100] | None = None,
+        proficiency_type: app_commands.Choice[str] | None = None,
+    ):
+        if name is None and proficiency_type is None:
+            raise CharacterError("Provide a new proficiency name, type, or both.")
+        selected = self.service.resolve(interaction.user.id, character)
+        proficiencies = selected.get("proficiencies", [])
+        try:
+            index = int(proficiency)
+            if index < 0:
+                raise IndexError
+            item = proficiencies[index]
+        except (ValueError, IndexError):
+            raise CharacterError("Select a proficiency currently recorded for this character.")
+        new_name = name or item["name"]
+        new_type = proficiency_type.value if proficiency_type else item["type"]
+        if any(
+            position != index
+            and candidate["name"].casefold() == new_name.casefold()
+            and candidate["type"].casefold() == new_type.casefold()
+            for position, candidate in enumerate(proficiencies)
+        ):
+            raise CharacterError("That proficiency is already recorded for this character.")
+        item.update({"name": new_name, "type": new_type})
+        self.service.save(interaction.user.id, selected, replace_selector=character)
+        await interaction.response.send_message(
+            f"✅ Updated proficiency to **{new_name} ({new_type})**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    async def _add_note_entry(self, interaction, character, subsection, text):
+        selected = self.service.resolve(interaction.user.id, character)
+        entries = selected["sections"]["Notes"][subsection]
+        if any(str(entry).casefold() == text.casefold() for entry in entries):
+            raise CharacterError(f"That entry is already recorded under {subsection}.")
+        entries.append(text)
+        self.service.save(interaction.user.id, selected, replace_selector=character)
+        await interaction.response.send_message(
+            f"✅ Added an entry under **{subsection}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    async def _edit_note_entry(self, interaction, character, subsection, selector, text):
+        selected = self.service.resolve(interaction.user.id, character)
+        entries, index, _entry = self._resolve_note_entry(selected, subsection, selector)
+        if any(
+            position != index and str(entry).casefold() == text.casefold()
+            for position, entry in enumerate(entries)
+        ):
+            raise CharacterError(f"That entry is already recorded under {subsection}.")
+        entries[index] = text
+        self.service.save(interaction.user.id, selected, replace_selector=character)
+        await interaction.response.send_message(
+            f"✅ Updated an entry under **{subsection}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    async def _remove_note_entry(self, interaction, character, subsection, selector):
+        selected = self.service.resolve(interaction.user.id, character)
+        entries, index, _entry = self._resolve_note_entry(selected, subsection, selector)
+        del entries[index]
+        self.service.save(interaction.user.id, selected, replace_selector=character)
+        await interaction.response.send_message(
+            f"✅ Removed an entry from **{subsection}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    @add.command(name="backstory", description="Add character backstory text")
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def add_backstory(
+        self, interaction: discord.Interaction, character: str,
+        text: app_commands.Range[str, 1, 4000],
+    ):
+        selected = self.service.resolve(interaction.user.id, character)
+        current = str(selected["sections"]["Notes"].get("Backstory", "")).strip()
+        if current and current.casefold() not in {"none", "blank"}:
+            raise CharacterError("Backstory already contains text; use /character edit backstory.")
+        selected["sections"]["Notes"]["Backstory"] = text
+        self.service.save(interaction.user.id, selected, replace_selector=character)
+        await interaction.response.send_message(
+            "✅ Added the character backstory.", ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    @edit.command(name="backstory", description="Replace character backstory text")
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def edit_backstory(
+        self, interaction: discord.Interaction, character: str,
+        text: app_commands.Range[str, 1, 4000],
+    ):
+        selected = self.service.resolve(interaction.user.id, character)
+        selected["sections"]["Notes"]["Backstory"] = text
+        self.service.save(interaction.user.id, selected, replace_selector=character)
+        await interaction.response.send_message(
+            "✅ Updated the character backstory.", ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    @remove.command(name="backstory", description="Clear character backstory text")
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def remove_backstory(self, interaction: discord.Interaction, character: str):
+        selected = self.service.resolve(interaction.user.id, character)
+        selected["sections"]["Notes"]["Backstory"] = "NONE"
+        self.service.save(interaction.user.id, selected, replace_selector=character)
+        await interaction.response.send_message(
+            "✅ Cleared the character backstory.", ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    @add.command(name="organization", description="Add a character organization")
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def add_organization(self, interaction: discord.Interaction, character: str, text: app_commands.Range[str, 1, 1000]):
+        await self._add_note_entry(interaction, character, "Organizations", text)
+
+    @edit.command(name="organization", description="Edit a character organization")
+    @app_commands.autocomplete(character=character_autocomplete, entry=organization_autocomplete)
+    async def edit_organization(self, interaction: discord.Interaction, character: str, entry: str, text: app_commands.Range[str, 1, 1000]):
+        await self._edit_note_entry(interaction, character, "Organizations", entry, text)
+
+    @remove.command(name="organization", description="Remove a character organization")
+    @app_commands.autocomplete(character=character_autocomplete, entry=organization_autocomplete)
+    async def remove_organization(self, interaction: discord.Interaction, character: str, entry: str):
+        await self._remove_note_entry(interaction, character, "Organizations", entry)
+
+    @add.command(name="ally", description="Add a character ally")
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def add_ally(self, interaction: discord.Interaction, character: str, text: app_commands.Range[str, 1, 1000]):
+        await self._add_note_entry(interaction, character, "Allies", text)
+
+    @edit.command(name="ally", description="Edit a character ally")
+    @app_commands.autocomplete(character=character_autocomplete, entry=ally_autocomplete)
+    async def edit_ally(self, interaction: discord.Interaction, character: str, entry: str, text: app_commands.Range[str, 1, 1000]):
+        await self._edit_note_entry(interaction, character, "Allies", entry, text)
+
+    @remove.command(name="ally", description="Remove a character ally")
+    @app_commands.autocomplete(character=character_autocomplete, entry=ally_autocomplete)
+    async def remove_ally(self, interaction: discord.Interaction, character: str, entry: str):
+        await self._remove_note_entry(interaction, character, "Allies", entry)
+
+    @add.command(name="enemy", description="Add a character enemy")
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def add_enemy(self, interaction: discord.Interaction, character: str, text: app_commands.Range[str, 1, 1000]):
+        await self._add_note_entry(interaction, character, "Enemies", text)
+
+    @edit.command(name="enemy", description="Edit a character enemy")
+    @app_commands.autocomplete(character=character_autocomplete, entry=enemy_autocomplete)
+    async def edit_enemy(self, interaction: discord.Interaction, character: str, entry: str, text: app_commands.Range[str, 1, 1000]):
+        await self._edit_note_entry(interaction, character, "Enemies", entry, text)
+
+    @remove.command(name="enemy", description="Remove a character enemy")
+    @app_commands.autocomplete(character=character_autocomplete, entry=enemy_autocomplete)
+    async def remove_enemy(self, interaction: discord.Interaction, character: str, entry: str):
+        await self._remove_note_entry(interaction, character, "Enemies", entry)
+
+    @add.command(name="other-note", description="Add another character note")
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def add_other_note(self, interaction: discord.Interaction, character: str, text: app_commands.Range[str, 1, 1000]):
+        await self._add_note_entry(interaction, character, "Other", text)
+
+    @edit.command(name="other-note", description="Edit another character note")
+    @app_commands.autocomplete(character=character_autocomplete, entry=other_note_autocomplete)
+    async def edit_other_note(self, interaction: discord.Interaction, character: str, entry: str, text: app_commands.Range[str, 1, 1000]):
+        await self._edit_note_entry(interaction, character, "Other", entry, text)
+
+    @remove.command(name="other-note", description="Remove another character note")
+    @app_commands.autocomplete(character=character_autocomplete, entry=other_note_autocomplete)
+    async def remove_other_note(self, interaction: discord.Interaction, character: str, entry: str):
+        await self._remove_note_entry(interaction, character, "Other", entry)
+
+    @add.command(name="action", description="Add or replace a character action")
     @app_commands.autocomplete(character=character_autocomplete)
     async def action_add(self, interaction: discord.Interaction, character: str, name: app_commands.Range[str, 1, 100], description: app_commands.Range[str, 0, 1000] = "", attack_bonus: app_commands.Range[int, -100, 100] | None = None, damage_rolls: app_commands.Range[str, 0, 200] = "", damage_type: app_commands.Range[str, 0, 50] = ""):
         selected = self.service.resolve(interaction.user.id, character)
@@ -1338,7 +1980,7 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             delete_after=EPHEMERAL_DELETE_AFTER,
         )
 
-    @app_commands.command(name="spell-add", description="Add or replace a character spell")
+    @add.command(name="spell", description="Add or replace a character spell")
     @app_commands.autocomplete(character=character_autocomplete)
     async def spell_add(self, interaction: discord.Interaction, character: str, name: app_commands.Range[str, 1, 100], level: app_commands.Range[int, 0, 9], description: app_commands.Range[str, 0, 1000] = "", attack_bonus: app_commands.Range[int, -100, 100] | None = None, save_ability: app_commands.Range[str, 0, 3] = "", save_dc: app_commands.Range[int, 1, 100] | None = None, damage_rolls: app_commands.Range[str, 0, 200] = ""):
         selected = self.service.resolve(interaction.user.id, character)
@@ -1352,6 +1994,154 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         self.service.save(interaction.user.id, selected, replace_selector=character)
         await interaction.response.send_message(
             f"✅ Saved spell **{name}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    @remove.command(name="action", description="Remove a character action")
+    @app_commands.autocomplete(
+        character=character_autocomplete,
+        action=action_entry_autocomplete,
+    )
+    async def remove_action(
+        self, interaction: discord.Interaction, character: str, action: str
+    ):
+        selected = self.service.resolve(interaction.user.id, character)
+        actions, index, item = self._resolve_list_entry(selected, "actions", action, "an action")
+        del actions[index]
+        self.service.save(interaction.user.id, selected, replace_selector=character)
+        await interaction.response.send_message(
+            f"✅ Removed action **{item['name']}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    @edit.command(name="action", description="Edit a character action")
+    @app_commands.autocomplete(
+        character=character_autocomplete,
+        action=action_entry_autocomplete,
+    )
+    async def edit_action(
+        self,
+        interaction: discord.Interaction,
+        character: str,
+        action: str,
+        name: app_commands.Range[str, 1, 100] | None = None,
+        description: app_commands.Range[str, 0, 1000] | None = None,
+        attack_bonus: app_commands.Range[int, -100, 100] | None = None,
+        damage_rolls: app_commands.Range[str, 0, 200] | None = None,
+        damage_type: app_commands.Range[str, 0, 50] | None = None,
+    ):
+        if all(
+            value is None
+            for value in (name, description, attack_bonus, damage_rolls, damage_type)
+        ):
+            raise CharacterError("Provide at least one action field to update.")
+        selected = self.service.resolve(interaction.user.id, character)
+        actions, index, item = self._resolve_list_entry(selected, "actions", action, "an action")
+        if name is not None:
+            if any(
+                position != index and candidate["name"].casefold() == name.casefold()
+                for position, candidate in enumerate(actions)
+            ):
+                raise CharacterError("That action name is already recorded.")
+            item["name"] = name
+        if description is not None:
+            item["description"] = description
+        if attack_bonus is not None:
+            item["attack_bonus"] = attack_bonus
+        if damage_rolls is not None:
+            self._validate_damage_rolls(damage_rolls)
+            rolls = [
+                value for value in re.split(r"\s*(?:,|;)\s*", damage_rolls) if value
+            ]
+            item["damage_rolls"] = rolls
+            item["damage_types"] = [damage_type or ""] * len(rolls)
+        elif damage_type is not None:
+            item["damage_types"] = [damage_type] * len(item.get("damage_rolls", ()))
+        self.service.save(interaction.user.id, selected, replace_selector=character)
+        await interaction.response.send_message(
+            f"✅ Updated action **{item['name']}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    @remove.command(name="spell", description="Remove a character spell")
+    @app_commands.autocomplete(
+        character=character_autocomplete,
+        spell=spell_entry_autocomplete,
+    )
+    async def remove_spell(
+        self, interaction: discord.Interaction, character: str, spell: str
+    ):
+        selected = self.service.resolve(interaction.user.id, character)
+        spells, index, item = self._resolve_list_entry(selected, "spells", spell, "a spell")
+        del spells[index]
+        self.service.save(interaction.user.id, selected, replace_selector=character)
+        await interaction.response.send_message(
+            f"✅ Removed spell **{item['name']}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    @edit.command(name="spell", description="Edit a character spell")
+    @app_commands.autocomplete(
+        character=character_autocomplete,
+        spell=spell_entry_autocomplete,
+    )
+    async def edit_spell(
+        self,
+        interaction: discord.Interaction,
+        character: str,
+        spell: str,
+        name: app_commands.Range[str, 1, 100] | None = None,
+        level: app_commands.Range[int, 0, 9] | None = None,
+        description: app_commands.Range[str, 0, 1000] | None = None,
+        attack_bonus: app_commands.Range[int, -100, 100] | None = None,
+        save_ability: app_commands.Range[str, 0, 3] | None = None,
+        save_dc: app_commands.Range[int, 1, 100] | None = None,
+        damage_rolls: app_commands.Range[str, 0, 200] | None = None,
+    ):
+        if all(
+            value is None
+            for value in (
+                name, level, description, attack_bonus, save_ability, save_dc,
+                damage_rolls,
+            )
+        ):
+            raise CharacterError("Provide at least one spell field to update.")
+        selected = self.service.resolve(interaction.user.id, character)
+        spells, index, item = self._resolve_list_entry(selected, "spells", spell, "a spell")
+        if name is not None:
+            duplicate = any(
+                position != index
+                and candidate["name"].casefold() == name.casefold()
+                and candidate["level"] == (level if level is not None else item["level"])
+                for position, candidate in enumerate(spells)
+            )
+            if duplicate:
+                raise CharacterError("That spell and level are already recorded.")
+            item["name"] = name
+        if level is not None:
+            item["level"] = level
+        if description is not None:
+            item["description"] = description
+        if attack_bonus is not None:
+            item["attack_bonus"] = attack_bonus
+        if save_ability is not None:
+            if save_ability and save_ability.casefold() not in ABILITY_NAMES:
+                raise CharacterError("Spell saves must use STR, DEX, CON, INT, WIS, or CHA.")
+            item["save_ability"] = save_ability.casefold()
+        if save_dc is not None:
+            item["save_dc"] = save_dc
+        if damage_rolls is not None:
+            self._validate_damage_rolls(damage_rolls)
+            item["damage_rolls"] = [
+                value for value in re.split(r"\s*(?:,|;)\s*", damage_rolls) if value
+            ]
+        self.service.save(interaction.user.id, selected, replace_selector=character)
+        await interaction.response.send_message(
+            f"✅ Updated spell **{item['name']}**.",
             ephemeral=True,
             delete_after=EPHEMERAL_DELETE_AFTER,
         )

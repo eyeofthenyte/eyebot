@@ -138,6 +138,7 @@ def character_template_json() -> bytes:
                 "Backpack": [{
                     "name": "Rope, Hempen (50 feet)",
                     "quantity": 1,
+                    "gp_value": 1,
                     "description": "Optional item details.",
                 }],
                 "Personal Belongings": [],
@@ -173,10 +174,10 @@ def character_template_json() -> bytes:
                 },
             },
             "Notes": {
+                "Backstory": "",
                 "Organizations": [],
                 "Allies": [],
                 "Enemies": [],
-                "Backstory": "",
                 "Other": [],
             },
         },
@@ -609,10 +610,14 @@ def _canonical_character_sections(payload, supplied):
             "Other": _as_section_list(legacy_notes),
         }
     for key, default in (
-        ("Organizations", []), ("Allies", []), ("Enemies", []),
-        ("Backstory", ""), ("Other", []),
+        ("Backstory", ""), ("Organizations", []), ("Allies", []),
+        ("Enemies", []), ("Other", []),
     ):
         notes.setdefault(key, default)
+    notes = {
+        key: notes[key]
+        for key in ("Backstory", "Organizations", "Allies", "Enemies", "Other")
+    }
 
     return {
         "Equipment": equipment,
@@ -1060,6 +1065,14 @@ def _flattened_equipment_sections(pages):
             current = "Other"
             for item, parts in sorted(values, key=lambda value: value[0]["y0"]):
                 name, quantity, weight = parts[0], parts[-2], parts[-1]
+                gp_value = next(
+                    (
+                        match.group(1)
+                        for value in parts[1:-2]
+                        if (match := re.search(r"\b(\d+(?:\.\d+)?)\s*gp\b", value, re.I))
+                    ),
+                    None,
+                )
                 if page_index == 0 and column >= 1 and item["y0"] >= 695:
                     current = "Attuned Items"
                 if _looks_like_container(name):
@@ -1074,6 +1087,7 @@ def _flattened_equipment_sections(pages):
                     "name": name,
                     "quantity": quantity,
                     "weight": weight,
+                    "gp_value": gp_value,
                 })
     attuned_names = {
         item["name"].casefold() for item in result.get("Attuned Items", [])
