@@ -538,6 +538,20 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
                 value=f"**{score}** ({signed(ability_modifier(score))})",
                 inline=True,
             )
+        spellcasting = character.get("spellcasting", {})
+        casting_ability = spellcasting.get("ability")
+        if casting_ability in ABILITY_NAMES:
+            casting_modifier = ability_modifier(character["abilities"][casting_ability])
+            embed.add_field(
+                name="Spellcasting",
+                value=(
+                    f"**Casting Modifier:** ({casting_ability.upper()}) "
+                    f"{signed(casting_modifier)}  |  "
+                    f"**Spell DC:** {spellcasting.get('save_dc', 0)}  |  "
+                    f"**Spell Attack:** {signed(spellcasting.get('attack_bonus', 0))}"
+                ),
+                inline=False,
+            )
         embed.add_field(
             name="Combat",
             value=(
@@ -547,6 +561,15 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
                 f"**Speed:** {character['speed']} ft.\n"
                 f"**Maximum HP:** {character['max_hit_points']}"
             ),
+            inline=False,
+        )
+        proficiency_lines = [
+            f"  - {item['name']} ({item['type']})"
+            for item in character.get("proficiencies", ())
+        ]
+        embed.add_field(
+            name="Proficiencies",
+            value="\n".join(proficiency_lines) or "BLANK",
             inline=False,
         )
         embed.set_footer(
@@ -569,11 +592,12 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         page_fields = []
         if section == "skills":
             skill_lines = [
-                f"**__{name.title()}:__** {signed(value)}"
+                f"  - {name.title()} ({SKILL_ABILITIES.get(name, '???').title()}): "
+                f"{signed(value)}"
                 for name, value in sorted(character.get("skills", {}).items())
             ]
             save_lines = [
-                f"**__{ABILITY_NAMES[key]}:__** {signed(value)}"
+                f"  - {ABILITY_NAMES[key]} ({key.title()}): {signed(value)}"
                 for key, value in character.get("saving_throws", {}).items()
             ]
             for index, value in enumerate(self._split_lines(skill_lines), start=1):
@@ -995,10 +1019,7 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         if thread is not None:
             kwargs["thread"] = thread
         await webhook.send(**kwargs)
-        await self._send_ephemeral_followup(
-            interaction,
-            f"✅ Posted as **{discord.utils.escape_markdown(username)}**.",
-        )
+        await interaction.delete_original_response()
 
     @app_commands.command(name="download", description="Download one of your characters as EyeBot JSON")
     @app_commands.autocomplete(character=character_autocomplete)
@@ -1086,13 +1107,27 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
 
     @app_commands.command(name="skill", description="Roll a skill check for one of your characters")
     @app_commands.autocomplete(character=character_autocomplete, skill=skill_autocomplete)
-    @app_commands.choices(mode=MODE_CHOICES)
-    async def skill(self, interaction: discord.Interaction, character: str, skill: str, modifier: app_commands.Range[int, -100, 100] = 0, mode: app_commands.Choice[str] | None = None):
+    @app_commands.choices(stat=STAT_CHOICES, mode=MODE_CHOICES)
+    async def skill(self, interaction: discord.Interaction, character: str, skill: str, stat: app_commands.Choice[str] | None = None, modifier: app_commands.Range[int, -100, 100] = 0, mode: app_commands.Choice[str] | None = None):
         selected = self.service.resolve(interaction.user.id, character)
         key = skill.casefold()
         if key not in selected["skills"]:
             raise CharacterError("That skill is not recorded for this character.")
-        await interaction.response.send_message(embed=self._roll_embed(selected, f"{key.title()} Check", selected["skills"][key], modifier, mode.value if mode else "normal"))
+        skill_modifier = selected["skills"][key]
+        label = f"{key.title()} Check"
+        if stat is not None:
+            normal_ability = SKILL_ABILITIES.get(key)
+            if normal_ability is None:
+                raise CharacterError("That skill does not have a recorded controlling ability.")
+            proficiency_contribution = skill_modifier - ability_modifier(
+                selected["abilities"][normal_ability]
+            )
+            skill_modifier = (
+                ability_modifier(selected["abilities"][stat.value])
+                + proficiency_contribution
+            )
+            label = f"{key.title()} ({ABILITY_NAMES[stat.value]}) Check"
+        await interaction.response.send_message(embed=self._roll_embed(selected, label, skill_modifier, modifier, mode.value if mode else "normal"))
 
     @app_commands.command(name="save", description="Roll a saving throw for one of your characters")
     @app_commands.autocomplete(character=character_autocomplete)

@@ -92,6 +92,8 @@ def character_template_json() -> bytes:
             "saving_throws": "Enter each complete saving-throw modifier, including proficiency.",
             "skills": "Enter each complete skill modifier. Unlisted skills default from their ability.",
             "combat": "speed is in feet; initiative is the total bonus; armor_class and max_hit_points are totals.",
+            "spellcasting": "ability uses STR, DEX, CON, INT, WIS, or CHA; save_dc and attack_bonus are totals.",
+            "proficiencies": "Add each proficiency with a name and type, such as Armor, Weapons, Language, or Tool.",
             "actions": (
                 "Each action may include description, attack_bonus, damage_rolls, damage_types, "
                 "save_ability, and save_dc. Damage rolls use bounded expressions such as "
@@ -123,6 +125,11 @@ def character_template_json() -> bytes:
         "initiative": 0,
         "armor_class": 10,
         "max_hit_points": 10,
+        "spellcasting": {"ability": "cha", "save_dc": 10, "attack_bonus": 2},
+        "proficiencies": [
+            {"name": "Light", "type": "Armor"},
+            {"name": "Common", "type": "Language"},
+        ],
         "avatar_url": "",
         "actions": [],
         "spells": [],
@@ -455,6 +462,98 @@ def _as_section_list(value):
     return value if isinstance(value, list) else [value]
 
 
+def _normalize_proficiencies(value):
+    result = []
+    seen = set()
+    if isinstance(value, dict):
+        value = [
+            {"name": name, "type": proficiency_type}
+            for proficiency_type, names in value.items()
+            for name in (names if isinstance(names, list) else [names])
+        ]
+    for item in value if isinstance(value, list) else []:
+        if isinstance(item, dict):
+            name = _text(item.get("name"), maximum=100)
+            proficiency_type = _text(item.get("type"), maximum=40)
+        else:
+            match = re.match(r"(.+?)\s*\(([^()]+)\)\s*$", str(item or ""))
+            name = _text(match.group(1) if match else item, maximum=100)
+            proficiency_type = _text(match.group(2) if match else "Other", maximum=40)
+        identity = (name.casefold(), proficiency_type.casefold())
+        if name and identity not in seen:
+            seen.add(identity)
+            result.append({"name": name, "type": proficiency_type or "Other"})
+    return result[:200]
+
+
+def _clean_feature_summaries(features):
+    """Remove information now rendered in the character Summary."""
+    proficiency_titles = {
+        "proficiencies", "proficiencies and training", "proficiencies & training"
+    }
+    casting_line = re.compile(r"\bspell\s*casting\s+(?:ability|modifier)\b", re.I)
+    for category in ("Class Features", "Species Traits", "Feats"):
+        cleaned = []
+        for item in _as_section_list(features.get(category)):
+            if isinstance(item, dict):
+                if str(item.get("name", "")).strip().casefold() in proficiency_titles:
+                    continue
+                item = deepcopy(item)
+                item["details"] = [
+                    detail for detail in _as_section_list(item.get("details"))
+                    if not casting_line.search(str(detail))
+                ]
+            elif (
+                str(item).strip().casefold() in proficiency_titles
+                or casting_line.search(str(item))
+            ):
+                continue
+            cleaned.append(item)
+        features[category] = cleaned
+    return features
+
+
+def _feature_summary_proficiencies(supplied):
+    if not isinstance(supplied, dict):
+        return []
+    features = supplied.get("Features and Traits")
+    if not isinstance(features, dict):
+        return []
+    titles = {"proficiencies", "proficiencies and training", "proficiencies & training"}
+    extracted = []
+    for category in features.values():
+        for item in _as_section_list(category):
+            if not isinstance(item, dict) or str(item.get("name", "")).strip().casefold() not in titles:
+                continue
+            for detail in _as_section_list(item.get("details")):
+                text = str(detail).strip()
+                match = re.match(
+                    r"^(Armor|Armour|Weapons?|Languages?|Tools?)\s*:?\s*(.+)$", text, re.I
+                )
+                if match:
+                    proficiency_type = _proficiency_type(match.group(1))
+                    names = re.split(r"\s*,\s*|\s*;\s*", match.group(2))
+                else:
+                    suffix = re.match(r"^(.+?)\s+(Armor|Weapons?|Languages?|Tools?)$", text, re.I)
+                    if not suffix:
+                        continue
+                    proficiency_type = _proficiency_type(suffix.group(2))
+                    names = [suffix.group(1)]
+                extracted.extend(
+                    {"name": name.strip(), "type": proficiency_type}
+                    for name in names if name.strip()
+                )
+    return _normalize_proficiencies(extracted)
+
+
+def _section_text(value):
+    if isinstance(value, dict):
+        return "\n".join(_section_text(item) for item in value.values())
+    if isinstance(value, list):
+        return "\n".join(_section_text(item) for item in value)
+    return str(value or "")
+
+
 def _canonical_character_sections(payload, supplied):
     """Return schema-v2 sections while accepting legacy JSON exports."""
     sections = deepcopy(supplied) if isinstance(supplied, dict) else {}
@@ -486,6 +585,7 @@ def _canonical_character_sections(payload, supplied):
         }
     for key in ("Class Features", "Species Traits", "Feats"):
         features.setdefault(key, [])
+    features = _clean_feature_summaries(features)
 
     background = sections.get("Background")
     if not isinstance(background, dict):
@@ -601,7 +701,15 @@ def normalize_character(value: dict, owner_id: str, *, source="json") -> dict:
     identifier = _text(payload.get("id"), maximum=80)
     if not re.fullmatch(r"[a-zA-Z0-9_-]{1,80}", identifier):
         identifier = f"{_slug(name)}-{uuid.uuid4().hex[:8]}"
-    sections = _canonical_character_sections(payload, payload.get("sections"))
+    supplied_sections = payload.get("sections")
+    migrated_proficiencies = _feature_summary_proficiencies(supplied_sections)
+    raw_spellcasting = payload.get("spellcasting") or _flattened_spellcasting(
+        [{"text": _section_text(supplied_sections)}], abilities, proficiency, spells
+    )
+    casting_ability = _text(raw_spellcasting.get("ability"), maximum=3).casefold()
+    if casting_ability not in ABILITY_NAMES:
+        casting_ability = ""
+    sections = _canonical_character_sections(payload, supplied_sections)
     return {
         "schema_version": 2,
         "id": identifier,
@@ -636,6 +744,18 @@ def normalize_character(value: dict, owner_id: str, *, source="json") -> dict:
             max(1, level * (6 + ability_modifier(abilities["con"]))),
             minimum=1,
             maximum=100_000,
+        ),
+        "spellcasting": {
+            "ability": casting_ability,
+            "save_dc": _integer(
+                raw_spellcasting.get("save_dc"), 0, minimum=0, maximum=100
+            ),
+            "attack_bonus": _integer(
+                raw_spellcasting.get("attack_bonus"), 0, minimum=-100, maximum=100
+            ),
+        },
+        "proficiencies": _normalize_proficiencies(
+            payload.get("proficiencies") or migrated_proficiencies
         ),
         "actions": _normalize_actions(actions),
         "spells": _normalize_spells(spells),
@@ -778,6 +898,88 @@ def _strip_biography_section_titles(value):
         flags=re.I,
     )
     return re.sub(r"\s{2,}", " ", selected).strip()
+
+
+def _proficiency_type(value):
+    selected = str(value or "").strip().casefold().rstrip(":")
+    return {
+        "armor": "Armor",
+        "armour": "Armor",
+        "weapon": "Weapons",
+        "weapons": "Weapons",
+        "language": "Language",
+        "languages": "Language",
+        "tool": "Tool",
+        "tools": "Tool",
+    }.get(selected, "")
+
+
+def _flattened_proficiencies(page):
+    """Extract typed entries from a flattened Proficiencies and Training area."""
+    result = []
+    current_type = ""
+    for item in sorted(page.get("blocks", []), key=lambda value: (value.get("y0", 0), value.get("x0", 0))):
+        text = str(item.get("text", "")).strip()
+        if not text or re.search(r"===\s*PROFICIENCIES", text, re.I):
+            continue
+        if _proficiency_type(text):
+            current_type = _proficiency_type(text)
+            continue
+        parts = [part.strip(" •*") for part in text.split("|") if part.strip(" •*")]
+        pairs = []
+        if len(parts) >= 2 and _proficiency_type(parts[0]):
+            pairs.extend((name, _proficiency_type(parts[0])) for name in parts[1:])
+        elif len(parts) >= 2 and _proficiency_type(parts[-1]):
+            pairs.append((" | ".join(parts[:-1]), _proficiency_type(parts[-1])))
+        else:
+            match = re.match(
+                r"^(Armor|Armour|Weapons?|Languages?|Tools?)\s*:\s*(.+)$", text, re.I
+            )
+            if match:
+                pairs.extend(
+                    (name.strip(), _proficiency_type(match.group(1)))
+                    for name in re.split(r"\s*,\s*|\s*;\s*", match.group(2))
+                )
+            elif current_type and len(parts) == 1 and text.lstrip().startswith(("*", "•")):
+                pairs.append((parts[0], current_type))
+        for name, proficiency_type in pairs:
+            name = re.sub(
+                rf"\s+{re.escape(proficiency_type)}$", "", name, flags=re.I
+            ).strip()
+            if name:
+                result.append({"name": name, "type": proficiency_type})
+    return _normalize_proficiencies(result)
+
+
+def _flattened_spellcasting(pages, abilities, proficiency, spells):
+    text = "\n".join(page.get("text", "") for page in pages)
+    ability_match = re.search(
+        r"spell\s*casting\s+(?:ability|modifier)\s*[:|]?\s*(STR|DEX|CON|INT|WIS|CHA)\b",
+        text,
+        re.I,
+    )
+    dc_match = re.search(r"spell\s*(?:save\s*)?dc\s*[:|]?\s*(\d{1,2})\b", text, re.I)
+    attack_match = re.search(
+        r"spell\s*attack(?:\s+bonus)?\s*[:|]?\s*([+-]?\d{1,2})\b", text, re.I
+    )
+    save_dc = int(dc_match.group(1)) if dc_match else next(
+        (int(item["save_dc"]) for item in spells if item.get("save_dc")), 0
+    )
+    attack_bonus = int(attack_match.group(1)) if attack_match else next(
+        (int(item["attack_bonus"]) for item in spells if item.get("attack_bonus") is not None),
+        0,
+    )
+    ability = ability_match.group(1).casefold() if ability_match else ""
+    if not ability and attack_bonus:
+        expected_modifier = attack_bonus - int(proficiency)
+        ability = next(
+            (
+                key for key, score in abilities.items()
+                if ability_modifier(int(score)) == expected_modifier
+            ),
+            "",
+        )
+    return {"ability": ability, "save_dc": save_dc, "attack_bonus": attack_bonus}
 
 
 def _flattened_feature_sections(page):
@@ -1118,17 +1320,24 @@ def _flattened_pdf_payload(pages):
         "Background": background_sections,
         "Notes": note_sections,
     }
+    proficiency_value = _flat_number(proficiency, proficiency_bonus(level))
+    proficiencies = _flattened_proficiencies(pages[1]) if len(pages) > 1 else []
+    spellcasting = _flattened_spellcasting(
+        pages, abilities, proficiency_value, spells
+    )
     return {
         "name": name,
         "classes": [{"name": class_name, "subclass": subclass, "level": level}],
         "abilities": abilities,
         "saving_throws": saving_throws,
         "skills": skills,
-        "proficiency_bonus": _flat_number(proficiency, proficiency_bonus(level)),
+        "proficiency_bonus": proficiency_value,
         "speed": _flat_number(speed, 30),
         "initiative": combat_values[0] if combat_values else ability_modifier(int(abilities["dex"])),
         "armor_class": combat_values[1] if len(combat_values) > 1 else 10,
         "max_hit_points": _flat_number(hit_points, 1),
+        "spellcasting": spellcasting,
+        "proficiencies": proficiencies,
         "species": species,
         "background": background,
         "actions": actions,

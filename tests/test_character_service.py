@@ -91,6 +91,66 @@ class CharacterMathTests(unittest.TestCase):
         self.assertIn(
             "Class Features", imported["sections"]["Features and Traits"]
         )
+        self.assertEqual(imported["spellcasting"]["ability"], "cha")
+        self.assertEqual(
+            imported["proficiencies"][0], {"name": "Light", "type": "Armor"}
+        )
+
+    def test_summary_data_is_normalized_and_removed_from_features(self):
+        payload = sample_character()
+        payload["spellcasting"] = {
+            "ability": "cha", "save_dc": 13, "attack_bonus": 5
+        }
+        payload["sections"] = {
+            "Features and Traits": {
+                "Class Features": [
+                    {
+                        "name": "Proficiencies",
+                        "details": ["Light Armor", "Languages: Common"],
+                    },
+                    {"name": "Pact Magic", "details": [
+                        "Spellcasting Modifier: Charisma", "Cast warlock spells."
+                    ]},
+                ],
+                "Species Traits": [],
+                "Feats": [],
+            }
+        }
+        value = normalize_character(payload, "123")
+        self.assertEqual(value["spellcasting"]["save_dc"], 13)
+        self.assertEqual(
+            value["proficiencies"][1], {"name": "Common", "type": "Language"}
+        )
+        features = value["sections"]["Features and Traits"]["Class Features"]
+        self.assertEqual(
+            features,
+            [{"name": "Pact Magic", "details": ["Cast warlock spells."]}],
+        )
+
+    def test_flattened_proficiencies_and_spellcasting_are_extracted(self):
+        from services.characterService import (
+            _flattened_proficiencies,
+            _flattened_spellcasting,
+        )
+
+        page = {
+            "text": "Spellcasting Ability CHA | Spell Save DC 13 | Spell Attack +5",
+            "blocks": [
+                {"x0": 10, "y0": 10, "text": "Light Armor | Armor"},
+                {"x0": 10, "y0": 20, "text": "Simple Weapons | Weapons"},
+                {"x0": 10, "y0": 30, "text": "Languages: Celestial, Common, Elvish, Sylvan"},
+                {"x0": 10, "y0": 40, "text": "Poisoners Kit | Tool"},
+            ],
+        }
+        proficiencies = _flattened_proficiencies(page)
+        self.assertIn({"name": "Light", "type": "Armor"}, proficiencies)
+        self.assertIn({"name": "Simple", "type": "Weapons"}, proficiencies)
+        self.assertIn({"name": "Celestial", "type": "Language"}, proficiencies)
+        self.assertIn({"name": "Poisoners Kit", "type": "Tool"}, proficiencies)
+        casting = _flattened_spellcasting([page], {"cha": 16}, 2, [])
+        self.assertEqual(
+            casting, {"ability": "cha", "save_dc": 13, "attack_bonus": 5}
+        )
 
     def test_legacy_json_sections_are_migrated_to_schema_two(self):
         payload = sample_character()

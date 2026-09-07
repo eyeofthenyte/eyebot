@@ -84,6 +84,22 @@ class CharacterCogStructureTests(unittest.TestCase):
         self.assertIn('selected_section = section.value if section else "summary"', source)
         self.assertEqual(source.count("ephemeral=True"), 2)
 
+    def test_summary_displays_spellcasting_and_typed_proficiencies(self):
+        source = COG_PATH.read_text(encoding="utf-8")
+        self.assertIn('name="Spellcasting"', source)
+        self.assertIn(
+            'f"**Casting Modifier:** ({casting_ability.upper()}) "', source
+        )
+        self.assertIn(
+            'f"**Spell DC:** {spellcasting.get(\'save_dc\', 0)}  |  "', source
+        )
+        self.assertIn(
+            'f"**Spell Attack:** {signed(spellcasting.get(\'attack_bonus\', 0))}"',
+            source,
+        )
+        self.assertIn('name="Proficiencies"', source)
+        self.assertIn('f"  - {item[\'name\']} ({item[\'type\']})"', source)
+
     def test_show_all_posts_sections_in_requested_order(self):
         source = COG_PATH.read_text(encoding="utf-8")
         self.assertIn('app_commands.Choice(name="Skills (Skills & Saves)"', source)
@@ -115,10 +131,27 @@ class CharacterCogStructureTests(unittest.TestCase):
         self.assertIn("self.cog._roll_embed", source)
         self.assertIn('if self.section == "skills"', source)
 
-    def test_skill_and_save_labels_are_underlined(self):
+    def test_typed_skill_roll_can_use_an_optional_controlling_stat(self):
         source = COG_PATH.read_text(encoding="utf-8")
-        self.assertIn('f"**__{name.title()}:__** {signed(value)}"', source)
-        self.assertIn('f"**__{ABILITY_NAMES[key]}:__** {signed(value)}"', source)
+        self.assertIn("@app_commands.choices(stat=STAT_CHOICES, mode=MODE_CHOICES)", source)
+        self.assertIn("stat: app_commands.Choice[str] | None = None", source)
+        self.assertIn("normal_ability = SKILL_ABILITIES.get(key)", source)
+        self.assertIn("proficiency_contribution = skill_modifier - ability_modifier(", source)
+        self.assertIn("ability_modifier(selected[\"abilities\"][stat.value])", source)
+        self.assertIn('label = f"{key.title()} ({ABILITY_NAMES[stat.value]}) Check"', source)
+
+    def test_only_skill_and_save_section_headings_are_underlined(self):
+        source = COG_PATH.read_text(encoding="utf-8")
+        self.assertIn(
+            'f"  - {name.title()} ({SKILL_ABILITIES.get(name, \'???\').title()}): "',
+            source,
+        )
+        self.assertIn(
+            'f"  - {ABILITY_NAMES[key]} ({key.title()}): {signed(value)}"', source
+        )
+        self.assertNotIn('**__{name.title()}:__**', source)
+        self.assertNotIn('**__{ABILITY_NAMES[key]}:__**', source)
+        self.assertIn('("__Skills__"', source)
         self.assertIn('("__Saving Throws__"', source)
 
     def test_action_rolls_have_clickable_controls_and_typed_damage(self):
@@ -140,6 +173,22 @@ class CharacterCogStructureTests(unittest.TestCase):
         self.assertIn('kwargs["avatar_url"] = avatar_url', source)
         self.assertIn("discord.AllowedMentions.none()", source)
         self.assertIn("await webhook.send(**kwargs)", source)
+
+    def test_successful_character_post_has_no_ephemeral_confirmation(self):
+        tree = ast.parse(COG_PATH.read_text(encoding="utf-8"))
+        post = next(
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name == "post"
+        )
+        post_source = ast.get_source_segment(
+            COG_PATH.read_text(encoding="utf-8"), post
+        )
+        self.assertIn("await webhook.send(**kwargs)", post_source)
+        self.assertIn("await interaction.delete_original_response()", post_source)
+        self.assertNotIn("✅ Posted as", post_source)
+        self.assertNotIn("_send_ephemeral_followup", post_source)
 
     def test_followup_expiration_is_compatible_with_discord_webhooks(self):
         source = COG_PATH.read_text(encoding="utf-8")
