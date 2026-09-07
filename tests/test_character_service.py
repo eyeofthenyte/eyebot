@@ -356,6 +356,38 @@ class CharacterServiceTests(unittest.TestCase):
             self.assertEqual(stored.format, "PNG")
             self.assertLessEqual(max(stored.size), 1024)
 
+    def test_avatar_and_four_gallery_slots_are_stored_separately(self):
+        character = self.service.save("123", sample_character())
+        source = io.BytesIO()
+        Image.new("RGB", (100, 100), "blue").save(source, format="PNG")
+        data = source.getvalue()
+
+        avatar = self.service.store_avatar(
+            "123", character["id"], data, "image/png"
+        )
+        gallery = self.service.store_gallery_image(
+            "123", character["id"], 1, data, "image/png"
+        )
+
+        self.assertTrue(Path(avatar["image_path"]).is_file())
+        self.assertTrue(Path(gallery["image_paths"][0]).is_file())
+        self.assertEqual(len(gallery["image_paths"]), 4)
+        self.assertNotEqual(gallery["image_path"], gallery["image_paths"][0])
+
+        removed_gallery = self.service.remove_gallery_image(
+            "123", character["id"], 1
+        )
+        self.assertEqual(removed_gallery["image_paths"][0], "")
+        removed_avatar = self.service.remove_avatar("123", character["id"])
+        self.assertEqual(removed_avatar["image_path"], "")
+
+    def test_gallery_rejects_slots_outside_one_through_four(self):
+        character = self.service.save("123", sample_character())
+        with self.assertRaises(CharacterError):
+            self.service.store_gallery_image(
+                "123", character["id"], 5, b"image", "image/png"
+            )
+
     def test_invalid_json_and_image_are_rejected(self):
         character = self.service.save("123", sample_character())
         with self.assertRaises(CharacterError):

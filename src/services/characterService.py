@@ -50,7 +50,6 @@ SKILL_ABILITIES = {
 }
 MAX_CHARACTERS_PER_USER = 50
 MAX_IMPORT_BYTES = 10 * 1024 * 1024
-MAX_IMAGE_BYTES = 5 * 1024 * 1024
 MAX_IMAGE_PIXELS = 25_000_000
 MAX_TEXT = 20_000
 MAX_LIST_ITEMS = 500
@@ -112,7 +111,8 @@ def character_template_json() -> bytes:
                 "Use /character set to edit section values, /character add container "
                 "to create an equipment container, and /character add item to add equipment."
             ),
-            "avatar_url": "Optional direct HTTPS portrait URL. You may instead use /character image after import.",
+            "avatar_url": "Optional direct HTTPS avatar URL. You may instead use /character add avatar after import.",
+            "images": "Gallery image paths are managed by /character add, edit, and remove image and are not portable in JSON exports.",
         },
         "name": "Example Character",
         "nickname": "",
@@ -131,6 +131,7 @@ def character_template_json() -> bytes:
             {"name": "Common", "type": "Language"},
         ],
         "avatar_url": "",
+        "images": [],
         "actions": [],
         "spells": [],
         "sections": {
@@ -216,6 +217,14 @@ def _integer(value, default=0, *, minimum=-1000, maximum=1000) -> int:
     except (TypeError, ValueError):
         selected = int(default)
     return max(minimum, min(maximum, selected))
+
+
+def _normalize_image_paths(value):
+    paths = value if isinstance(value, list) else []
+    return [
+        _text(paths[index], maximum=1000) if index < len(paths) else ""
+        for index in range(4)
+    ]
 
 
 def _slug(value: str) -> str:
@@ -725,6 +734,9 @@ def normalize_character(value: dict, owner_id: str, *, source="json") -> dict:
         "source_reference": _text(payload.get("source_reference"), maximum=200),
         "avatar_url": _text(payload.get("avatar_url") or payload.get("avatarUrl"), maximum=1000),
         "image_path": "",
+        "image_paths": _normalize_image_paths(
+            payload.get("image_paths") or payload.get("images")
+        ),
         "classes": classes,
         "level": level,
         "abilities": abilities,
@@ -1578,6 +1590,7 @@ class CharacterService:
                 normalized["created_at"] = previous.get("created_at", normalized["created_at"])
                 normalized["nickname"] = previous.get("nickname", "")
                 normalized["image_path"] = previous.get("image_path", "")
+                normalized["image_paths"] = previous.get("image_paths", ["", "", "", ""])
                 store["characters"].pop(previous["id"], None)
             elif len(store["characters"]) >= int(
                 self.settings.get("max_characters_per_user", MAX_CHARACTERS_PER_USER)
@@ -1622,8 +1635,12 @@ class CharacterService:
             for key, value in changes.items():
                 if key == "nickname":
                     stored[key] = _text(value, maximum=100)
+                elif key == "avatar_url":
+                    stored[key] = _text(value, maximum=1000)
                 elif key == "image_path":
                     stored[key] = _text(value, maximum=1000)
+                elif key == "image_paths":
+                    stored[key] = _normalize_image_paths(value)
             stored["updated_at"] = utc_now()
             self._write(owner, store)
             return deepcopy(stored)
@@ -1636,9 +1653,12 @@ class CharacterService:
             removed = store["characters"].pop(character["id"])
             self._write(owner, store)
         image_path = removed.get("image_path")
-        if image_path:
+        image_paths = [image_path, *removed.get("image_paths", [])]
+        for stored_path in image_paths:
+            if not stored_path:
+                continue
             try:
-                Path(image_path).unlink(missing_ok=True)
+                Path(stored_path).unlink(missing_ok=True)
             except OSError:
                 pass
         return deepcopy(removed)
@@ -1647,16 +1667,16 @@ class CharacterService:
         character = self.resolve(owner_id, selector)
         exported = deepcopy(character)
         exported["image_path"] = ""
+        exported["image_paths"] = ["", "", "", ""]
         exported["schema_version"] = 2
         exported["sections"] = _canonical_character_sections(
             exported, exported.get("sections")
         )
         return (json.dumps(exported, indent=2) + "\n").encode("utf-8")
 
-    def store_image(self, owner_id, selector, data: bytes, content_type: str) -> dict:
-        maximum = int(self.settings.get("max_image_bytes", MAX_IMAGE_BYTES))
-        if not data or len(data) > maximum:
-            raise CharacterError(f"Character images must be no larger than {maximum:,} bytes.")
+    def _normalized_image(self, data: bytes, content_type: str):
+        if not data:
+            raise CharacterError("The uploaded character image is empty.")
         allowed = {"image/png", "image/jpeg", "image/webp"}
         if str(content_type or "").split(";", 1)[0].casefold() not in allowed:
             raise CharacterError("Character images must be PNG, JPEG, or WebP files.")
@@ -1672,13 +1692,75 @@ class CharacterService:
         image = ImageOps.exif_transpose(image).convert("RGBA")
         maximum_dimension = int(self.settings.get("image_max_dimension", 1024))
         image.thumbnail((maximum_dimension, maximum_dimension), Image.Resampling.LANCZOS)
+        return image
+
+    def store_avatar(self, owner_id, selector, data: bytes, content_type: str) -> dict:
+        image = self._normalized_image(data, content_type)
         character = self.resolve(owner_id, selector)
         directory = self.root / "images" / self.validate_owner(owner_id)
         directory.mkdir(parents=True, exist_ok=True)
-        path = directory / f"{character['id']}.png"
+        path = directory / f"{character['id']}-avatar.png"
         image.save(path, format="PNG", optimize=True)
         try:
             path.chmod(0o600)
         except OSError:
             pass
-        return self.update(owner_id, selector, image_path=str(path))
+        updated = self.update(
+            owner_id, selector, image_path=str(path), avatar_url=""
+        )
+        previous_path = character.get("image_path")
+        if previous_path and Path(previous_path) != path:
+            try:
+                Path(previous_path).unlink(missing_ok=True)
+            except OSError:
+                pass
+        return updated
+
+    def store_image(self, owner_id, selector, data: bytes, content_type: str) -> dict:
+        """Backward-compatible alias for avatar storage."""
+        return self.store_avatar(owner_id, selector, data, content_type)
+
+    def remove_avatar(self, owner_id, selector) -> dict:
+        character = self.resolve(owner_id, selector)
+        path = character.get("image_path")
+        updated = self.update(owner_id, selector, image_path="", avatar_url="")
+        if path:
+            try:
+                Path(path).unlink(missing_ok=True)
+            except OSError:
+                pass
+        return updated
+
+    def store_gallery_image(
+        self, owner_id, selector, slot: int, data: bytes, content_type: str
+    ) -> dict:
+        if slot not in range(1, 5):
+            raise CharacterError("Character image slots must be from 1 through 4.")
+        image = self._normalized_image(data, content_type)
+        character = self.resolve(owner_id, selector)
+        directory = self.root / "images" / self.validate_owner(owner_id)
+        directory.mkdir(parents=True, exist_ok=True)
+        path = directory / f"{character['id']}-gallery-{slot}.png"
+        image.save(path, format="PNG", optimize=True)
+        try:
+            path.chmod(0o600)
+        except OSError:
+            pass
+        paths = _normalize_image_paths(character.get("image_paths"))
+        paths[slot - 1] = str(path)
+        return self.update(owner_id, selector, image_paths=paths)
+
+    def remove_gallery_image(self, owner_id, selector, slot: int) -> dict:
+        if slot not in range(1, 5):
+            raise CharacterError("Character image slots must be from 1 through 4.")
+        character = self.resolve(owner_id, selector)
+        paths = _normalize_image_paths(character.get("image_paths"))
+        path = paths[slot - 1]
+        paths[slot - 1] = ""
+        updated = self.update(owner_id, selector, image_paths=paths)
+        if path:
+            try:
+                Path(path).unlink(missing_ok=True)
+            except OSError:
+                pass
+        return updated

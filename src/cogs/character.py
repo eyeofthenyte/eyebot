@@ -371,6 +371,7 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             root = guild_root.parent / "characters"
         self.service = CharacterService(root, settings=settings, logger=self.logger)
         self._ephemeral_deletion_tasks = set()
+        self._webhook_avatar_lock = asyncio.Lock()
 
     def cog_unload(self):
         for task in self._ephemeral_deletion_tasks:
@@ -1165,25 +1166,68 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             delete_after=EPHEMERAL_DELETE_AFTER,
         )
 
-    @app_commands.command(name="image", description="Replace a character portrait")
-    @app_commands.autocomplete(character=character_autocomplete)
-    async def image(self, interaction: discord.Interaction, character: str, image: discord.Attachment):
-        await interaction.response.defer(ephemeral=True, thinking=True)
+    async def _read_character_image(self, image):
         content_type = image.content_type or mimetypes.guess_type(image.filename)[0] or ""
-        maximum = int(self.service.settings.get("max_image_bytes", 5 * 1024 * 1024))
-        if int(getattr(image, "size", 0) or 0) > maximum:
-            raise CharacterError(
-                f"Character images must be no larger than {maximum:,} bytes."
-            )
-        updated = self.service.store_image(
-            interaction.user.id,
-            character,
-            await image.read(use_cached=False),
-            content_type,
+        return await image.read(use_cached=False), content_type
+
+    @app_commands.command(name="avatar", description="Display a character avatar")
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def avatar(self, interaction: discord.Interaction, character: str):
+        selected = self.service.resolve(interaction.user.id, character)
+        embed = discord.Embed(
+            title=f"{_display_name(selected, markdown=False)} — Avatar",
+            color=0x7A2E8E,
         )
-        await self._send_ephemeral_followup(
-            interaction,
-            f"✅ Updated the portrait for **{updated['name']}**.",
+        image_path = selected.get("image_path")
+        avatar_url = str(selected.get("avatar_url") or "").strip()
+        kwargs = {"embed": embed, "ephemeral": True, "delete_after": EPHEMERAL_DELETE_AFTER}
+        if image_path and Path(image_path).is_file():
+            filename = f"character-{selected['id']}-avatar.png"
+            kwargs["file"] = discord.File(image_path, filename=filename)
+            embed.set_image(url=f"attachment://{filename}")
+        elif avatar_url.startswith("https://"):
+            embed.set_image(url=avatar_url)
+        else:
+            raise CharacterError("That character does not have an avatar image.")
+        await interaction.response.send_message(**kwargs)
+
+    @app_commands.command(name="image", description="Display character gallery images")
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def image(
+        self,
+        interaction: discord.Interaction,
+        character: str,
+        slot: app_commands.Range[int, 1, 4] | None = None,
+    ):
+        selected = self.service.resolve(interaction.user.id, character)
+        paths = selected.get("image_paths", ["", "", "", ""])
+        selected_slots = [slot] if slot is not None else range(1, 5)
+        files = []
+        embeds = []
+        for image_slot in selected_slots:
+            path = paths[image_slot - 1] if image_slot <= len(paths) else ""
+            if not path or not Path(path).is_file():
+                if slot is not None:
+                    raise CharacterError(f"Image slot {image_slot} is empty.")
+                continue
+            filename = f"character-{selected['id']}-image-{image_slot}.png"
+            files.append(discord.File(path, filename=filename))
+            embed = discord.Embed(
+                title=f"{_display_name(selected, markdown=False)} — Image {image_slot}",
+                color=0x7A2E8E,
+            )
+            if slot is None:
+                embed.set_thumbnail(url=f"attachment://{filename}")
+            else:
+                embed.set_image(url=f"attachment://{filename}")
+            embeds.append(embed)
+        if not embeds:
+            raise CharacterError("That character does not have any gallery images.")
+        await interaction.response.send_message(
+            embeds=embeds,
+            files=files,
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
         )
 
     @app_commands.command(name="post", description="Post in character using the character's name and portrait")
@@ -1207,7 +1251,19 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             kwargs["avatar_url"] = avatar_url
         if thread is not None:
             kwargs["thread"] = thread
-        await webhook.send(**kwargs)
+        async with self._webhook_avatar_lock:
+            avatar_path = selected.get("image_path")
+            if avatar_path and Path(avatar_path).is_file():
+                webhook = await webhook.edit(
+                    avatar=Path(avatar_path).read_bytes(),
+                    reason="EyeBot character avatar post",
+                )
+            elif not avatar_url.startswith("https://"):
+                webhook = await webhook.edit(
+                    avatar=None,
+                    reason="EyeBot character post without avatar",
+                )
+            await webhook.send(**kwargs)
         await interaction.delete_original_response()
 
     @app_commands.command(name="download", description="Download one of your characters as EyeBot JSON")
@@ -1475,6 +1531,116 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         self.service.save(interaction.user.id, selected, replace_selector=character)
         await interaction.response.send_message(
             f"✅ Added equipment container **{name}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    @add.command(name="avatar", description="Add a character posting avatar")
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def add_avatar(
+        self, interaction: discord.Interaction, character: str, image: discord.Attachment
+    ):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        selected = self.service.resolve(interaction.user.id, character)
+        if selected.get("image_path") or str(selected.get("avatar_url") or "").startswith("https://"):
+            raise CharacterError("That character already has an avatar; use /character edit avatar.")
+        data, content_type = await self._read_character_image(image)
+        updated = self.service.store_avatar(
+            interaction.user.id, character, data, content_type
+        )
+        await self._send_ephemeral_followup(
+            interaction, f"✅ Added the avatar for **{updated['name']}**."
+        )
+
+    @edit.command(name="avatar", description="Replace a character posting avatar")
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def edit_avatar(
+        self, interaction: discord.Interaction, character: str, image: discord.Attachment
+    ):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        selected = self.service.resolve(interaction.user.id, character)
+        if not selected.get("image_path") and not str(selected.get("avatar_url") or "").startswith("https://"):
+            raise CharacterError("That character does not have an avatar; use /character add avatar.")
+        data, content_type = await self._read_character_image(image)
+        updated = self.service.store_avatar(
+            interaction.user.id, character, data, content_type
+        )
+        await self._send_ephemeral_followup(
+            interaction, f"✅ Replaced the avatar for **{updated['name']}**."
+        )
+
+    @remove.command(name="avatar", description="Remove a character posting avatar")
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def remove_avatar(self, interaction: discord.Interaction, character: str):
+        selected = self.service.resolve(interaction.user.id, character)
+        if not selected.get("image_path") and not str(selected.get("avatar_url") or "").startswith("https://"):
+            raise CharacterError("That character does not have an avatar image.")
+        updated = self.service.remove_avatar(interaction.user.id, character)
+        await interaction.response.send_message(
+            f"✅ Removed the avatar for **{updated['name']}**.",
+            ephemeral=True,
+            delete_after=EPHEMERAL_DELETE_AFTER,
+        )
+
+    @add.command(name="image", description="Add an image to an empty gallery slot")
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def add_image(
+        self,
+        interaction: discord.Interaction,
+        character: str,
+        slot: app_commands.Range[int, 1, 4],
+        image: discord.Attachment,
+    ):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        selected = self.service.resolve(interaction.user.id, character)
+        paths = selected.get("image_paths", ["", "", "", ""])
+        if slot <= len(paths) and paths[slot - 1]:
+            raise CharacterError(f"Image slot {slot} is occupied; use /character edit image.")
+        data, content_type = await self._read_character_image(image)
+        updated = self.service.store_gallery_image(
+            interaction.user.id, character, slot, data, content_type
+        )
+        await self._send_ephemeral_followup(
+            interaction, f"✅ Added image {slot} for **{updated['name']}**."
+        )
+
+    @edit.command(name="image", description="Replace an occupied gallery image slot")
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def edit_image(
+        self,
+        interaction: discord.Interaction,
+        character: str,
+        slot: app_commands.Range[int, 1, 4],
+        image: discord.Attachment,
+    ):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        selected = self.service.resolve(interaction.user.id, character)
+        paths = selected.get("image_paths", ["", "", "", ""])
+        if slot > len(paths) or not paths[slot - 1]:
+            raise CharacterError(f"Image slot {slot} is empty; use /character add image.")
+        data, content_type = await self._read_character_image(image)
+        updated = self.service.store_gallery_image(
+            interaction.user.id, character, slot, data, content_type
+        )
+        await self._send_ephemeral_followup(
+            interaction, f"✅ Replaced image {slot} for **{updated['name']}**."
+        )
+
+    @remove.command(name="image", description="Remove a gallery image slot")
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def remove_image(
+        self,
+        interaction: discord.Interaction,
+        character: str,
+        slot: app_commands.Range[int, 1, 4],
+    ):
+        selected = self.service.resolve(interaction.user.id, character)
+        paths = selected.get("image_paths", ["", "", "", ""])
+        if slot > len(paths) or not paths[slot - 1]:
+            raise CharacterError(f"Image slot {slot} is already empty.")
+        updated = self.service.remove_gallery_image(interaction.user.id, character, slot)
+        await interaction.response.send_message(
+            f"✅ Removed image {slot} for **{updated['name']}**.",
             ephemeral=True,
             delete_after=EPHEMERAL_DELETE_AFTER,
         )

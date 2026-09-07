@@ -33,7 +33,7 @@ class CharacterCogStructureTests(unittest.TestCase):
         }
         expected = {
             "list", "template", "show", "show-all", "import-pdf", "import-json", "create", "refresh",
-            "nickname", "image", "post", "download", "delete", "check",
+            "nickname", "avatar", "image", "post", "download", "delete", "check",
             "skill", "save", "action", "spell", "modifier", "set",
             "container", "item",
         }
@@ -173,6 +173,9 @@ class CharacterCogStructureTests(unittest.TestCase):
         self.assertIn('kwargs["avatar_url"] = avatar_url', source)
         self.assertIn("discord.AllowedMentions.none()", source)
         self.assertIn("await webhook.send(**kwargs)", source)
+        self.assertIn("self._webhook_avatar_lock = asyncio.Lock()", source)
+        self.assertIn("async with self._webhook_avatar_lock", source)
+        self.assertIn("avatar=Path(avatar_path).read_bytes()", source)
 
     def test_successful_character_post_has_no_ephemeral_confirmation(self):
         tree = ast.parse(COG_PATH.read_text(encoding="utf-8"))
@@ -287,6 +290,21 @@ class CharacterCogStructureTests(unittest.TestCase):
         self.assertIn('"gp_value": gp_value', source)
         self.assertIn('selected_item["gp_value"] = gp_value', source)
         self.assertIn("f\" — {gp_value:g} gp\"", source)
+
+    def test_avatar_and_gallery_commands_are_separate(self):
+        source = COG_PATH.read_text(encoding="utf-8")
+        self.assertIn('@app_commands.command(name="avatar"', source)
+        self.assertIn('@app_commands.command(name="image", description="Display character gallery images")', source)
+        for operation in ("add", "edit", "remove"):
+            self.assertIn(f'@{operation}.command(name="avatar"', source)
+            self.assertIn(f'@{operation}.command(name="image"', source)
+        self.assertIn("slot: app_commands.Range[int, 1, 4]", source)
+        self.assertIn("embed.set_thumbnail", source)
+        self.assertIn("embed.set_image", source)
+        self.assertIn("self.service.store_avatar", source)
+        self.assertIn("self.service.store_gallery_image", source)
+        self.assertIn("self.service.remove_gallery_image", source)
+        self.assertNotIn("Character images must be no larger than", source)
 
     def test_actions_and_spells_use_the_add_command_group(self):
         source = COG_PATH.read_text(encoding="utf-8")
