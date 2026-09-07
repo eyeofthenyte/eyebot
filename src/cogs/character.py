@@ -187,6 +187,55 @@ class CharacterSaveRollSelect(discord.ui.Select):
         await interaction.response.send_message(embed=embed)
 
 
+class CharacterActionAttackSelect(discord.ui.Select):
+    def __init__(self, cog, character):
+        self.cog = cog
+        self.character = character
+        options = [
+            discord.SelectOption(
+                label=f"{item['name']} Attack ({signed(item['attack_bonus'])})"[:100],
+                value=str(index),
+            )
+            for index, item in enumerate(character.get("actions", ()))
+            if item.get("attack_bonus") is not None
+        ][:25]
+        super().__init__(placeholder="Roll an action attack", options=options, row=2)
+
+    async def callback(self, interaction):
+        item = self.character["actions"][int(self.values[0])]
+        embed = self.cog._roll_embed(
+            self.character, f"{item['name']} Attack", item["attack_bonus"], 0, "normal"
+        )
+        await interaction.response.send_message(embed=embed)
+
+
+class CharacterActionDamageSelect(discord.ui.Select):
+    def __init__(self, cog, character):
+        self.cog = cog
+        self.character = character
+        choices = []
+        for action_index, item in enumerate(character.get("actions", ())):
+            types = item.get("damage_types", ())
+            for damage_index, expression in enumerate(item.get("damage_rolls", ())):
+                damage_type = types[damage_index] if damage_index < len(types) else ""
+                label = f"{item['name']} Damage ({expression}"
+                label += f" {damage_type})" if damage_type else ")"
+                choices.append((label[:100], f"{action_index}:{damage_index}"))
+        options = [discord.SelectOption(label=label, value=value) for label, value in choices[:25]]
+        super().__init__(placeholder="Roll action damage", options=options, row=3)
+
+    async def callback(self, interaction):
+        action_index, damage_index = map(int, self.values[0].split(":"))
+        item = self.character["actions"][action_index]
+        expression = item["damage_rolls"][damage_index]
+        types = item.get("damage_types", ())
+        damage_type = types[damage_index] if damage_index < len(types) else ""
+        embed = self.cog._damage_roll_embed(
+            self.character, item["name"], expression, damage_type
+        )
+        await interaction.response.send_message(embed=embed)
+
+
 class CharacterView(discord.ui.View):
     def __init__(self, cog, character, owner_id):
         super().__init__(timeout=600)
@@ -199,11 +248,21 @@ class CharacterView(discord.ui.View):
 
     def sync_section_controls(self):
         for child in tuple(self.children):
-            if isinstance(child, (CharacterSkillRollSelect, CharacterSaveRollSelect)):
+            if isinstance(child, (
+                CharacterSkillRollSelect,
+                CharacterSaveRollSelect,
+                CharacterActionAttackSelect,
+                CharacterActionDamageSelect,
+            )):
                 self.remove_item(child)
         if self.section == "skills":
             self.add_item(CharacterSkillRollSelect(self.cog, self.character))
             self.add_item(CharacterSaveRollSelect(self.cog, self.character))
+        elif self.section == "actions":
+            if any(item.get("attack_bonus") is not None for item in self.character.get("actions", ())):
+                self.add_item(CharacterActionAttackSelect(self.cog, self.character))
+            if any(item.get("damage_rolls") for item in self.character.get("actions", ())):
+                self.add_item(CharacterActionDamageSelect(self.cog, self.character))
 
     async def interaction_check(self, interaction):
         if interaction.user.id == self.owner_id:
@@ -527,23 +586,24 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             for item in character.get("actions", ()):
                 details = []
                 if item.get("attack_bonus") is not None:
-                    details.append(f"**Attack:** {signed(item['attack_bonus'])}")
-                if item.get("damage_rolls"):
-                    details.append(
-                        "**Damage:** "
-                        + ", ".join(f"`{roll}`" for roll in item["damage_rolls"])
-                    )
+                    details.append(f"  - **Attack:** {signed(item['attack_bonus'])}")
+                damage_types = item.get("damage_types", ())
+                for index, roll in enumerate(item.get("damage_rolls", ())):
+                    damage_type = damage_types[index] if index < len(damage_types) else ""
+                    suffix = f" {damage_type}" if damage_type else ""
+                    details.append(f"  - **Damage:** `{roll}`{suffix}")
                 if item.get("save_dc"):
                     details.append(
-                        f"**Save:** DC {item['save_dc']} "
+                        f"  - **Save:** DC {item['save_dc']} "
                         f"{str(item.get('save_ability', '')).upper()}"
                     )
                 description = _plain(item.get("description"), 700)
+                if description:
+                    details.extend(f"  - {line}" for line in description.splitlines() if line)
                 page_fields.append(
                     (
                         item["name"][:256],
-                        "\n".join(details + ([description] if description else []))
-                        or "No details recorded.",
+                        "\n".join(details) or "No details recorded.",
                     )
                 )
         elif section == "spells":
@@ -792,9 +852,9 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         for section in SHOW_ALL_SECTION_ORDER:
             for index, embed in enumerate(self.section_embeds(selected, section)):
                 kwargs = {"embed": embed}
-                if section == "skills" and index == 0:
+                if section in {"skills", "actions"} and index == 0:
                     view = CharacterView(self, selected, interaction.user.id)
-                    view.section = "skills"
+                    view.section = section
                     view.sync_section_controls()
                     kwargs["view"] = view
                 await interaction.followup.send(**kwargs)
@@ -1001,6 +1061,15 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         )
         return embed
 
+    def _damage_roll_embed(self, character, action_name, expression, damage_type=""):
+        total, _ = self._roller().roll_full_expression(expression)
+        type_text = f" {damage_type}" if damage_type else ""
+        return discord.Embed(
+            title=f"🎲 {_display_name(character, markdown=False)} — {action_name} Damage",
+            description=f"**Roll:** `{expression}`{type_text}\n## Total: {total}{type_text}",
+            color=0x7A2E8E,
+        )
+
     @app_commands.command(name="check", description="Roll an ability check for one of your characters")
     @app_commands.autocomplete(character=character_autocomplete)
     @app_commands.choices(stat=STAT_CHOICES, mode=MODE_CHOICES)
@@ -1040,7 +1109,10 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             embed.add_field(name="Attack roll", value=f"**{total}** ({signed(item['attack_bonus'] + modifier)})", inline=False)
         for index, expression in enumerate(item.get("damage_rolls", ()), start=1):
             total, _ = self._roller().roll_full_expression(expression)
-            embed.add_field(name=f"Damage {index}", value=f"`{expression}` → **{total}**", inline=True)
+            damage_types = item.get("damage_types", ())
+            damage_type = damage_types[index - 1] if index <= len(damage_types) else ""
+            suffix = f" {damage_type}" if damage_type else ""
+            embed.add_field(name=f"Damage {index}", value=f"`{expression}` → **{total}**{suffix}", inline=True)
         if item.get("save_dc"):
             embed.add_field(name="Saving throw", value=f"DC {item['save_dc']} {str(item.get('save_ability', '')).upper()}", inline=False)
         await interaction.response.send_message(embed=embed)
@@ -1212,11 +1284,12 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
 
     @app_commands.command(name="action-add", description="Add or replace a character action")
     @app_commands.autocomplete(character=character_autocomplete)
-    async def action_add(self, interaction: discord.Interaction, character: str, name: app_commands.Range[str, 1, 100], description: app_commands.Range[str, 0, 1000] = "", attack_bonus: app_commands.Range[int, -100, 100] | None = None, damage_rolls: app_commands.Range[str, 0, 200] = ""):
+    async def action_add(self, interaction: discord.Interaction, character: str, name: app_commands.Range[str, 1, 100], description: app_commands.Range[str, 0, 1000] = "", attack_bonus: app_commands.Range[int, -100, 100] | None = None, damage_rolls: app_commands.Range[str, 0, 200] = "", damage_type: app_commands.Range[str, 0, 50] = ""):
         selected = self.service.resolve(interaction.user.id, character)
         self._validate_damage_rolls(damage_rolls)
         selected["actions"] = [item for item in selected["actions"] if item["name"].casefold() != name.casefold()]
-        selected["actions"].append({"name": name, "description": description, "attack_bonus": attack_bonus, "damage_rolls": damage_rolls})
+        rolls = [value for value in re.split(r"\s*(?:,|;)\s*", damage_rolls) if value]
+        selected["actions"].append({"name": name, "description": description, "attack_bonus": attack_bonus, "damage_rolls": rolls, "damage_types": [damage_type] * len(rolls)})
         self.service.save(interaction.user.id, selected, replace_selector=character)
         await interaction.response.send_message(
             f"✅ Saved action **{name}**.",

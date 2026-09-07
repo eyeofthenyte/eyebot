@@ -93,8 +93,9 @@ def character_template_json() -> bytes:
             "skills": "Enter each complete skill modifier. Unlisted skills default from their ability.",
             "combat": "speed is in feet; initiative is the total bonus; armor_class and max_hit_points are totals.",
             "actions": (
-                "Each action may include description, attack_bonus, damage_rolls, save_ability, "
-                "and save_dc. Damage rolls use bounded expressions such as 1d8+3."
+                "Each action may include description, attack_bonus, damage_rolls, damage_types, "
+                "save_ability, and save_dc. Damage rolls use bounded expressions such as "
+                "1d8+3. damage_types is a parallel list such as ['Slashing']."
             ),
             "spells": (
                 "Spell level is 0 through 9. damage_rolls_by_level maps a character or slot "
@@ -177,6 +178,7 @@ def character_template_json() -> bytes:
             "description": "Melee weapon attack.",
             "attack_bonus": 5,
             "damage_rolls": ["1d8+3"],
+            "damage_types": ["Slashing"],
             "save_ability": "",
             "save_dc": None,
         },
@@ -298,6 +300,15 @@ def _normalize_actions(value) -> list[dict]:
     for item in value if isinstance(value, list) else ():
         if not isinstance(item, dict) or not _text(item.get("name"), maximum=100):
             continue
+        damage_rolls = _normalize_rolls(item.get("damage_rolls") or item.get("damage"))
+        raw_types = item.get("damage_types") or item.get("damage_type") or []
+        if isinstance(raw_types, str):
+            raw_types = [raw_types]
+        damage_types = [
+            _text(damage_type, maximum=50)
+            for damage_type in raw_types[:len(damage_rolls)]
+        ] if isinstance(raw_types, list) else []
+        damage_types.extend([""] * (len(damage_rolls) - len(damage_types)))
         result.append(
             {
                 "name": _text(item.get("name"), maximum=100),
@@ -307,9 +318,8 @@ def _normalize_actions(value) -> list[dict]:
                     if item.get("attack_bonus") not in (None, "")
                     else None
                 ),
-                "damage_rolls": _normalize_rolls(
-                    item.get("damage_rolls") or item.get("damage")
-                ),
+                "damage_rolls": damage_rolls,
+                "damage_types": damage_types,
                 "save_ability": _text(item.get("save_ability"), maximum=3).casefold(),
                 "save_dc": (
                     _integer(item.get("save_dc"), minimum=1, maximum=100)
@@ -321,6 +331,31 @@ def _normalize_actions(value) -> list[dict]:
         if len(result) >= MAX_LIST_ITEMS:
             break
     return result
+
+
+DAMAGE_TYPES = (
+    "acid", "bludgeoning", "cold", "fire", "force", "lightning", "necrotic",
+    "piercing", "poison", "psychic", "radiant", "slashing", "thunder",
+)
+
+
+def _split_action_damage(parts):
+    rolls, damage_types, details = [], [], []
+    damage_pattern = re.compile(
+        r"^(\+?(?:\d*d\d+(?:[+-]\d+)?|\d+))(?:\s+(" + "|".join(DAMAGE_TYPES) + r")\b)?(.*)$",
+        re.I,
+    )
+    for part in parts:
+        match = damage_pattern.match(str(part).strip())
+        if match:
+            rolls.append(match.group(1).lstrip("+"))
+            damage_types.append((match.group(2) or "").title())
+            remainder = match.group(3).strip(" ,;|-")
+            if remainder:
+                details.append(remainder)
+        else:
+            details.append(str(part).strip())
+    return rolls, damage_types, [value for value in details if value]
 
 
 def _normalize_spells(value) -> list[dict]:
@@ -997,15 +1032,13 @@ def _flattened_pdf_payload(pages):
         parts = [part.strip() for part in item["text"].split("|") if part.strip()]
         if len(parts) < 2 or not re.fullmatch(r"[+-]\d+", parts[1]):
             continue
-        description = " | ".join(parts[2:])
-        rolls = [roll.lstrip("+") for roll in re.findall(
-            r"(?<![\w])\+?\d*d\d+(?:[+-]\d+)?", description, re.I
-        )]
+        rolls, damage_types, description_parts = _split_action_damage(parts[2:])
         actions.append({
             "name": parts[0],
-            "description": description,
+            "description": " | ".join(description_parts),
             "attack_bonus": parts[1],
             "damage_rolls": rolls,
+            "damage_types": damage_types,
         })
 
     spells = []
@@ -1184,12 +1217,15 @@ def character_from_pdf(data: bytes, owner_id: str) -> dict:
         name = _pdf_field_value(fields, (f"Wpn Name {index}", f"WpnName{index}", f"Attack {index}"))
         if not name:
             continue
+        damage_value = _pdf_field_value(fields, (f"Wpn{index} Damage", f"WpnDamage{index}"))
+        rolls, damage_types, damage_details = _split_action_damage([damage_value])
         actions.append(
             {
                 "name": name,
-                "description": "Imported from the character-sheet attack table.",
+                "description": " | ".join(damage_details),
                 "attack_bonus": _pdf_field_value(fields, (f"Wpn{index} AtkBonus", f"WpnAtkBonus{index}")),
-                "damage_rolls": _pdf_field_value(fields, (f"Wpn{index} Damage", f"WpnDamage{index}")),
+                "damage_rolls": rolls,
+                "damage_types": damage_types,
             }
         )
     character["actions"] = _normalize_actions(actions)

@@ -110,6 +110,17 @@ class CharacterCogStructureTests(unittest.TestCase):
         self.assertIn('f"**__{ABILITY_NAMES[key]}:__** {signed(value)}"', source)
         self.assertIn('("__Saving Throws__"', source)
 
+    def test_action_rolls_have_clickable_controls_and_typed_damage(self):
+        source = COG_PATH.read_text(encoding="utf-8")
+        self.assertIn("class CharacterActionAttackSelect", source)
+        self.assertIn("class CharacterActionDamageSelect", source)
+        self.assertIn('placeholder="Roll an action attack"', source)
+        self.assertIn('placeholder="Roll action damage"', source)
+        self.assertIn("self.cog._damage_roll_embed", source)
+        self.assertIn('details.append(f"  - **Attack:**', source)
+        self.assertIn('details.append(f"  - **Damage:** `{roll}`{suffix}")', source)
+        self.assertIn('section in {"skills", "actions"}', source)
+
     def test_character_posts_use_named_webhook_with_character_avatar(self):
         source = COG_PATH.read_text(encoding="utf-8")
         self.assertIn('CHARACTER_WEBHOOK_NAME = "EyeBot Characters"', source)

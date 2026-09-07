@@ -326,6 +326,7 @@ class CharacterPdfTests(unittest.TestCase):
         self.assertEqual(payload["saving_throws"]["wis"], "+8")
         self.assertEqual(payload["armor_class"], "18")
         self.assertEqual(payload["actions"][0]["damage_rolls"], ["1d8+5", "1d6"])
+        self.assertEqual(payload["actions"][0]["damage_types"], ["Bludgeoning", "Radiant"])
         self.assertEqual(payload["spells"][0]["save_ability"], "dex")
 
     def test_editable_pdf_fields_are_imported(self):
@@ -362,6 +363,18 @@ class CharacterPdfTests(unittest.TestCase):
         self.assertEqual(character["saving_throws"]["int"], 7)
         self.assertEqual(character["actions"][0]["name"], "Quarterstaff")
         self.assertEqual(character["actions"][0]["damage_rolls"], ["1d6-1"])
+
+    def test_action_damage_parser_separates_dice_fixed_damage_and_types(self):
+        from services.characterService import _split_action_damage
+
+        rolls, types, details = _split_action_damage([
+            "1d8+4 Piercing",
+            "3 Bludgeoning",
+            "Ammunition, Two-Handed",
+        ])
+        self.assertEqual(rolls, ["1d8+4", "3"])
+        self.assertEqual(types, ["Piercing", "Bludgeoning"])
+        self.assertEqual(details, ["Ammunition, Two-Handed"])
 
     def test_pdf_without_character_name_is_rejected(self):
         reader = SimpleNamespace(
