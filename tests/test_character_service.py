@@ -199,6 +199,19 @@ class CharacterMathTests(unittest.TestCase):
             ["2d10"],
         )
 
+    def test_normalization_upgrades_legacy_action_damage_descriptions(self):
+        payload = sample_character()
+        payload["actions"][0].update({
+            "damage_rolls": ["1d8+3"],
+            "damage_types": [],
+            "description": "1d8+3 Slashing | Versatile (1d10)",
+        })
+
+        value = normalize_character(payload, "123", source="manual")
+
+        self.assertEqual(value["actions"][0]["damage_types"], ["Slashing"])
+        self.assertEqual(value["actions"][0]["description"], "Versatile (1d10)")
+
 
 class CharacterServiceTests(unittest.TestCase):
     def setUp(self):

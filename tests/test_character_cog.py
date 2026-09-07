@@ -69,10 +69,10 @@ class CharacterCogStructureTests(unittest.TestCase):
     def test_ephemeral_character_responses_expire_after_thirty_seconds(self):
         source = COG_PATH.read_text(encoding="utf-8")
         self.assertIn("EPHEMERAL_DELETE_AFTER = 30", source)
-        self.assertNotRegex(source, r"ephemeral=True\s*\)")
-        self.assertNotRegex(source, r"ephemeral=True,\s*\)")
+        self.assertIn('kwargs["delete_after"] = EPHEMERAL_DELETE_AFTER', source)
+        self.assertIn("self._delete_followup_after(message, EPHEMERAL_DELETE_AFTER)", source)
 
-    def test_show_command_posts_character_sheet_publicly(self):
+    def test_show_command_posts_character_sheet_ephemerally(self):
         show = next(
             method
             for method in CHARACTER.body
@@ -82,7 +82,7 @@ class CharacterCogStructureTests(unittest.TestCase):
         self.assertIn("_send_sheet", source)
         self.assertIn("_send_section_pages", source)
         self.assertIn('selected_section = section.value if section else "summary"', source)
-        self.assertNotIn("ephemeral=True", source)
+        self.assertEqual(source.count("ephemeral=True"), 2)
 
     def test_show_all_posts_sections_in_requested_order(self):
         source = COG_PATH.read_text(encoding="utf-8")
@@ -92,6 +92,17 @@ class CharacterCogStructureTests(unittest.TestCase):
         self.assertIn(expected, source)
         self.assertIn('@app_commands.command(name="show-all"', source)
         self.assertIn("for section in SHOW_ALL_SECTION_ORDER", source)
+        show_all = next(
+            method
+            for method in CHARACTER.body
+            if isinstance(method, ast.AsyncFunctionDef) and method.name == "show_all"
+        )
+        show_all_source = ast.get_source_segment(
+            COG_PATH.read_text(encoding="utf-8"), show_all
+        )
+        self.assertIn("with_view=False", show_all_source)
+        self.assertNotIn("CharacterView", show_all_source)
+        self.assertNotIn("ephemeral=True", show_all_source)
 
     def test_skill_and_save_modifiers_have_clickable_roll_controls(self):
         source = COG_PATH.read_text(encoding="utf-8")
@@ -117,9 +128,9 @@ class CharacterCogStructureTests(unittest.TestCase):
         self.assertIn('placeholder="Roll an action attack"', source)
         self.assertIn('placeholder="Roll action damage"', source)
         self.assertIn("self.cog._damage_roll_embed", source)
-        self.assertIn('details.append(f"  - **Attack:**', source)
+        self.assertIn('details.append(f"- **Attack:**', source)
         self.assertIn('details.append(f"  - **Damage:** `{roll}`{suffix}")', source)
-        self.assertIn('section in {"skills", "actions"}', source)
+        self.assertIn('elif self.section == "actions"', source)
 
     def test_character_posts_use_named_webhook_with_character_avatar(self):
         source = COG_PATH.read_text(encoding="utf-8")

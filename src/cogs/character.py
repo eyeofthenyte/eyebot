@@ -365,11 +365,12 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         except (asyncio.CancelledError, discord.HTTPException):
             pass
 
-    async def _send_ephemeral_followup(self, interaction, content):
+    async def _send_ephemeral_followup(self, interaction, content=None, **kwargs):
         message = await interaction.followup.send(
             content,
             ephemeral=True,
             wait=True,
+            **kwargs,
         )
         task = asyncio.create_task(
             self._delete_followup_after(message, EPHEMERAL_DELETE_AFTER)
@@ -586,7 +587,7 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             for item in character.get("actions", ()):
                 details = []
                 if item.get("attack_bonus") is not None:
-                    details.append(f"  - **Attack:** {signed(item['attack_bonus'])}")
+                    details.append(f"- **Attack:** {signed(item['attack_bonus'])}")
                 damage_types = item.get("damage_types", ())
                 for index, roll in enumerate(item.get("damage_rolls", ())):
                     damage_type = damage_types[index] if index < len(damage_types) else ""
@@ -594,7 +595,7 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
                     details.append(f"  - **Damage:** `{roll}`{suffix}")
                 if item.get("save_dc"):
                     details.append(
-                        f"  - **Save:** DC {item['save_dc']} "
+                        f"- **Save:** DC {item['save_dc']} "
                         f"{str(item.get('save_ability', '')).upper()}"
                     )
                 description = _plain(item.get("description"), 700)
@@ -743,10 +744,13 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
     def section_embed(self, character, section):
         return self.section_embeds(character, section)[0]
 
-    async def _send_sheet(self, interaction, character):
+    async def _send_sheet(self, interaction, character, *, ephemeral=False, with_view=True):
         embed = self.summary_embed(character)
-        view = CharacterView(self, character, interaction.user.id)
-        kwargs = {"embed": embed, "view": view}
+        kwargs = {"embed": embed, "ephemeral": ephemeral}
+        if ephemeral:
+            kwargs["delete_after"] = EPHEMERAL_DELETE_AFTER
+        if with_view:
+            kwargs["view"] = CharacterView(self, character, interaction.user.id)
         image_path = character.get("image_path")
         if image_path and Path(image_path).is_file():
             filename = f"character-{character['id']}.png"
@@ -754,14 +758,20 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             embed.set_thumbnail(url=f"attachment://{filename}")
         await interaction.response.send_message(**kwargs)
 
-    async def _send_section_pages(self, interaction, character, section):
+    async def _send_section_pages(self, interaction, character, section, *, ephemeral=False):
         pages = self.section_embeds(character, section)
         view = CharacterView(self, character, interaction.user.id)
         view.section = section
         view.sync_section_controls()
-        await interaction.response.send_message(embed=pages[0], view=view)
+        kwargs = {"embed": pages[0], "view": view, "ephemeral": ephemeral}
+        if ephemeral:
+            kwargs["delete_after"] = EPHEMERAL_DELETE_AFTER
+        await interaction.response.send_message(**kwargs)
         for embed in pages[1:]:
-            await interaction.followup.send(embed=embed)
+            if ephemeral:
+                await self._send_ephemeral_followup(interaction, embed=embed)
+            else:
+                await interaction.followup.send(embed=embed)
 
     async def _character_webhook(self, interaction):
         channel = interaction.channel
@@ -840,24 +850,20 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         selected = self.service.resolve(interaction.user.id, character)
         selected_section = section.value if section else "summary"
         if selected_section == "summary":
-            await self._send_sheet(interaction, selected)
+            await self._send_sheet(interaction, selected, ephemeral=True)
         else:
-            await self._send_section_pages(interaction, selected, selected_section)
+            await self._send_section_pages(
+                interaction, selected, selected_section, ephemeral=True
+            )
 
     @app_commands.command(name="show-all", description="Post every section of one of your character sheets")
     @app_commands.autocomplete(character=character_autocomplete)
     async def show_all(self, interaction: discord.Interaction, character: str):
         selected = self.service.resolve(interaction.user.id, character)
-        await self._send_sheet(interaction, selected)
+        await self._send_sheet(interaction, selected, with_view=False)
         for section in SHOW_ALL_SECTION_ORDER:
-            for index, embed in enumerate(self.section_embeds(selected, section)):
-                kwargs = {"embed": embed}
-                if section in {"skills", "actions"} and index == 0:
-                    view = CharacterView(self, selected, interaction.user.id)
-                    view.section = section
-                    view.sync_section_controls()
-                    kwargs["view"] = view
-                await interaction.followup.send(**kwargs)
+            for embed in self.section_embeds(selected, section):
+                await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="import-pdf", description="Import your editable D&D character-sheet PDF")
     async def import_pdf(self, interaction: discord.Interaction, file: discord.Attachment):

@@ -309,10 +309,28 @@ def _normalize_actions(value) -> list[dict]:
             for damage_type in raw_types[:len(damage_rolls)]
         ] if isinstance(raw_types, list) else []
         damage_types.extend([""] * (len(damage_rolls) - len(damage_types)))
+        description = _text(item.get("description") or item.get("snippet"))
+        description_parts = re.split(r"\s*\|\s*", description) if description else []
+        while description_parts and damage_rolls:
+            parsed_rolls, parsed_types, parsed_details = _split_action_damage(
+                [description_parts[0]]
+            )
+            if (
+                len(parsed_rolls) != 1
+                or parsed_rolls[0] not in damage_rolls
+                or not parsed_types[0]
+            ):
+                break
+            damage_index = damage_rolls.index(parsed_rolls[0])
+            if not damage_types[damage_index]:
+                damage_types[damage_index] = parsed_types[0]
+            description_parts.pop(0)
+            description_parts[0:0] = parsed_details
+        description = " | ".join(description_parts)
         result.append(
             {
                 "name": _text(item.get("name"), maximum=100),
-                "description": _text(item.get("description") or item.get("snippet")),
+                "description": description,
                 "attack_bonus": (
                     _integer(item.get("attack_bonus"), minimum=-100, maximum=100)
                     if item.get("attack_bonus") not in (None, "")
