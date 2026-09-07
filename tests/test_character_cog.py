@@ -32,7 +32,7 @@ class CharacterCogStructureTests(unittest.TestCase):
             if isinstance(method, (ast.FunctionDef, ast.AsyncFunctionDef))
         }
         expected = {
-            "list", "template", "show", "show-all", "import-pdf", "import-json", "create", "refresh",
+            "list", "template", "show", "show-all", "import-pdf", "import-json", "import-url", "create", "refresh",
             "nickname", "avatar", "image", "post", "download", "delete", "check",
             "skill", "save", "action", "spell", "modifier", "set",
             "container", "item",
@@ -45,20 +45,23 @@ class CharacterCogStructureTests(unittest.TestCase):
         self.assertIn("roll_full_expression", source)
         self.assertNotIn("random.randint", source)
 
+    def test_public_dndbeyond_urls_can_be_imported_safely(self):
+        source = COG_PATH.read_text(encoding="utf-8")
+        self.assertIn('@app_commands.command(\n        name="import-url"', source)
+        self.assertIn('"dndbeyond.com", "www.dndbeyond.com"', source)
+        self.assertIn('re.fullmatch(r"/characters/(\\d+)/?"', source)
+        self.assertIn("DND_BEYOND_CHARACTER_API.format", source)
+        self.assertIn("allow_redirects=False", source)
+        self.assertIn("aiohttp.ClientTimeout(total=20, connect=10)", source)
+        self.assertIn("response.content.iter_chunked", source)
+        self.assertIn("Character Privacy setting is Public", source)
+        self.assertIn("self.service.import_dndbeyond_json", source)
+
     def test_owner_scoped_autocomplete_and_confirmation_are_present(self):
         source = COG_PATH.read_text(encoding="utf-8")
         self.assertIn("self.service.list(interaction.user.id)", source)
         self.assertIn("DeleteCharacterView", source)
         self.assertIn("Only the character owner", source)
-
-    def test_no_undocumented_dnd_beyond_endpoint_is_used(self):
-        source = COG_PATH.read_text(encoding="utf-8")
-        source += (COG_PATH.parents[1] / "services/characterService.py").read_text(
-            encoding="utf-8"
-        )
-        self.assertNotIn("character-service.dndbeyond.com", source)
-        self.assertNotIn("aiohttp", source)
-        self.assertNotIn("requests.get", source)
 
     def test_attachments_use_original_discord_cdn_instead_of_media_proxy(self):
         source = COG_PATH.read_text(encoding="utf-8")

@@ -1620,6 +1620,27 @@ class CharacterService:
         character = normalize_character(value, str(owner_id), source="json")
         return self.save(owner_id, character, replace_selector=replace_selector)
 
+    def import_dndbeyond_json(
+        self, owner_id, data: bytes, source_url: str, *, replace_selector=None
+    ) -> dict:
+        if len(data) > int(self.settings.get("max_import_bytes", MAX_IMPORT_BYTES)):
+            raise CharacterError("The D&D Beyond character data exceeds the import limit.")
+        try:
+            response = json.loads(data.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise CharacterError("D&D Beyond returned invalid character data.") from error
+        payload = response.get("data") if isinstance(response, dict) else None
+        if not isinstance(payload, dict):
+            message = _text(response.get("message"), maximum=300) if isinstance(response, dict) else ""
+            raise CharacterError(
+                message or "D&D Beyond did not return a public character sheet."
+            )
+        payload = deepcopy(payload)
+        payload["source"] = "dndbeyond"
+        payload["source_reference"] = source_url
+        character = normalize_character(payload, str(owner_id), source="dndbeyond")
+        return self.save(owner_id, character, replace_selector=replace_selector)
+
     def import_pdf(self, owner_id, data: bytes, *, replace_selector=None) -> dict:
         if len(data) > int(self.settings.get("max_import_bytes", MAX_IMPORT_BYTES)):
             raise CharacterError("The character PDF exceeds the import size limit.")

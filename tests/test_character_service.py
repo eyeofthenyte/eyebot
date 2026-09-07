@@ -397,6 +397,46 @@ class CharacterServiceTests(unittest.TestCase):
                 "123", character["id"], b"not image", "image/png"
             )
 
+    def test_dndbeyond_response_envelope_is_imported_with_source(self):
+        response = {
+            "success": True,
+            "data": {
+                "id": 79025557,
+                "name": "Nysari",
+                "classes": [{
+                    "level": 5,
+                    "definition": {"name": "Warlock"},
+                    "subclassDefinition": {"name": "The Archfey"},
+                }],
+                "stats": [
+                    {"id": 1, "value": 10}, {"id": 2, "value": 14},
+                    {"id": 3, "value": 12}, {"id": 4, "value": 13},
+                    {"id": 5, "value": 14}, {"id": 6, "value": 16},
+                ],
+            },
+        }
+        imported = self.service.import_dndbeyond_json(
+            "123",
+            json.dumps(response).encode(),
+            "https://www.dndbeyond.com/characters/79025557",
+        )
+        self.assertEqual(imported["name"], "Nysari")
+        self.assertEqual(imported["classes"][0]["name"], "Warlock")
+        self.assertEqual(imported["abilities"]["cha"], 16)
+        self.assertEqual(imported["source"], "dndbeyond")
+        self.assertEqual(
+            imported["source_reference"],
+            "https://www.dndbeyond.com/characters/79025557",
+        )
+
+    def test_dndbeyond_error_envelope_is_rejected(self):
+        with self.assertRaisesRegex(CharacterError, "not public"):
+            self.service.import_dndbeyond_json(
+                "123",
+                json.dumps({"success": False, "message": "Character is not public"}).encode(),
+                "https://www.dndbeyond.com/characters/79025557",
+            )
+
 
 class CharacterPdfTests(unittest.TestCase):
     def test_flattened_dnd_beyond_layout_is_structured(self):

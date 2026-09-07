@@ -9,7 +9,9 @@ import mimetypes
 import os
 import re
 from pathlib import Path
+from urllib.parse import urlparse
 
+import aiohttp
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -27,6 +29,10 @@ from services.characterService import (
 
 EPHEMERAL_DELETE_AFTER = 30
 CHARACTER_WEBHOOK_NAME = "EyeBot Characters"
+DND_BEYOND_CHARACTER_API = (
+    "https://character-service.dndbeyond.com/character/v5/character/{character_id}"
+    "?includeCustomItems=true"
+)
 
 
 MODE_CHOICES = [
@@ -448,6 +454,73 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
                 f"Character imports must be no larger than {maximum:,} bytes."
             )
         return data
+
+    @staticmethod
+    def _dndbeyond_character_id(url):
+        parsed = urlparse(str(url or "").strip())
+        try:
+            port = parsed.port
+        except ValueError as error:
+            raise CharacterError("The D&D Beyond character URL contains an invalid port.") from error
+        if (
+            parsed.scheme.casefold() != "https"
+            or (parsed.hostname or "").casefold() not in {"dndbeyond.com", "www.dndbeyond.com"}
+            or parsed.username is not None
+            or parsed.password is not None
+            or port not in (None, 443)
+        ):
+            raise CharacterError(
+                "Use an HTTPS D&D Beyond character URL such as "
+                "https://www.dndbeyond.com/characters/79025557."
+            )
+        match = re.fullmatch(r"/characters/(\d+)/?", parsed.path)
+        if not match:
+            raise CharacterError(
+                "The D&D Beyond URL must use /characters/<character-id>."
+            )
+        return match.group(1)
+
+    async def _download_dndbeyond_character(self, url):
+        character_id = self._dndbeyond_character_id(url)
+        endpoint = DND_BEYOND_CHARACTER_API.format(character_id=character_id)
+        maximum = int(
+            self.service.settings.get("max_import_bytes", 10 * 1024 * 1024)
+        )
+        timeout = aiohttp.ClientTimeout(total=20, connect=10)
+        try:
+            async with aiohttp.ClientSession(
+                timeout=timeout,
+                headers={"User-Agent": "EyeBot/2 character importer"},
+            ) as session:
+                async with session.get(endpoint, allow_redirects=False) as response:
+                    if response.status in {401, 403, 404}:
+                        raise CharacterError(
+                            "D&D Beyond did not expose that character. Confirm its "
+                            "Character Privacy setting is Public, then try again."
+                        )
+                    if response.status != 200:
+                        raise CharacterError(
+                            f"D&D Beyond returned HTTP {response.status}; try a PDF export instead."
+                        )
+                    declared_size = int(response.headers.get("Content-Length", 0) or 0)
+                    if declared_size > maximum:
+                        raise CharacterError("The D&D Beyond character data is too large to import.")
+                    chunks = []
+                    received = 0
+                    async for chunk in response.content.iter_chunked(64 * 1024):
+                        received += len(chunk)
+                        if received > maximum:
+                            raise CharacterError(
+                                "The D&D Beyond character data is too large to import."
+                            )
+                        chunks.append(chunk)
+        except CharacterError:
+            raise
+        except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+            raise CharacterError(
+                "EyeBot could not reach D&D Beyond; try again or import the PDF export."
+            ) from error
+        return b"".join(chunks), character_id
 
     async def skill_autocomplete(self, interaction, current):
         character = self._selected_character(interaction)
@@ -1097,6 +1170,26 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         await self._send_ephemeral_followup(
             interaction,
             f"✅ Imported **{character['name']}** from JSON.",
+        )
+
+    @app_commands.command(
+        name="import-url",
+        description="Import a public D&D Beyond character URL",
+    )
+    async def import_url(
+        self,
+        interaction: discord.Interaction,
+        url: app_commands.Range[str, 1, 500],
+    ):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        data, character_id = await self._download_dndbeyond_character(url)
+        canonical_url = f"https://www.dndbeyond.com/characters/{character_id}"
+        character = self.service.import_dndbeyond_json(
+            interaction.user.id, data, canonical_url
+        )
+        await self._send_ephemeral_followup(
+            interaction,
+            f"✅ Imported **{character['name']}** from D&D Beyond.",
         )
 
     @app_commands.command(name="create", description="Create a character manually")
