@@ -56,6 +56,9 @@ class CharacterCogStructureTests(unittest.TestCase):
         self.assertIn("response.content.iter_chunked", source)
         self.assertIn("Character Privacy setting is Public", source)
         self.assertIn("self.service.import_dndbeyond_json", source)
+        self.assertIn("character_url: app_commands.Range[str, 1, 500] | None", source)
+        self.assertIn("dndbeyond_data=dndbeyond_data", source)
+        self.assertIn("with D&D Beyond spell descriptions", source)
 
     def test_owner_scoped_autocomplete_and_confirmation_are_present(self):
         source = COG_PATH.read_text(encoding="utf-8")
@@ -125,6 +128,9 @@ class CharacterCogStructureTests(unittest.TestCase):
         self.assertIn('details.append(f"**{label}:**', source)
         self.assertIn("def _spell_description", source)
         self.assertIn("Flattened PDF listing", source)
+        self.assertIn("remaining_description", source)
+        self.assertIn("Description continued", source)
+        self.assertNotIn('_spell_description(item.get("description"), 700)', source)
 
     def test_show_all_posts_sections_in_requested_order(self):
         source = COG_PATH.read_text(encoding="utf-8")

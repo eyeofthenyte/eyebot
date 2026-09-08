@@ -195,6 +195,11 @@ def character_template_json() -> bytes:
             "name": "Fire Bolt",
             "level": 0,
             "description": "A ranged spell attack.",
+            "casting_time": "1 Action",
+            "range": "120 feet",
+            "effect": "Fire damage",
+            "duration": "Instantaneous",
+            "components": "V/S",
             "attack_bonus": 5,
             "save_ability": "",
             "save_dc": None,
@@ -1713,10 +1718,64 @@ class CharacterService:
         character = normalize_character(payload, str(owner_id), source="dndbeyond")
         return self.save(owner_id, character, replace_selector=replace_selector)
 
-    def import_pdf(self, owner_id, data: bytes, *, replace_selector=None) -> dict:
+    @staticmethod
+    def _dndbeyond_payload(data: bytes) -> dict:
+        try:
+            response = json.loads(data.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise CharacterError("D&D Beyond returned invalid character data.") from error
+        payload = response.get("data") if isinstance(response, dict) else None
+        if not isinstance(payload, dict):
+            raise CharacterError("D&D Beyond did not return a public character sheet.")
+        return payload
+
+    @staticmethod
+    def _merge_spell_details(character: dict, payload: dict, owner_id) -> None:
+        reference = normalize_character(payload, str(owner_id), source="dndbeyond")
+        available = {
+            (spell["name"].casefold(), spell["level"]): spell
+            for spell in reference.get("spells", ())
+        }
+        for spell in character.get("spells", ()):
+            detail = available.get((spell["name"].casefold(), spell["level"]))
+            if detail is None:
+                detail = next(
+                    (
+                        value for (name, _level), value in available.items()
+                        if name == spell["name"].casefold()
+                    ),
+                    None,
+                )
+            if detail is None:
+                continue
+            for key in (
+                "description", "higher_levels", "damage_rolls",
+                "damage_rolls_by_level", "casting_time", "range", "effect",
+                "duration", "components",
+            ):
+                if detail.get(key) and not spell.get(key):
+                    spell[key] = deepcopy(detail[key])
+
+    def import_pdf(
+        self,
+        owner_id,
+        data: bytes,
+        *,
+        dndbeyond_data: bytes | None = None,
+        source_url: str = "",
+        replace_selector=None,
+    ) -> dict:
         if len(data) > int(self.settings.get("max_import_bytes", MAX_IMPORT_BYTES)):
             raise CharacterError("The character PDF exceeds the import size limit.")
         character = character_from_pdf(data, str(owner_id))
+        if dndbeyond_data is not None:
+            if len(dndbeyond_data) > int(
+                self.settings.get("max_import_bytes", MAX_IMPORT_BYTES)
+            ):
+                raise CharacterError("The D&D Beyond character data exceeds the import limit.")
+            payload = self._dndbeyond_payload(dndbeyond_data)
+            self._merge_spell_details(character, payload, owner_id)
+            character["source_reference"] = _text(source_url, maximum=200)
         return self.save(owner_id, character, replace_selector=replace_selector)
 
     def update(self, owner_id, selector, **changes) -> dict:

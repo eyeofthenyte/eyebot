@@ -105,7 +105,7 @@ def _class_summary(character):
     return " / ".join(values) or f"Adventurer {character.get('level', 1)}"
 
 
-def _spell_description(value, limit=700):
+def _spell_description(value, limit=20000):
     description = _plain(value)
     description = re.sub(
         r"^Flattened PDF listing\. Source:.*?Prepared on export:.*?Details:\s*"
@@ -929,15 +929,31 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
                 ):
                     if item.get(key):
                         details.append(f"**{label}:** {item[key]}")
-                description = _spell_description(item.get("description"), 700)
+                description = _spell_description(item.get("description"))
+                value = "\n".join(details)
+                remaining_description = ""
                 if description:
-                    details.append(f"**Description:** {description}")
+                    description_label = "**Description:** "
+                    available = max(1, 1000 - len(value) - len(description_label) - 1)
+                    first_description = description[:available]
+                    remaining_description = description[available:]
+                    value += f"\n{description_label}{first_description}"
                 page_fields.append(
                     (
                         f"__{item['name'][:252]}__",
-                        "\n".join(details),
+                        value,
                     )
                 )
+                if remaining_description:
+                    for index, chunk in enumerate(
+                        self._split_lines([remaining_description], 1000), start=1
+                    ):
+                        suffix = "Description continued"
+                        if index > 1:
+                            suffix += f" {index}"
+                        page_fields.append(
+                            (f"__{item['name'][:225]} — {suffix}__", chunk)
+                        )
         else:
             import json
 
@@ -1179,14 +1195,35 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             for embed in self.section_embeds(selected, section):
                 await interaction.followup.send(embed=embed)
 
-    @app_commands.command(name="import-pdf", description="Import your editable D&D character-sheet PDF")
-    async def import_pdf(self, interaction: discord.Interaction, file: discord.Attachment):
+    @app_commands.command(
+        name="import-pdf",
+        description="Import a D&D PDF and optionally add descriptions from a public character URL",
+    )
+    async def import_pdf(
+        self,
+        interaction: discord.Interaction,
+        file: discord.Attachment,
+        character_url: app_commands.Range[str, 1, 500] | None = None,
+    ):
         await interaction.response.defer(ephemeral=True, thinking=True)
         data = await self._read_import_attachment(file)
-        character = self.service.import_pdf(interaction.user.id, data)
+        dndbeyond_data = None
+        canonical_url = ""
+        if character_url:
+            dndbeyond_data, character_id = await self._download_dndbeyond_character(
+                character_url
+            )
+            canonical_url = f"https://www.dndbeyond.com/characters/{character_id}"
+        character = self.service.import_pdf(
+            interaction.user.id,
+            data,
+            dndbeyond_data=dndbeyond_data,
+            source_url=canonical_url,
+        )
         await self._send_ephemeral_followup(
             interaction,
-            f"✅ Imported **{character['name']}** from PDF.",
+            f"✅ Imported **{character['name']}** from PDF"
+            f"{' with D&D Beyond spell descriptions' if dndbeyond_data else ''}.",
         )
 
     @app_commands.command(name="import-json", description="Import an EyeBot or manually supplied character JSON file")

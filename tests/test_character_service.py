@@ -283,6 +283,32 @@ class CharacterMathTests(unittest.TestCase):
 
 
 class CharacterServiceTests(unittest.TestCase):
+    def test_dndbeyond_spell_descriptions_enrich_pdf_spells(self):
+        character = normalize_character(sample_character(), "123", source="pdf-flat")
+        character["spells"][0]["description"] = ""
+        payload = sample_character("Reference Character")
+        payload["spells"] = []
+        payload["classSpells"] = [{
+            "spells": [{
+                "definition": {
+                    "name": "Fire Bolt",
+                    "level": 0,
+                    "description": "<p>A mote of fire streaks toward a creature.</p>",
+                    "atHigherLevels": "The damage increases as you gain levels.",
+                },
+                "damage_rolls_by_level": {"5": ["2d10"]},
+            }]
+        }]
+
+        CharacterService._merge_spell_details(character, payload, "123")
+
+        spell = character["spells"][0]
+        self.assertIn("mote of fire", spell["description"])
+        self.assertEqual(
+            spell["higher_levels"], "The damage increases as you gain levels."
+        )
+        self.assertEqual(spell["damage_rolls_by_level"]["5"], ["2d10"])
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.service = CharacterService(self.temporary.name)
