@@ -105,6 +105,20 @@ def _class_summary(character):
     return " / ".join(values) or f"Adventurer {character.get('level', 1)}"
 
 
+def _spell_description(value, limit=700):
+    description = _plain(value)
+    description = re.sub(
+        r"^Flattened PDF listing\. Source:.*?Prepared on export:.*?Details:\s*"
+        r"[OP]\s+.*?\|\s*[A-Z][A-Z0-9&' -]{1,20}\s+\d+\s*\|\s*"
+        r"[VSM](?:\s*[/,]\s*[VSM]){0,2}\s*",
+        "",
+        description,
+        count=1,
+        flags=re.I | re.S,
+    )
+    return _plain(description, limit)
+
+
 class CharacterSectionSelect(discord.ui.Select):
     def __init__(self, cog, character):
         self.cog = cog
@@ -830,9 +844,6 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
             value="\n".join(proficiency_lines) or "BLANK",
             inline=False,
         )
-        embed.set_footer(
-            text=f"Source: {character.get('source', 'manual')} • ID: {character['id']}"
-        )
         return embed
 
     def section_embeds(self, character, section):
@@ -892,23 +903,39 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         elif section == "spells":
             for item in character.get("spells", ()):
                 details = [f"**Level:** {item['level']}"]
+                for label, key in (
+                    ("Casting Time", "casting_time"),
+                    ("Range", "range"),
+                ):
+                    if item.get(key):
+                        details.append(f"**{label}:** {item[key]}")
                 if item.get("attack_bonus") is not None:
-                    details.append(f"**Spell attack:** {signed(item['attack_bonus'])}")
+                    details.append(f"**Spell Attack:** {signed(item['attack_bonus'])}")
                 if item.get("save_dc"):
                     details.append(
-                        f"**Save:** DC {item['save_dc']} "
+                        f"**Save DC:** {item['save_dc']} "
                         f"{str(item.get('save_ability', '')).upper()}"
                     )
+                if item.get("effect"):
+                    details.append(f"**Effect:** {item['effect']}")
                 if item.get("damage_rolls"):
                     details.append(
                         "**Damage:** "
                         + ", ".join(f"`{roll}`" for roll in item["damage_rolls"])
                     )
-                description = _plain(item.get("description"), 700)
+                for label, key in (
+                    ("Duration", "duration"),
+                    ("Components", "components"),
+                ):
+                    if item.get(key):
+                        details.append(f"**{label}:** {item[key]}")
+                description = _spell_description(item.get("description"), 700)
+                if description:
+                    details.append(f"**Description:** {description}")
                 page_fields.append(
                     (
-                        item["name"][:256],
-                        "\n".join(details + ([description] if description else [])),
+                        f"__{item['name'][:252]}__",
+                        "\n".join(details),
                     )
                 )
         else:

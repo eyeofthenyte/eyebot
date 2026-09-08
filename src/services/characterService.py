@@ -416,6 +416,22 @@ def _normalize_spells(value) -> list[dict]:
                 "description": _text(
                     definition.get("description") or definition.get("snippet")
                 ),
+                "casting_time": _text(
+                    item.get("casting_time") or definition.get("casting_time"),
+                    maximum=100,
+                ),
+                "range": _text(
+                    item.get("range") or definition.get("range"), maximum=100
+                ),
+                "effect": _text(
+                    item.get("effect") or definition.get("effect"), maximum=300
+                ),
+                "duration": _text(
+                    item.get("duration") or definition.get("duration"), maximum=100
+                ),
+                "components": _text(
+                    item.get("components") or definition.get("components"), maximum=100
+                ),
                 "attack_bonus": (
                     _integer(item.get("attack_bonus"), minimum=-100, maximum=100)
                     if item.get("attack_bonus") not in (None, "")
@@ -446,6 +462,63 @@ def _normalize_spells(value) -> list[dict]:
         )
         if len(result) >= MAX_LIST_ITEMS:
             break
+    return result
+
+
+def _expanded_casting_time(value):
+    selected = _text(value, maximum=100)
+    match = re.fullmatch(r"(\d+)\s*(BA|A|R|M|H)", selected, re.I)
+    if not match:
+        return selected
+    amount = int(match.group(1))
+    unit = {
+        "BA": "Bonus Action",
+        "A": "Action",
+        "R": "Reaction",
+        "M": "Minute",
+        "H": "Hour",
+    }[match.group(2).upper()]
+    return f"{amount} {unit}{'' if amount == 1 else 's'}"
+
+
+def _flattened_spell_details(parts):
+    result = {
+        "casting_time": "",
+        "range": "",
+        "effect": "",
+        "duration": "",
+        "components": "",
+    }
+    leftovers = []
+    for value in (part.strip() for part in parts if part.strip()):
+        if re.fullmatch(r"(?:[+-]\d{1,2}|(?:STR|DEX|CON|INT|WIS|CHA)\s+\d{1,2})", value, re.I):
+            continue
+        if not result["casting_time"] and re.fullmatch(
+            r"(?:\d+\s*(?:BA|A|R|M|H)|\d+\s+(?:bonus action|action|reaction|minute|hour)s?)",
+            value,
+            re.I,
+        ):
+            result["casting_time"] = _expanded_casting_time(value)
+        elif not result["range"] and re.search(
+            r"\b(?:self|touch|sight|unlimited|\d+\s*(?:ft\.?|feet|mile|miles))\b",
+            value,
+            re.I,
+        ):
+            result["range"] = value
+        elif re.fullmatch(r"[VSM](?:\s*[,/]\s*[VSM]){0,2}", value, re.I):
+            if not result["components"]:
+                result["components"] = "/".join(re.findall(r"[VSM]", value.upper()))
+        elif not result["duration"] and re.search(
+            r"\b(?:instantaneous|concentration|until dispelled|round|minute|hour|day|week|year)s?\b",
+            value,
+            re.I,
+        ):
+            result["duration"] = value
+        elif re.fullmatch(r"[A-Z][A-Z0-9&' -]{1,20}\s+\d+", value):
+            continue
+        else:
+            leftovers.append(value)
+    result["effect"] = " | ".join(leftovers)
     return result
 
 
@@ -1302,7 +1375,7 @@ def _flattened_pdf_payload(pages):
             match = re.match(r"([OP])\s+(.+?)\s+\|\s+([^|]+)", text)
             if not match:
                 continue
-            prepared, spell_name, source = match.groups()
+            _prepared, spell_name, _source = match.groups()
             spell_name = re.sub(r"\s+\[R\]$", "", spell_name).strip()
             identity_key = (spell_name.casefold(), spell_level)
             if identity_key in seen_spells:
@@ -1310,14 +1383,13 @@ def _flattened_pdf_payload(pages):
             seen_spells.add(identity_key)
             save = re.search(r"\b(STR|DEX|CON|INT|WIS|CHA)\s+(\d{1,2})\b", text)
             attack = re.search(r"(?<![\w/])\+(\d{1,2})(?!\w)", text)
+            columns = [part.strip() for part in text.split("|")]
+            display = _flattened_spell_details(columns[3:])
             spells.append({
                 "name": spell_name,
                 "level": spell_level,
-                "description": (
-                    f"Flattened PDF listing. Source: {source.strip()}. "
-                    f"Prepared on export: {'yes' if prepared == 'P' else 'no'}. "
-                    f"Details: {text}"
-                ),
+                "description": "",
+                **display,
                 "attack_bonus": attack.group(1) if attack else None,
                 "save_ability": save.group(1).casefold() if save else "",
                 "save_dc": save.group(2) if save else None,

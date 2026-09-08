@@ -15,6 +15,7 @@ from services.characterService import (
     character_template_json,
     character_from_pdf,
     _flattened_pdf_payload,
+    _flattened_spell_details,
     normalize_character,
     proficiency_bonus,
 )
@@ -439,6 +440,20 @@ class CharacterServiceTests(unittest.TestCase):
 
 
 class CharacterPdfTests(unittest.TestCase):
+    def test_flattened_spell_columns_are_parsed_without_description_metadata(self):
+        details = _flattened_spell_details(
+            [
+                "+5", "1A", "120 ft.", "1d10 Force", "V,S",
+                "Instantaneous", "PHB 237", "V/S",
+            ]
+        )
+
+        self.assertEqual(details["casting_time"], "1 Action")
+        self.assertEqual(details["range"], "120 ft.")
+        self.assertEqual(details["effect"], "1d10 Force")
+        self.assertEqual(details["duration"], "Instantaneous")
+        self.assertEqual(details["components"], "V/S")
+
     def test_flattened_dnd_beyond_layout_is_structured(self):
         def block(x0, y0, text, x1=None, y1=None):
             return {
@@ -468,7 +483,12 @@ class CharacterPdfTests(unittest.TestCase):
             empty, empty,
             {"text": "spells", "blocks": [
                 block(44, 153, "=== CANTRIPS === | At Will"),
-                block(31, 164, "O Sacred Flame | Cleric | DEX 16 1A | 60 ft."),
+                block(
+                    31,
+                    164,
+                    "O Sacred Flame | Cleric | DEX 16 | 1A | 60 ft. | "
+                    "Radiant damage | V,S | Instantaneous | PHB 272 | V/S",
+                ),
             ]},
         ]
 
@@ -481,6 +501,12 @@ class CharacterPdfTests(unittest.TestCase):
         self.assertEqual(payload["actions"][0]["damage_rolls"], ["1d8+5", "1d6"])
         self.assertEqual(payload["actions"][0]["damage_types"], ["Bludgeoning", "Radiant"])
         self.assertEqual(payload["spells"][0]["save_ability"], "dex")
+        self.assertEqual(payload["spells"][0]["casting_time"], "1 Action")
+        self.assertEqual(payload["spells"][0]["range"], "60 ft.")
+        self.assertEqual(payload["spells"][0]["effect"], "Radiant damage")
+        self.assertEqual(payload["spells"][0]["duration"], "Instantaneous")
+        self.assertEqual(payload["spells"][0]["components"], "V/S")
+        self.assertEqual(payload["spells"][0]["description"], "")
 
     def test_editable_pdf_fields_are_imported(self):
         fields = {

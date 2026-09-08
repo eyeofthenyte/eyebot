@@ -103,6 +103,29 @@ class CharacterCogStructureTests(unittest.TestCase):
         self.assertIn('name="Proficiencies"', source)
         self.assertIn('f"  - {item[\'name\']} ({item[\'type\']})"', source)
 
+    def test_summary_does_not_display_source_or_internal_id_footer(self):
+        summary = next(
+            method
+            for method in CHARACTER.body
+            if isinstance(method, ast.FunctionDef) and method.name == "summary_embed"
+        )
+        source = ast.get_source_segment(COG_PATH.read_text(encoding="utf-8"), summary)
+        self.assertNotIn('text=f"Source:', source)
+        self.assertNotIn("character['id']}", source)
+
+    def test_spells_use_underlined_names_and_bold_parameter_labels(self):
+        source = COG_PATH.read_text(encoding="utf-8")
+        self.assertIn('f"__{item[\'name\'][:252]}__"', source)
+        for label in (
+            "Level", "Spell Attack", "Save DC", "Effect", "Damage", "Description",
+        ):
+            self.assertIn(f'**{label}:**', source)
+        for label in ("Casting Time", "Range", "Duration", "Components"):
+            self.assertIn(f'("{label}",', source)
+        self.assertIn('details.append(f"**{label}:**', source)
+        self.assertIn("def _spell_description", source)
+        self.assertIn("Flattened PDF listing", source)
+
     def test_show_all_posts_sections_in_requested_order(self):
         source = COG_PATH.read_text(encoding="utf-8")
         self.assertIn('app_commands.Choice(name="Skills (Skills & Saves)"', source)
