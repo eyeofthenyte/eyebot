@@ -283,6 +283,45 @@ class CharacterMathTests(unittest.TestCase):
 
 
 class CharacterServiceTests(unittest.TestCase):
+    def test_dndbeyond_inventory_enriches_pdf_item_value_and_description(self):
+        character = normalize_character(sample_character(), "123", source="pdf-flat")
+        character["sections"]["Equipment"] = {
+            "Backpack": [{
+                "name": "Hempen Rope",
+                "quantity": "1",
+                "weight": "10 lb.",
+                "gp_value": None,
+            }],
+            "Personal Belongings": [],
+            "Attuned Items": [],
+            "Other": [],
+        }
+        payload = {
+            "inventory": [{
+                "quantity": 1,
+                "definition": {
+                    "name": "Hempen Rope",
+                    "description": "<p>Ten feet of sturdy rope.</p>",
+                    "cost": 1,
+                },
+            }]
+        }
+
+        CharacterService._merge_equipment_details(character, payload)
+
+        item = character["sections"]["Equipment"]["Backpack"][0]
+        self.assertEqual(item["gp_value"], 1)
+        self.assertIn("sturdy rope", item["description"])
+
+    def test_dndbeyond_item_currency_values_are_converted_to_gp(self):
+        self.assertEqual(CharacterService._item_gp_value({"cost": "5 sp"}), 0.5)
+        self.assertEqual(
+            CharacterService._item_gp_value(
+                {"cost": {"quantity": 2, "unit": "pp"}}
+            ),
+            20,
+        )
+
     def test_dndbeyond_spell_descriptions_enrich_pdf_spells(self):
         character = normalize_character(sample_character(), "123", source="pdf-flat")
         character["spells"][0]["description"] = ""

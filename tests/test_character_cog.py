@@ -58,7 +58,7 @@ class CharacterCogStructureTests(unittest.TestCase):
         self.assertIn("self.service.import_dndbeyond_json", source)
         self.assertIn("character_url: app_commands.Range[str, 1, 500] | None", source)
         self.assertIn("dndbeyond_data=dndbeyond_data", source)
-        self.assertIn("with D&D Beyond spell descriptions", source)
+        self.assertIn("with D&D Beyond spell and item details", source)
 
     def test_owner_scoped_autocomplete_and_confirmation_are_present(self):
         source = COG_PATH.read_text(encoding="utf-8")
@@ -322,6 +322,7 @@ class CharacterCogStructureTests(unittest.TestCase):
         self.assertIn('"gp_value": gp_value', source)
         self.assertIn('selected_item["gp_value"] = gp_value', source)
         self.assertIn("f\" — {gp_value:g} gp\"", source)
+        self.assertIn("_plain(item['description'], 12000)", source)
 
     def test_avatar_and_gallery_commands_are_separate(self):
         source = COG_PATH.read_text(encoding="utf-8")

@@ -1039,7 +1039,7 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
                             for detail in item.get("details") or []:
                                 lines.append(f"  - {_plain(detail, 2800)}")
                         elif item.get("description"):
-                            lines.append(f"  - {_plain(item['description'], 2800)}")
+                            lines.append(f"  - {_plain(item['description'], 12000)}")
                     else:
                         readable = _plain(item, 3000)
                         if main_section == "Features and Traits" and " • " in readable:
@@ -1223,7 +1223,7 @@ class Character(commands.GroupCog, group_name="character", group_description="Im
         await self._send_ephemeral_followup(
             interaction,
             f"✅ Imported **{character['name']}** from PDF"
-            f"{' with D&D Beyond spell descriptions' if dndbeyond_data else ''}.",
+            f"{' with D&D Beyond spell and item details' if dndbeyond_data else ''}.",
         )
 
     @app_commands.command(name="import-json", description="Import an EyeBot or manually supplied character JSON file")

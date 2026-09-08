@@ -1756,6 +1756,92 @@ class CharacterService:
                 if detail.get(key) and not spell.get(key):
                     spell[key] = deepcopy(detail[key])
 
+    @staticmethod
+    def _item_gp_value(definition: dict):
+        raw_value = definition.get("cost")
+        if raw_value is None:
+            raw_value = definition.get("value")
+        unit = "gp"
+        if isinstance(raw_value, dict):
+            unit = str(
+                raw_value.get("unit") or raw_value.get("currency") or "gp"
+            ).casefold()
+            raw_value = next(
+                (
+                    raw_value.get(key)
+                    for key in ("quantity", "amount", "value")
+                    if raw_value.get(key) is not None
+                ),
+                None,
+            )
+        if isinstance(raw_value, str):
+            match = re.fullmatch(
+                r"\s*(\d+(?:\.\d+)?)\s*(cp|sp|ep|gp|pp)?\s*",
+                raw_value,
+                re.I,
+            )
+            if not match:
+                return None
+            raw_value = match.group(1)
+            unit = (match.group(2) or unit).casefold()
+        try:
+            value = float(raw_value)
+        except (TypeError, ValueError):
+            return None
+        value *= {"cp": 0.01, "sp": 0.1, "ep": 0.5, "gp": 1, "pp": 10}.get(
+            unit, 1
+        )
+        return int(value) if value.is_integer() else value
+
+    @staticmethod
+    def _merge_equipment_details(character: dict, payload: dict) -> None:
+        available = {}
+        for entry in payload.get("inventory") or ():
+            if not isinstance(entry, dict):
+                continue
+            definition = entry.get("definition") or entry
+            if not isinstance(definition, dict):
+                continue
+            name = _text(
+                entry.get("name") or definition.get("name"), maximum=200
+            )
+            if not name:
+                continue
+            key = re.sub(r"[^a-z0-9]+", " ", name.casefold()).strip()
+            available.setdefault(key, []).append({
+                "description": _text(
+                    definition.get("description") or definition.get("snippet")
+                ),
+                "gp_value": CharacterService._item_gp_value(definition),
+            })
+
+        equipment = character.get("sections", {}).get("Equipment", {})
+        if not isinstance(equipment, dict):
+            return
+        matched = {}
+        for items in equipment.values():
+            if not isinstance(items, list):
+                continue
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                key = re.sub(
+                    r"[^a-z0-9]+", " ", str(item.get("name", "")).casefold()
+                ).strip()
+                candidates = available.get(key, ())
+                if not candidates:
+                    continue
+                index = min(matched.get(key, 0), len(candidates) - 1)
+                detail = candidates[index]
+                matched[key] = index + 1
+                if detail.get("description") and not item.get("description"):
+                    item["description"] = detail["description"]
+                if detail.get("gp_value") is not None and item.get("gp_value") in (
+                    None,
+                    "",
+                ):
+                    item["gp_value"] = detail["gp_value"]
+
     def import_pdf(
         self,
         owner_id,
@@ -1775,6 +1861,7 @@ class CharacterService:
                 raise CharacterError("The D&D Beyond character data exceeds the import limit.")
             payload = self._dndbeyond_payload(dndbeyond_data)
             self._merge_spell_details(character, payload, owner_id)
+            self._merge_equipment_details(character, payload)
             character["source_reference"] = _text(source_url, maximum=200)
         return self.save(owner_id, character, replace_selector=replace_selector)
 
