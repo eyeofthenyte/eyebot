@@ -4,6 +4,10 @@ import subprocess
 import random
 import os
 import logging
+from core.namegen_format import (
+    format_namegen_output,
+    uses_plain_text_namegen_output,
+)
 from services.logService import LogService
 
 
@@ -104,14 +108,18 @@ class NameGen(commands.Cog):
                 await ctx.send(f"❌ Error generating names: {e.output}")
                 return
 
-        result_str = "\n".join(results)
-        if len(result_str) > 1900:
+        request = getattr(ctx, "request", None)
+        platform = getattr(request, "platform", None)
+        result = format_namegen_output(
+            results,
+            quantity,
+            race,
+            plain_text=uses_plain_text_namegen_output(platform),
+        )
+        if len(result) > 1900:
             await ctx.send("Generated names are too long to display. Try a smaller quantity.")
         else:
-            if race is None:
-                await ctx.send(f"**Generated {quantity} Random Name(s):**\n```{result_str}```")
-            else:
-                await ctx.send(f"**Generated {quantity} {race.title()} Name(s):**\n```{result_str}```")
+            await ctx.send(result)
 
 async def setup(bot):
     await bot.add_cog(NameGen(bot))
