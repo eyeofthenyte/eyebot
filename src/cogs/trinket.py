@@ -1,6 +1,7 @@
 import os
 import discord
 import random
+import re
 from services.googleSheetsService import (
     GoogleSheetsError,
     get_google_sheets_service,
@@ -57,27 +58,50 @@ class Trinket(commands.Cog):
                 await ctx.send(file=icon, embed=embed)
 
     # Lookup trinket list by class name
+    @staticmethod
+    def normalize_class_key(value):
+        return re.sub(r"[^a-z0-9]+", "", str(value or "").casefold())
+
     async def get_trinket_data(self, select: str | None = None):
         worksheets = await self.sheets.worksheets(TRINKET_SHEET_KEY)
         sheet_data = {
-            worksheet.title.lower(): [
-                value for value in worksheet.col_values(2) if value
-            ]
+            self.normalize_class_key(worksheet.title): {
+                "title": worksheet.title,
+                "trinkets": [value for value in worksheet.col_values(2) if value],
+            }
             for worksheet in worksheets
         }
         if select is None:
-            return sheet_data
-        key = select.lower()
-        return key, sheet_data.get(key)
+            return {
+                item["title"]: item["trinkets"] for item in sheet_data.values()
+            }
+        key = self.normalize_class_key(select)
+        selected = sheet_data.get(key)
+        return (
+            (selected["title"], selected["trinkets"])
+            if selected else (str(select).strip(), None)
+        )
 
     # Build an embed for a valid trinket draw
-    def build_trinket_embed(self, class_key: str, trinkets: list):
-        image_path = os.path.join(os.path.dirname(__file__), f'../../images/classes/{class_key}.jpeg')
-        icon_file = discord.File(image_path, filename=f'{class_key}.jpeg')
+    def build_trinket_embed(self, class_title: str, trinkets: list):
+        class_key = self.normalize_class_key(class_title)
+        image_directory = os.path.join(os.path.dirname(__file__), '../../images/classes')
+        image_path = next(
+            (
+                os.path.join(image_directory, f'{class_key}.{extension}')
+                for extension in ('jpeg', 'jpg', 'png', 'webp')
+                if os.path.isfile(os.path.join(image_directory, f'{class_key}.{extension}'))
+            ),
+            None,
+        )
+        if image_path is None:
+            image_path = os.path.join(os.path.dirname(__file__), '../../images/system/prohibited.png')
+        icon_filename = os.path.basename(image_path)
+        icon_file = discord.File(image_path, filename=icon_filename)
 
         embed = discord.Embed(color=0x019cd0)
-        embed.set_thumbnail(url=f'attachment://{class_key}.jpeg')
-        embed.set_author(name=f'{class_key.upper()} TRINKET')
+        embed.set_thumbnail(url=f'attachment://{icon_filename}')
+        embed.set_author(name=f'{class_title.upper()} TRINKET')
         embed.add_field(name='You found the following:', value=random.choice(trinkets), inline=False)
 
         return embed, icon_file
