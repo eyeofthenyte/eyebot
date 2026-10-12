@@ -2,7 +2,7 @@
 
 PLATFORM_SECRET_PARAMETERS = {
     "discord": frozenset({"bot_token"}),
-    "twitch": frozenset({"tmi_token", "client_id"}),
+    "twitch": frozenset({"tmi_token", "client_id", "client_secret"}),
     "youtube": frozenset(
         {"api_key", "client_id", "client_secret", "access_token", "refresh_token"}
     ),

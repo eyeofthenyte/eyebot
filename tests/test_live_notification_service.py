@@ -45,7 +45,56 @@ class RecordingNotifier(LiveNotificationService):
         self.posts.append((channel_id, event.event_id))
 
 
+class UnauthorizedError(Exception):
+    status = 401
+
+
+class TwitchTokens:
+    uses_app_token = True
+
+    def __init__(self):
+        self.calls = []
+        self.invalidations = 0
+
+    async def access_token(self, session, *, force=False):
+        self.calls.append(force)
+        return "renewed" if force else "expired"
+
+    def invalidate(self):
+        self.invalidations += 1
+
+
 class LiveNotificationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_twitch_401_renews_app_token_and_retries_once(self):
+        with tempfile.TemporaryDirectory() as root:
+            settings = {
+                "enabled": True,
+                "channel": "creator",
+                "destination_channel": "123456789012345678",
+            }
+            seen = []
+
+            async def detector(config, session):
+                seen.append(config["helix_access_token"])
+                if config["helix_access_token"] == "expired":
+                    raise UnauthorizedError("expired")
+                return LiveEvent(
+                    "stream-1", "Live", "https://example.com/live", "Creator"
+                )
+
+            notifier = RecordingNotifier(
+                "twitch", {"twitch": {}}, PlatformService(root, settings), detector, Logger()
+            )
+            tokens = TwitchTokens()
+            notifier.twitch_tokens = tokens
+
+            await notifier.poll_once(object())
+
+            self.assertEqual(seen, ["expired", "renewed"])
+            self.assertEqual(tokens.calls, [False, True])
+            self.assertEqual(tokens.invalidations, 1)
+            self.assertEqual(notifier.posts, [("123456789012345678", "stream-1")])
+
     async def test_posts_only_on_new_live_transition_and_resets_offline(self):
         with tempfile.TemporaryDirectory() as root:
             settings = {

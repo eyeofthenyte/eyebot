@@ -45,7 +45,9 @@ logger = LogService("twitch", config["logging"])
 async def detect_twitch_live(settings, session):
     """Detect one configured Twitch channel through the official Helix API."""
     channel = str(settings.get("channel") or "").strip().casefold()
-    token = str(settings.get("tmi_token") or "").removeprefix("oauth:")
+    token = str(
+        settings.get("helix_access_token") or settings.get("tmi_token") or ""
+    ).removeprefix("oauth:")
     client_id = str(settings.get("client_id") or "")
     if not channel or not token or not client_id:
         return None

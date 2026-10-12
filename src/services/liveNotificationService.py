@@ -75,6 +75,13 @@ class LiveNotificationService:
         from services.tokenRefreshService import TokenRefreshService
 
         self.token_refresher = TokenRefreshService(platform_service, logger)
+        self.twitch_tokens = None
+        if platform_name == "twitch":
+            from services.twitchHelixTokenService import TwitchHelixTokenService
+
+            self.twitch_tokens = TwitchHelixTokenService(
+                config.get("twitch", {}), logger
+            )
 
     @staticmethod
     def _bounded_interval(value) -> int:
@@ -222,6 +229,19 @@ class LiveNotificationService:
         active_keys = set()
         changed = False
         for guild_id, destination, effective in self._targets():
+            if self.platform_name == "twitch" and self.twitch_tokens is not None:
+                try:
+                    effective = dict(effective)
+                    effective["helix_access_token"] = (
+                        await self.twitch_tokens.access_token(session)
+                    )
+                except Exception as error:
+                    self.logger.error(
+                        f"Skipping Twitch live check for guild {guild_id}: "
+                        f"app-token request failed: {error}",
+                        guild_id=guild_id,
+                    )
+                    continue
             if self.platform_name in {
                 "youtube",
                 "facebook",
@@ -264,13 +284,35 @@ class LiveNotificationService:
                 try:
                     cache[source_key] = await self.detector(effective, session)
                 except Exception as error:
-                    self.logger.error(
-                        f"{self.platform_name} detector failed for guild "
-                        f"{guild_id}: {error}",
-                        guild_id=guild_id,
-                    )
-                    failed_sources.add(source_key)
-                    continue
+                    recovered = False
+                    if (
+                        self.platform_name == "twitch"
+                        and self.twitch_tokens is not None
+                        and self.twitch_tokens.uses_app_token
+                        and getattr(error, "status", None) == 401
+                    ):
+                        try:
+                            self.twitch_tokens.invalidate()
+                            retry_settings = dict(effective)
+                            retry_settings["helix_access_token"] = (
+                                await self.twitch_tokens.access_token(
+                                    session, force=True
+                                )
+                            )
+                            cache[source_key] = await self.detector(
+                                retry_settings, session
+                            )
+                            recovered = True
+                        except Exception as retry_error:
+                            error = retry_error
+                    if not recovered:
+                        self.logger.error(
+                            f"{self.platform_name} detector failed for guild "
+                            f"{guild_id}: {error}",
+                            guild_id=guild_id,
+                        )
+                        failed_sources.add(source_key)
+                        continue
             event = cache[source_key]
             state_key = f"{guild_id}:{destination}:{source_key}"
             active_keys.add(state_key)

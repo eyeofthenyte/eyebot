@@ -45,10 +45,11 @@ References: [Discord applications](https://discord.com/developers/applications) 
 
 1. Open the [Twitch Developer Console](https://dev.twitch.tv/console/apps), register an application, enable 2FA, and configure an exact OAuth redirect URI.
 2. Generate a **user access token** for the bot Twitch account with `chat:read` and `chat:edit`. Do not use an app access token, ID token, refresh token, or client secret as `tmi_token`.
-3. Validate that the token's login matches the intended bot account and that its Client ID matches the application.
-4. Store both values as global secrets on the EyeBot host. One Twitch process uses one bot identity for every joined channel:
+3. Validate that the token's login matches the intended bot account and that its Client ID matches the application. Copy the application's Client Secret for Helix live detection; EyeBot uses it to create and automatically renew a separate app access token.
+4. Store all three values as global secrets on the EyeBot host. One Twitch process uses one bot identity for every joined channel:
    `docker compose run --rm --no-deps eyebot python src/manage_secrets.py set twitch tmi_token`
    `docker compose run --rm --no-deps eyebot python src/manage_secrets.py set twitch client_id`
+   `docker compose run --rm --no-deps eyebot python src/manage_secrets.py set twitch client_secret`
 5. For a private installation, set connector-wide `nick` and `channels` in `platforms.yaml`.
 6. For a shared installation, the host must set `private_install: false` in `config.yaml`; then add this server's Twitch channels with `!platform twitch channel add <channel_login> [<#destination>]`. If destination is omitted, the guild's Twitch `destination_channel` is used for live alerts. Use `channel remove <channel_login>` or `channel list` to manage the guild-owned list. The legacy `set channel` command remains compatible.
 7. Select the Discord channel for Twitch go-live posts with `!platform twitch set destination_channel <#channel>`. EyeBot polls the official Helix Get Streams endpoint and posts once when a new stream becomes live.
