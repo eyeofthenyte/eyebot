@@ -153,7 +153,14 @@ class Poll:
     @classmethod
     def from_dict(cls, value):
         allowed = cls.__dataclass_fields__
-        return cls(**{key: item for key, item in value.items() if key in allowed})
+        selected = {key: item for key, item in value.items() if key in allowed}
+        for key in (
+            "guild_id", "channel_id", "creator_id", "message_id",
+            "mod_channel_id", "mod_message_id",
+        ):
+            if selected.get(key) is not None:
+                selected[key] = str(selected[key])
+        return cls(**selected)
 
     def to_dict(self):
         return asdict(self)
@@ -230,7 +237,10 @@ class PollService:
     def find_active_by_message(self, message_id) -> Poll | None:
         selected = str(message_id)
         return next(
-            (poll for poll in self.list(status="active") if poll.message_id == selected),
+            (
+                poll for poll in self.list(status="active")
+                if poll.message_id is not None and str(poll.message_id) == selected
+            ),
             None,
         )
 
@@ -275,7 +285,11 @@ class PollService:
         allowed = {"message_id", "mod_channel_id", "mod_message_id"}
         if set(fields) - allowed:
             raise PollError("Invalid poll delivery update.")
-        return self._transition(poll_id, None, **fields)
+        normalized = {
+            key: str(value) if value is not None else None
+            for key, value in fields.items()
+        }
+        return self._transition(poll_id, None, **normalized)
 
     def cancel(self, poll_id) -> Poll:
         return self._transition(poll_id, "active", status="canceled", canceled_at=utc_now().isoformat())

@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -113,8 +114,16 @@ class PollStorageTests(unittest.TestCase):
 
     def test_finds_active_poll_by_message(self):
         poll = self.create_poll()
-        self.service.update_delivery(poll.id, message_id="123")
+        delivered = self.service.update_delivery(poll.id, message_id=123)
+        self.assertEqual(delivered.message_id, "123")
         self.assertEqual(self.service.find_active_by_message("123").id, poll.id)
+
+    def test_finds_legacy_poll_with_integer_message_id(self):
+        poll = self.create_poll()
+        store = json.loads(self.service.path.read_text(encoding="utf-8"))
+        store["polls"][poll.id]["message_id"] = 456
+        self.service.path.write_text(json.dumps(store), encoding="utf-8")
+        self.assertEqual(self.service.find_active_by_message(456).id, poll.id)
 
     def test_due_returns_expired_active_poll(self):
         poll = self.create_poll()
