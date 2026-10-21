@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 from datetime import datetime
 
 import discord
@@ -25,6 +26,7 @@ POLL_EMOJIS = (
     "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "✅", "❌", "👍", "👎", "❤️",
     "🔥", "🎲", "⚔️", "🛡️", "🧙", "🐉", "⭐", "🌙", "☀️", "🎉",
 )
+CUSTOM_EMOJI_NAME = re.compile(r"^:([A-Za-z0-9_]{2,32}):$")
 def is_moderator(member) -> bool:
     permissions = getattr(member, "guild_permissions", None)
     return bool(permissions and (
@@ -215,6 +217,18 @@ class PollCog(commands.Cog, name="Poll"):
         selected = str(value or "").strip()
         if not selected:
             raise PollError("Every poll option requires an emoji.")
+        named = CUSTOM_EMOJI_NAME.fullmatch(selected)
+        if named and guild is not None:
+            emoji = discord.utils.find(
+                lambda item: item.name.casefold() == named.group(1).casefold(),
+                guild.emojis,
+            )
+            usable = getattr(emoji, "is_usable", None) if emoji else None
+            if emoji is None or (callable(usable) and not usable()):
+                raise PollError(
+                    f"The custom emoji `{selected}` is not available to EyeBot in this server."
+                )
+            return str(emoji)
         partial = discord.PartialEmoji.from_str(selected)
         if partial.id is None:
             return selected
@@ -225,6 +239,12 @@ class PollCog(commands.Cog, name="Poll"):
                 "A selected custom emoji is not available to EyeBot in this server."
             )
         return str(emoji)
+
+    @staticmethod
+    def reaction_value(value):
+        """Convert stored Unicode or custom-emoji markup for add_reaction()."""
+        partial = discord.PartialEmoji.from_str(str(value))
+        return partial if partial.id is not None else str(value)
 
     async def cog_load(self):
         if hasattr(self.bot, "tree") and not self.poll_timer.is_running():
@@ -328,11 +348,12 @@ class PollCog(commands.Cog, name="Poll"):
             )
         except PollError as error:
             return await interaction.followup.send(f"❌ {error}", ephemeral=True)
+        message = None
         try:
             message = await interaction.channel.send(embed=poll_embed(poll))
             poll = self.service.update_delivery(poll.id, message_id=message.id)
             for emoji in poll.emojis:
-                await message.add_reaction(emoji)
+                await message.add_reaction(self.reaction_value(emoji))
             mod_message = await self.mod_channels.send(
                 interaction.guild,
                 content=f"📊 Poll **{poll.title}** started in {interaction.channel.mention} by {interaction.user}.",
@@ -341,6 +362,16 @@ class PollCog(commands.Cog, name="Poll"):
             poll = self.service.update_delivery(poll.id, mod_message_id=mod_message.id)
             self.bot.add_view(PollControlView(self, poll, "cancel"), message_id=mod_message.id)
         except (discord.Forbidden, discord.HTTPException) as error:
+            if self.logger:
+                self.logger.error(
+                    f"Discord poll creation failed while adding reactions: {error}",
+                    guild_id=interaction.guild_id,
+                )
+            if message is not None:
+                try:
+                    await message.delete()
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    pass
             try:
                 self.service.cancel(poll.id)
             except PollError:
