@@ -136,6 +136,7 @@ class Poll:
     mod_channel_id: str | None = None
     mod_message_id: str | None = None
     results: list[int] = field(default_factory=list)
+    votes: dict[str, int] = field(default_factory=dict)
     ended_at: str | None = None
     canceled_at: str | None = None
     published_at: str | None = None
@@ -216,6 +217,33 @@ class PollService:
         with self._lock:
             polls = tuple(Poll.from_dict(value) for value in self._read()["polls"].values())
         return tuple(poll for poll in polls if status is None or poll.status == status)
+
+    def find_active_by_message(self, message_id) -> Poll | None:
+        selected = str(message_id)
+        return next(
+            (poll for poll in self.list(status="active") if poll.message_id == selected),
+            None,
+        )
+
+    def record_vote(self, poll_id, user_id, option_index: int) -> bool:
+        """Record a user's first selection and reject all later selections."""
+        with self._lock:
+            store = self._read()
+            value = store["polls"].get(str(poll_id))
+            if not isinstance(value, dict):
+                raise PollError("Poll was not found.")
+            if value.get("status") != "active":
+                return False
+            selected = int(option_index)
+            if not 0 <= selected < len(value.get("options", ())):
+                raise PollError("Poll option is invalid.")
+            votes = value.setdefault("votes", {})
+            voter = str(user_id)
+            if voter in votes:
+                return False
+            votes[voter] = selected
+            self._write(store)
+            return True
 
     def update_delivery(self, poll_id, **fields) -> Poll:
         allowed = {"message_id", "mod_channel_id", "mod_message_id"}

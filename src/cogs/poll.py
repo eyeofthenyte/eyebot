@@ -127,6 +127,35 @@ class PollCog(commands.Cog, name="Poll"):
             elif poll.status == "ended" and poll.mod_message_id:
                 self.bot.add_view(PollControlView(self, poll, "publish"), message_id=int(poll.mod_message_id))
 
+    @commands.Cog.listener()
+    async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
+        if self.bot.user is None or payload.user_id == self.bot.user.id:
+            return
+        poll = self.service.find_active_by_message(payload.message_id)
+        if poll is None:
+            return
+        emoji = str(payload.emoji)
+        if emoji not in poll.emojis:
+            return
+        option_index = poll.emojis.index(emoji)
+        if self.service.record_vote(poll.id, payload.user_id, option_index):
+            return
+        channel = await self._channel(poll.channel_id)
+        if channel is None:
+            return
+        try:
+            message = await channel.fetch_message(payload.message_id)
+            member = payload.member or self.bot.get_user(payload.user_id)
+            if member is None:
+                try:
+                    member = await self.bot.fetch_user(payload.user_id)
+                except (discord.NotFound, discord.HTTPException):
+                    member = None
+            if member is not None:
+                await message.remove_reaction(payload.emoji, member)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            pass
+
     @app_commands.command(name="poll", description="Create a timed poll")
     @app_commands.guild_only()
     @app_commands.describe(
@@ -177,6 +206,7 @@ class PollCog(commands.Cog, name="Poll"):
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             message = await interaction.channel.send(embed=poll_embed(poll))
+            poll = self.service.update_delivery(poll.id, message_id=message.id)
             for emoji in poll.emojis:
                 await message.add_reaction(emoji)
             mod_message = await self.mod_channels.send(
@@ -184,9 +214,7 @@ class PollCog(commands.Cog, name="Poll"):
                 content=f"📊 Poll **{poll.title}** started in {interaction.channel.mention} by {interaction.user}.",
                 view=PollControlView(self, poll, "cancel"), silent=True,
             )
-            poll = self.service.update_delivery(
-                poll.id, message_id=message.id, mod_message_id=mod_message.id,
-            )
+            poll = self.service.update_delivery(poll.id, mod_message_id=mod_message.id)
             self.bot.add_view(PollControlView(self, poll, "cancel"), message_id=mod_message.id)
         except (discord.Forbidden, discord.HTTPException) as error:
             try:
@@ -238,7 +266,10 @@ class PollCog(commands.Cog, name="Poll"):
         choice = int(selected)
         if not 1 <= choice <= len(state["options"]):
             return False
-        state["votes"][str(actor_id)] = choice
+        voter = str(actor_id)
+        if voter in state["votes"]:
+            return True
+        state["votes"][voter] = choice
         return True
 
     async def _finish_portable_poll(self, key, seconds):
@@ -292,11 +323,10 @@ class PollCog(commands.Cog, name="Poll"):
             return
         channel, message = await self._message(poll.channel_id, poll.message_id)
         counts = {emoji: 0 for emoji in poll.emojis}
+        for option_index in poll.votes.values():
+            if 0 <= int(option_index) < len(poll.emojis):
+                counts[poll.emojis[int(option_index)]] += 1
         if message is not None:
-            for reaction in message.reactions:
-                emoji = str(reaction.emoji)
-                if emoji in counts:
-                    counts[emoji] = max(0, reaction.count - (1 if reaction.me else 0))
             try:
                 await message.delete()
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):

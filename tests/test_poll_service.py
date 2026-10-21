@@ -80,6 +80,17 @@ class PollStorageTests(unittest.TestCase):
         self.assertEqual(poll.results, [4, 4])
         self.assertEqual(self.service.publish(poll.id).status, "published")
 
+    def test_first_vote_is_locked(self):
+        poll = self.create_poll()
+        self.assertTrue(self.service.record_vote(poll.id, "user-1", 0))
+        self.assertFalse(self.service.record_vote(poll.id, "user-1", 1))
+        self.assertEqual(self.service.get(poll.id).votes, {"user-1": 0})
+
+    def test_finds_active_poll_by_message(self):
+        poll = self.create_poll()
+        self.service.update_delivery(poll.id, message_id="123")
+        self.assertEqual(self.service.find_active_by_message("123").id, poll.id)
+
     def test_due_returns_expired_active_poll(self):
         poll = self.create_poll()
         future = datetime.now(timezone.utc) + timedelta(minutes=6)
