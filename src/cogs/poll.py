@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
-from datetime import datetime, timezone
+from datetime import datetime
 
 import discord
 from discord import app_commands
@@ -16,7 +16,7 @@ from services.pollService import (
     PollService,
     format_duration,
     format_portable_results,
-    parse_duration,
+    parse_portable_duration,
     parse_portable_poll,
 )
 
@@ -25,14 +25,6 @@ POLL_EMOJIS = (
     "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "✅", "❌", "👍", "👎", "❤️",
     "🔥", "🎲", "⚔️", "🛡️", "🧙", "🐉", "⭐", "🌙", "☀️", "🎉",
 )
-EMOJI_CHOICES = [app_commands.Choice(name=value, value=value) for value in POLL_EMOJIS]
-UNIT_CHOICES = [
-    app_commands.Choice(name="Minutes", value="minutes"),
-    app_commands.Choice(name="Hours", value="hours"),
-    app_commands.Choice(name="Days", value="days"),
-]
-
-
 def is_moderator(member) -> bool:
     permissions = getattr(member, "guild_permissions", None)
     return bool(permissions and (
@@ -42,12 +34,163 @@ def is_moderator(member) -> bool:
 
 def poll_embed(poll) -> discord.Embed:
     timestamp = int(datetime.fromisoformat(poll.ends_at).timestamp())
+    counts = [0] * len(poll.options)
+    for selected in poll.votes.values():
+        if 0 <= int(selected) < len(counts):
+            counts[int(selected)] += 1
     embed = discord.Embed(title=poll.title, description=poll.description, color=0x5865F2)
-    for emoji, option in zip(poll.emojis, poll.options):
-        embed.add_field(name=f"{emoji} 0", value=option, inline=False)
+    for emoji, option, count in zip(poll.emojis, poll.options, counts):
+        embed.add_field(name=f"{emoji} {count}", value=option, inline=False)
     embed.add_field(name="Poll ends", value=f"<t:{timestamp}:R> (<t:{timestamp}:F>)", inline=False)
-    embed.set_footer(text="Select an option by reacting with its emoji.")
+    embed.set_footer(text="Select one option below. Your first vote is final.")
     return embed
+
+
+class PollDetailsModal(discord.ui.Modal, title="Create a Poll"):
+    duration = discord.ui.TextInput(
+        label="Duration", placeholder="30m, 2h, or 1d (maximum 30 days)", max_length=8
+    )
+    poll_title = discord.ui.TextInput(label="Poll title", max_length=200)
+    description = discord.ui.TextInput(
+        label="Description", style=discord.TextStyle.paragraph, max_length=2000
+    )
+    option_1 = discord.ui.TextInput(label="Option 1", max_length=300)
+    option_2 = discord.ui.TextInput(label="Option 2", max_length=300)
+
+    def __init__(self, cog: "PollCog"):
+        super().__init__()
+        self.cog = cog
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            duration = parse_portable_duration(self.duration.value)
+        except PollError as error:
+            return await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+        draft = {
+            "duration": duration,
+            "title": self.poll_title.value.strip(),
+            "description": self.description.value.strip(),
+            "options": [self.option_1.value.strip(), self.option_2.value.strip()],
+        }
+        await interaction.response.send_message(
+            "Add up to three more options, or continue with these two options.",
+            view=AdditionalOptionsView(self.cog, draft), ephemeral=True,
+        )
+
+
+class ExtraOptionsModal(discord.ui.Modal, title="Optional Poll Options"):
+    option_3 = discord.ui.TextInput(label="Option 3", required=False, max_length=300)
+    option_4 = discord.ui.TextInput(label="Option 4", required=False, max_length=300)
+    option_5 = discord.ui.TextInput(label="Option 5", required=False, max_length=300)
+
+    def __init__(self, cog: "PollCog", draft):
+        super().__init__()
+        self.cog = cog
+        self.draft = draft
+
+    async def on_submit(self, interaction: discord.Interaction):
+        extras = [self.option_3.value, self.option_4.value, self.option_5.value]
+        self.draft["options"] = self.draft["options"] + [
+            value.strip() for value in extras if value.strip()
+        ]
+        await interaction.response.edit_message(
+            content="Choose one unique emoji for each option. The poll will be created after the last selection.",
+            view=EmojiSetupView(self.cog, self.draft),
+        )
+
+
+class AdditionalOptionsView(discord.ui.View):
+    def __init__(self, cog: "PollCog", draft):
+        super().__init__(timeout=900)
+        self.cog = cog
+        self.draft = draft
+
+    @discord.ui.button(label="Use 2 Options", style=discord.ButtonStyle.primary)
+    async def use_two(self, interaction, _button):
+        await interaction.response.edit_message(
+            content="Choose one unique emoji for each option. The poll will be created after the last selection.",
+            view=EmojiSetupView(self.cog, self.draft),
+        )
+
+    @discord.ui.button(label="Add Options 3–5", style=discord.ButtonStyle.secondary)
+    async def add_more(self, interaction, _button):
+        await interaction.response.send_modal(ExtraOptionsModal(self.cog, self.draft))
+
+
+class EmojiSetupSelect(discord.ui.Select):
+    def __init__(self, view: "EmojiSetupView", index: int, option: str):
+        choices = [discord.SelectOption(label=emoji, value=emoji, emoji=emoji) for emoji in POLL_EMOJIS]
+        super().__init__(
+            placeholder=f"Emoji for option {index + 1}: {option[:60]}",
+            min_values=1, max_values=1, options=choices, row=index,
+        )
+        self.setup_view = view
+        self.index = index
+
+    async def callback(self, interaction: discord.Interaction):
+        self.setup_view.emojis[self.index] = self.values[0]
+        selected = [emoji for emoji in self.setup_view.emojis if emoji]
+        if len(selected) != len(self.setup_view.emojis):
+            return await interaction.response.defer()
+        if len(set(selected)) != len(selected):
+            self.setup_view.emojis[self.index] = None
+            return await interaction.response.send_message(
+                "❌ Each option must use a different emoji. Choose another emoji for this option.",
+                ephemeral=True,
+            )
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.setup_view.cog.create_discord_poll(
+            interaction, self.setup_view.draft, selected
+        )
+
+
+class EmojiSetupView(discord.ui.View):
+    def __init__(self, cog: "PollCog", draft):
+        super().__init__(timeout=900)
+        self.cog = cog
+        self.draft = draft
+        self.emojis = [None] * len(draft["options"])
+        for index, option in enumerate(draft["options"]):
+            self.add_item(EmojiSetupSelect(self, index, option))
+
+
+class PollVoteSelect(discord.ui.Select):
+    def __init__(self, cog: "PollCog", poll):
+        options = [
+            discord.SelectOption(label=option[:100], value=str(index), emoji=emoji)
+            for index, (option, emoji) in enumerate(zip(poll.options, poll.emojis))
+        ]
+        super().__init__(
+            placeholder="Select one option — your first vote is final",
+            min_values=1, max_values=1, options=options,
+            custom_id=f"eyebot:poll:vote:{poll.id}",
+        )
+        self.cog = cog
+        self.poll_id = poll.id
+
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            accepted = self.cog.service.record_vote(
+                self.poll_id, interaction.user.id, int(self.values[0])
+            )
+            poll = self.cog.service.get(self.poll_id)
+        except PollError as error:
+            return await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+        if not accepted:
+            return await interaction.response.send_message(
+                "❌ You have already voted in this poll. Your first vote is final.", ephemeral=True
+            )
+        await interaction.response.send_message("✅ Your vote was recorded.", ephemeral=True)
+        try:
+            await interaction.message.edit(embed=poll_embed(poll), view=PollVoteView(self.cog, poll))
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            pass
+
+
+class PollVoteView(discord.ui.View):
+    def __init__(self, cog: "PollCog", poll):
+        super().__init__(timeout=None)
+        self.add_item(PollVoteSelect(cog, poll))
 
 
 def results_embed(poll) -> discord.Embed:
@@ -122,93 +265,46 @@ class PollCog(commands.Cog, name="Poll"):
             return
         self._restored = True
         for poll in self.service.list():
-            if poll.status == "active" and poll.mod_message_id:
-                self.bot.add_view(PollControlView(self, poll, "cancel"), message_id=int(poll.mod_message_id))
+            if poll.status == "active":
+                if poll.message_id:
+                    self.bot.add_view(PollVoteView(self, poll), message_id=int(poll.message_id))
+                if poll.mod_message_id:
+                    self.bot.add_view(PollControlView(self, poll, "cancel"), message_id=int(poll.mod_message_id))
             elif poll.status == "ended" and poll.mod_message_id:
                 self.bot.add_view(PollControlView(self, poll, "publish"), message_id=int(poll.mod_message_id))
 
-    @commands.Cog.listener()
-    async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
-        if self.bot.user is None or payload.user_id == self.bot.user.id:
-            return
-        poll = self.service.find_active_by_message(payload.message_id)
-        if poll is None:
-            return
-        emoji = str(payload.emoji)
-        if emoji not in poll.emojis:
-            return
-        option_index = poll.emojis.index(emoji)
-        if self.service.record_vote(poll.id, payload.user_id, option_index):
-            return
-        channel = await self._channel(poll.channel_id)
-        if channel is None:
-            return
-        try:
-            message = await channel.fetch_message(payload.message_id)
-            member = payload.member or self.bot.get_user(payload.user_id)
-            if member is None:
-                try:
-                    member = await self.bot.fetch_user(payload.user_id)
-                except (discord.NotFound, discord.HTTPException):
-                    member = None
-            if member is not None:
-                await message.remove_reaction(payload.emoji, member)
-        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-            pass
-
     @app_commands.command(name="poll", description="Create a timed poll")
     @app_commands.guild_only()
-    @app_commands.describe(
-        duration="Whole-number poll duration", unit="Minutes, hours, or days (maximum 30 days)",
-        title="Poll title", description="Poll description",
-        option_1="First option", emoji_1="Emoji for the first option",
-        option_2="Second option", emoji_2="Emoji for the second option",
-        option_3="Optional third option", emoji_3="Emoji for the third option",
-        option_4="Optional fourth option", emoji_4="Emoji for the fourth option",
-        option_5="Optional fifth option", emoji_5="Emoji for the fifth option",
-    )
-    @app_commands.choices(
-        unit=UNIT_CHOICES, emoji_1=EMOJI_CHOICES, emoji_2=EMOJI_CHOICES,
-        emoji_3=EMOJI_CHOICES, emoji_4=EMOJI_CHOICES, emoji_5=EMOJI_CHOICES,
-    )
-    async def poll_slash(
-        self, interaction: discord.Interaction, duration: app_commands.Range[int, 1, 43200],
-        unit: app_commands.Choice[str], title: app_commands.Range[str, 1, 200],
-        description: app_commands.Range[str, 1, 2000], option_1: app_commands.Range[str, 1, 300],
-        emoji_1: app_commands.Choice[str], option_2: app_commands.Range[str, 1, 300],
-        emoji_2: app_commands.Choice[str], option_3: str | None = None,
-        emoji_3: app_commands.Choice[str] | None = None, option_4: str | None = None,
-        emoji_4: app_commands.Choice[str] | None = None, option_5: str | None = None,
-        emoji_5: app_commands.Choice[str] | None = None,
-    ):
+    async def poll_slash(self, interaction: discord.Interaction):
         mod_channel = self.mod_channels.configured_channel(interaction.guild)
         if mod_channel is None:
             return await interaction.response.send_message(
                 "❌ A moderator log channel must be configured before creating a poll.", ephemeral=True
             )
-        pairs = [(option_1, emoji_1), (option_2, emoji_2), (option_3, emoji_3), (option_4, emoji_4), (option_5, emoji_5)]
-        if any(bool(option) != bool(emoji) for option, emoji in pairs):
-            return await interaction.response.send_message(
-                "❌ Every filled option must have an emoji, and unused emoji fields must be blank.", ephemeral=True
+        await interaction.response.send_modal(PollDetailsModal(self))
+
+    async def create_discord_poll(self, interaction, draft, emojis):
+        mod_channel = self.mod_channels.configured_channel(interaction.guild)
+        if mod_channel is None:
+            return await interaction.followup.send(
+                "❌ The configured moderator log channel is no longer available.", ephemeral=True
             )
-        options = [option for option, emoji in pairs if option]
-        emojis = [emoji.value for option, emoji in pairs if option]
         try:
-            selected_duration = parse_duration(duration, unit.value)
             poll = self.service.create(
                 guild_id=interaction.guild_id, channel_id=interaction.channel_id,
-                creator_id=interaction.user.id, title=title, description=description,
-                options=options, emojis=emojis, duration=selected_duration,
+                creator_id=interaction.user.id, title=draft["title"],
+                description=draft["description"], options=draft["options"],
+                emojis=emojis, duration=draft["duration"],
                 mod_channel_id=mod_channel.id,
             )
         except PollError as error:
-            return await interaction.response.send_message(f"❌ {error}", ephemeral=True)
-        await interaction.response.defer(ephemeral=True, thinking=True)
+            return await interaction.followup.send(f"❌ {error}", ephemeral=True)
         try:
-            message = await interaction.channel.send(embed=poll_embed(poll))
+            message = await interaction.channel.send(
+                embed=poll_embed(poll), view=PollVoteView(self, poll)
+            )
             poll = self.service.update_delivery(poll.id, message_id=message.id)
-            for emoji in poll.emojis:
-                await message.add_reaction(emoji)
+            self.bot.add_view(PollVoteView(self, poll), message_id=message.id)
             mod_message = await self.mod_channels.send(
                 interaction.guild,
                 content=f"📊 Poll **{poll.title}** started in {interaction.channel.mention} by {interaction.user}.",
@@ -222,7 +318,7 @@ class PollCog(commands.Cog, name="Poll"):
             except PollError:
                 pass
             return await interaction.followup.send(
-                "❌ EyeBot could not create the poll. Check Send Messages, Embed Links, and Add Reactions permissions.",
+                "❌ EyeBot could not create the poll. Check its Send Messages, Embed Links, and Use External Emoji permissions.",
                 ephemeral=True,
             )
         await interaction.followup.send(f"✅ Poll created: {message.jump_url}", ephemeral=True)
