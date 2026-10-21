@@ -93,9 +93,9 @@ class ExtraOptionsModal(discord.ui.Modal, title="Optional Poll Options"):
         self.draft["options"] = self.draft["options"] + [
             value.strip() for value in extras if value.strip()
         ]
-        view = EmojiSetupView(self.cog, self.draft, interaction.guild)
         await interaction.response.edit_message(
-            content=view.prompt(), view=view,
+            content="Options saved. Continue to the third popup to assign one reaction to each option.",
+            view=EmojiNextView(self.cog, self.draft),
         )
 
 
@@ -105,147 +105,55 @@ class AdditionalOptionsView(discord.ui.View):
         self.cog = cog
         self.draft = draft
 
-    @discord.ui.button(label="Use 2 Options", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="Next: Choose Emojis", style=discord.ButtonStyle.primary)
     async def use_two(self, interaction, _button):
-        view = EmojiSetupView(self.cog, self.draft, interaction.guild)
-        await interaction.response.edit_message(
-            content=view.prompt(), view=view,
-        )
+        await interaction.response.send_modal(EmojiEntryModal(self.cog, self.draft))
 
-    @discord.ui.button(label="Add Options 3–5", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="Next: Options 3–5", style=discord.ButtonStyle.secondary)
     async def add_more(self, interaction, _button):
         await interaction.response.send_modal(ExtraOptionsModal(self.cog, self.draft))
 
 
-class EmojiSetupSelect(discord.ui.Select):
-    def __init__(self, view: "EmojiSetupView"):
-        start = view.page * 25
-        page_items = view.available_emojis[start:start + 25]
-        choices = [
-            discord.SelectOption(label=label[:100], value=value, emoji=display)
-            for value, label, display in page_items
-        ]
-        option = view.draft["options"][view.option_index]
-        super().__init__(
-            placeholder=f"Reaction for option {view.option_index + 1}: {option[:55]}",
-            min_values=1, max_values=1, options=choices, row=0,
-        )
-        self.setup_view = view
-
-    async def callback(self, interaction: discord.Interaction):
-        await self.setup_view.accept_emoji(interaction, self.values[0])
-
-
-class ManualEmojiModal(discord.ui.Modal, title="Enter Any Emoji"):
-    emoji = discord.ui.TextInput(
-        label="Unicode or server emoji",
-        placeholder="Paste 😀 or <:server_emoji:123456789>",
-        max_length=100,
-    )
-
-    def __init__(self, setup_view: "EmojiSetupView"):
-        super().__init__()
-        self.setup_view = setup_view
+class EmojiEntryModal(discord.ui.Modal):
+    def __init__(self, cog: "PollCog", draft):
+        super().__init__(title="Poll Reactions")
+        self.cog = cog
+        self.draft = draft
+        self.emoji_inputs = []
+        for index, option in enumerate(draft["options"], 1):
+            field = discord.ui.TextInput(
+                label=f"Option {index}: {option}"[:45],
+                placeholder="Paste a Unicode or server emoji",
+                max_length=100,
+            )
+            self.emoji_inputs.append(field)
+            self.add_item(field)
 
     async def on_submit(self, interaction: discord.Interaction):
-        value = self.emoji.value.strip()
-        partial = discord.PartialEmoji.from_str(value)
-        if partial.id is not None:
-            guild_emoji = interaction.guild.get_emoji(partial.id)
-            usable = getattr(guild_emoji, "is_usable", None) if guild_emoji else None
-            if guild_emoji is None or (callable(usable) and not usable()):
-                return await interaction.response.send_message(
-                    "❌ That custom emoji is not available to EyeBot in this server.", ephemeral=True
-                )
-            value = str(guild_emoji)
-        await self.setup_view.accept_emoji(interaction, value)
+        emojis = []
+        for field in self.emoji_inputs:
+            try:
+                emoji = self.cog.resolve_poll_emoji(interaction.guild, field.value)
+            except PollError as error:
+                return await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            emojis.append(emoji)
+        if len(set(emojis)) != len(emojis):
+            return await interaction.response.send_message(
+                "❌ Each poll option must use a different emoji.", ephemeral=True
+            )
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.cog.create_discord_poll(interaction, self.draft, emojis)
 
 
-class EmojiSetupView(discord.ui.View):
-    def __init__(self, cog: "PollCog", draft, guild):
+class EmojiNextView(discord.ui.View):
+    def __init__(self, cog: "PollCog", draft):
         super().__init__(timeout=900)
         self.cog = cog
         self.draft = draft
-        self.guild = guild
-        self.emojis = []
-        self.option_index = 0
-        self.page = 0
-        standard = [(emoji, f"Standard {emoji}", emoji) for emoji in POLL_EMOJIS]
-        custom = []
-        for emoji in getattr(guild, "emojis", ()):
-            usable = getattr(emoji, "is_usable", None)
-            if callable(usable) and not usable():
-                continue
-            custom.append((str(emoji), f":{emoji.name}:", emoji))
-        self.catalog = standard + custom
-        self.rebuild()
 
-    @property
-    def available_emojis(self):
-        selected = set(self.emojis)
-        return [item for item in self.catalog if item[0] not in selected]
-
-    @property
-    def page_count(self):
-        return max(1, (len(self.available_emojis) + 24) // 25)
-
-    def prompt(self):
-        option = self.draft["options"][self.option_index]
-        return (
-            f"Choose a reaction for option {self.option_index + 1}: **{option}** "
-            f"(emoji page {self.page + 1}/{self.page_count}). Use **Enter Any Emoji** "
-            "to paste another Unicode emoji."
-        )
-
-    async def accept_emoji(self, interaction, value):
-        if value in self.emojis:
-            return await interaction.response.send_message(
-                "❌ Each option must use a different emoji.", ephemeral=True
-            )
-        self.emojis.append(value)
-        self.option_index += 1
-        self.page = 0
-        if self.option_index == len(self.draft["options"]):
-            await interaction.response.defer(ephemeral=True, thinking=True)
-            return await self.cog.create_discord_poll(interaction, self.draft, self.emojis)
-        self.rebuild()
-        await interaction.response.edit_message(content=self.prompt(), view=self)
-
-    def rebuild(self):
-        self.clear_items()
-        self.page = min(self.page, self.page_count - 1)
-        self.add_item(EmojiSetupSelect(self))
-        previous = discord.ui.Button(
-            label="Previous Emoji Page", style=discord.ButtonStyle.secondary,
-            disabled=self.page == 0, row=1,
-        )
-        next_page = discord.ui.Button(
-            label="Next Emoji Page", style=discord.ButtonStyle.secondary,
-            disabled=self.page >= self.page_count - 1, row=1,
-        )
-        manual = discord.ui.Button(
-            label="Enter Any Emoji", style=discord.ButtonStyle.primary, row=2,
-        )
-
-        async def previous_callback(interaction):
-            self.page -= 1
-            self.rebuild()
-            await interaction.response.edit_message(content=self.prompt(), view=self)
-
-        async def next_callback(interaction):
-            self.page += 1
-            self.rebuild()
-            await interaction.response.edit_message(content=self.prompt(), view=self)
-
-        async def manual_callback(interaction):
-            await interaction.response.send_modal(ManualEmojiModal(self))
-
-        previous.callback = previous_callback
-        next_page.callback = next_callback
-        manual.callback = manual_callback
-        self.add_item(previous)
-        self.add_item(next_page)
-        self.add_item(manual)
+    @discord.ui.button(label="Next: Choose Emojis", style=discord.ButtonStyle.primary)
+    async def choose_emojis(self, interaction, _button):
+        await interaction.response.send_modal(EmojiEntryModal(self.cog, self.draft))
 
 
 def results_embed(poll) -> discord.Embed:
@@ -301,6 +209,22 @@ class PollCog(commands.Cog, name="Poll"):
         self._restored = False
         self.portable_polls = {}
         self.portable_destinations = {}
+
+    @staticmethod
+    def resolve_poll_emoji(guild, value):
+        selected = str(value or "").strip()
+        if not selected:
+            raise PollError("Every poll option requires an emoji.")
+        partial = discord.PartialEmoji.from_str(selected)
+        if partial.id is None:
+            return selected
+        emoji = guild.get_emoji(partial.id) if guild is not None else None
+        usable = getattr(emoji, "is_usable", None) if emoji else None
+        if emoji is None or (callable(usable) and not usable()):
+            raise PollError(
+                "A selected custom emoji is not available to EyeBot in this server."
+            )
+        return str(emoji)
 
     async def cog_load(self):
         if hasattr(self.bot, "tree") and not self.poll_timer.is_running():
