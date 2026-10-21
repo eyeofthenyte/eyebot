@@ -1,0 +1,359 @@
+"""Discord reaction polls and portable livestream-chat polls."""
+
+from __future__ import annotations
+
+import asyncio
+import os
+from datetime import datetime, timezone
+
+import discord
+from discord import app_commands
+from discord.ext import commands, tasks
+
+from services.modChannelService import ModChannelHandler
+from services.pollService import (
+    PollError,
+    PollService,
+    format_duration,
+    format_portable_results,
+    parse_duration,
+    parse_portable_poll,
+)
+
+
+POLL_EMOJIS = (
+    "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "✅", "❌", "👍", "👎", "❤️",
+    "🔥", "🎲", "⚔️", "🛡️", "🧙", "🐉", "⭐", "🌙", "☀️", "🎉",
+)
+EMOJI_CHOICES = [app_commands.Choice(name=value, value=value) for value in POLL_EMOJIS]
+UNIT_CHOICES = [
+    app_commands.Choice(name="Minutes", value="minutes"),
+    app_commands.Choice(name="Hours", value="hours"),
+    app_commands.Choice(name="Days", value="days"),
+]
+
+
+def is_moderator(member) -> bool:
+    permissions = getattr(member, "guild_permissions", None)
+    return bool(permissions and (
+        permissions.administrator or permissions.manage_guild or permissions.manage_messages
+    ))
+
+
+def poll_embed(poll) -> discord.Embed:
+    timestamp = int(datetime.fromisoformat(poll.ends_at).timestamp())
+    embed = discord.Embed(title=poll.title, description=poll.description, color=0x5865F2)
+    for emoji, option in zip(poll.emojis, poll.options):
+        embed.add_field(name=f"{emoji} 0", value=option, inline=False)
+    embed.add_field(name="Poll ends", value=f"<t:{timestamp}:R> (<t:{timestamp}:F>)", inline=False)
+    embed.set_footer(text="Select an option by reacting with its emoji.")
+    return embed
+
+
+def results_embed(poll) -> discord.Embed:
+    embed = discord.Embed(title=poll.title, color=0x57F287)
+    for emoji, option, count in zip(poll.emojis, poll.options, poll.results):
+        embed.add_field(name=f"{emoji} {count}", value=option, inline=False)
+    embed.set_footer(text="Final poll results")
+    return embed
+
+
+class PollButton(discord.ui.Button):
+    def __init__(self, cog: "PollCog", poll, action: str, *, disabled=False):
+        publish = action == "publish"
+        super().__init__(
+            label="Publish Poll Results" if publish else "Cancel Poll",
+            emoji="📣" if publish else "✖️",
+            style=discord.ButtonStyle.success if publish else discord.ButtonStyle.danger,
+            custom_id=f"eyebot:poll:{action}:{poll.id}",
+            disabled=disabled,
+        )
+        self.cog = cog
+        self.poll_id = poll.id
+        self.action = action
+
+    async def callback(self, interaction: discord.Interaction):
+        if not is_moderator(interaction.user):
+            return await interaction.response.send_message(
+                "❌ Only moderators may manage polls.", ephemeral=True
+            )
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        if self.action == "cancel":
+            await self.cog.cancel_poll(interaction, self.poll_id)
+        else:
+            await self.cog.publish_poll(interaction, self.poll_id)
+
+
+class PollControlView(discord.ui.View):
+    def __init__(self, cog: "PollCog", poll, action: str, *, disabled=False):
+        super().__init__(timeout=None)
+        self.add_item(PollButton(cog, poll, action, disabled=disabled))
+
+
+class PollCog(commands.Cog, name="Poll"):
+    def __init__(self, bot):
+        self.bot = bot
+        self.logger = getattr(bot, "logger", None)
+        self.mod_channels = ModChannelHandler(bot)
+        default_root = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "data", "guilds")
+        )
+        guild_root = os.getenv("EYEBOT_GUILD_CONFIG_DIR", default_root)
+        self.service = PollService(os.path.join(guild_root, ".polls"))
+        self._restored = False
+        self.portable_polls = {}
+        self.portable_destinations = {}
+
+    async def cog_load(self):
+        if hasattr(self.bot, "tree") and not self.poll_timer.is_running():
+            self.poll_timer.start()
+
+    async def cog_unload(self):
+        if self.poll_timer.is_running():
+            self.poll_timer.cancel()
+        for value in self.portable_polls.values():
+            task = value.get("task")
+            if task:
+                task.cancel()
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        if self._restored:
+            return
+        self._restored = True
+        for poll in self.service.list():
+            if poll.status == "active" and poll.mod_message_id:
+                self.bot.add_view(PollControlView(self, poll, "cancel"), message_id=int(poll.mod_message_id))
+            elif poll.status == "ended" and poll.mod_message_id:
+                self.bot.add_view(PollControlView(self, poll, "publish"), message_id=int(poll.mod_message_id))
+
+    @app_commands.command(name="poll", description="Create a timed poll")
+    @app_commands.guild_only()
+    @app_commands.describe(
+        duration="Whole-number poll duration", unit="Minutes, hours, or days (maximum 30 days)",
+        title="Poll title", description="Poll description",
+        option_1="First option", emoji_1="Emoji for the first option",
+        option_2="Second option", emoji_2="Emoji for the second option",
+        option_3="Optional third option", emoji_3="Emoji for the third option",
+        option_4="Optional fourth option", emoji_4="Emoji for the fourth option",
+        option_5="Optional fifth option", emoji_5="Emoji for the fifth option",
+    )
+    @app_commands.choices(
+        unit=UNIT_CHOICES, emoji_1=EMOJI_CHOICES, emoji_2=EMOJI_CHOICES,
+        emoji_3=EMOJI_CHOICES, emoji_4=EMOJI_CHOICES, emoji_5=EMOJI_CHOICES,
+    )
+    async def poll_slash(
+        self, interaction: discord.Interaction, duration: app_commands.Range[int, 1, 43200],
+        unit: app_commands.Choice[str], title: app_commands.Range[str, 1, 200],
+        description: app_commands.Range[str, 1, 2000], option_1: app_commands.Range[str, 1, 300],
+        emoji_1: app_commands.Choice[str], option_2: app_commands.Range[str, 1, 300],
+        emoji_2: app_commands.Choice[str], option_3: str | None = None,
+        emoji_3: app_commands.Choice[str] | None = None, option_4: str | None = None,
+        emoji_4: app_commands.Choice[str] | None = None, option_5: str | None = None,
+        emoji_5: app_commands.Choice[str] | None = None,
+    ):
+        mod_channel = self.mod_channels.configured_channel(interaction.guild)
+        if mod_channel is None:
+            return await interaction.response.send_message(
+                "❌ A moderator log channel must be configured before creating a poll.", ephemeral=True
+            )
+        pairs = [(option_1, emoji_1), (option_2, emoji_2), (option_3, emoji_3), (option_4, emoji_4), (option_5, emoji_5)]
+        if any(bool(option) != bool(emoji) for option, emoji in pairs):
+            return await interaction.response.send_message(
+                "❌ Every filled option must have an emoji, and unused emoji fields must be blank.", ephemeral=True
+            )
+        options = [option for option, emoji in pairs if option]
+        emojis = [emoji.value for option, emoji in pairs if option]
+        try:
+            selected_duration = parse_duration(duration, unit.value)
+            poll = self.service.create(
+                guild_id=interaction.guild_id, channel_id=interaction.channel_id,
+                creator_id=interaction.user.id, title=title, description=description,
+                options=options, emojis=emojis, duration=selected_duration,
+                mod_channel_id=mod_channel.id,
+            )
+        except PollError as error:
+            return await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            message = await interaction.channel.send(embed=poll_embed(poll))
+            for emoji in poll.emojis:
+                await message.add_reaction(emoji)
+            mod_message = await self.mod_channels.send(
+                interaction.guild,
+                content=f"📊 Poll **{poll.title}** started in {interaction.channel.mention} by {interaction.user}.",
+                view=PollControlView(self, poll, "cancel"), silent=True,
+            )
+            poll = self.service.update_delivery(
+                poll.id, message_id=message.id, mod_message_id=mod_message.id,
+            )
+            self.bot.add_view(PollControlView(self, poll, "cancel"), message_id=mod_message.id)
+        except (discord.Forbidden, discord.HTTPException) as error:
+            try:
+                self.service.cancel(poll.id)
+            except PollError:
+                pass
+            return await interaction.followup.send(
+                "❌ EyeBot could not create the poll. Check Send Messages, Embed Links, and Add Reactions permissions.",
+                ephemeral=True,
+            )
+        await interaction.followup.send(f"✅ Poll created: {message.jump_url}", ephemeral=True)
+
+    @commands.command(name="poll")
+    async def poll_portable(self, ctx, *, specification: str = ""):
+        request = getattr(ctx, "request", None)
+        if request is None or getattr(request.platform, "value", "discord") == "discord":
+            return await ctx.send("Use `/poll` to create a Discord poll.")
+        try:
+            duration, title, description, options = parse_portable_poll(request.raw_content, request.prefix)
+        except PollError as error:
+            return await ctx.send(f"❌ {error}")
+        key = (request.platform.value, str(request.location.channel_id))
+        existing = self.portable_polls.get(key)
+        if existing and not existing["task"].done():
+            return await ctx.send("❌ A poll is already active in this channel.")
+        state = {
+            "title": title, "description": description, "options": options,
+            "votes": {}, "duration": duration, "task": None,
+        }
+        self.portable_polls[key] = state
+        state["task"] = asyncio.create_task(self._finish_portable_poll(key, duration.total_seconds()))
+        await ctx.send(
+            f"{title} {description} Vote by submitting the number for the option you wish to select. "
+            f"The poll is open for {format_duration(duration)}."
+        )
+        await ctx.send("Select one of the following options: " + ", ".join(
+            f"{index}-{option}" for index, option in enumerate(options, 1)
+        ))
+
+    def bind_portable_destination(self, platform, channel_id, sender):
+        self.portable_destinations[(str(platform), str(channel_id))] = sender
+
+    def record_portable_vote(self, platform, channel_id, actor_id, content) -> bool:
+        key = (str(platform), str(channel_id))
+        state = self.portable_polls.get(key)
+        selected = str(content or "").strip()
+        if state is None or not selected.isdecimal():
+            return False
+        choice = int(selected)
+        if not 1 <= choice <= len(state["options"]):
+            return False
+        state["votes"][str(actor_id)] = choice
+        return True
+
+    async def _finish_portable_poll(self, key, seconds):
+        try:
+            await asyncio.sleep(seconds)
+            state = self.portable_polls.get(key)
+            if state is None:
+                return
+            sender = self.portable_destinations.get(key)
+            if sender is not None:
+                await sender(format_portable_results(
+                    state["title"], state["options"], state["votes"].values()
+                ))
+        finally:
+            self.portable_polls.pop(key, None)
+
+    @tasks.loop(seconds=15)
+    async def poll_timer(self):
+        for poll in self.service.due():
+            try:
+                await self.end_poll(poll.id)
+            except Exception as error:
+                if self.logger:
+                    self.logger.error(f"Poll {poll.id} could not be ended: {error}", guild_id=poll.guild_id)
+
+    @poll_timer.before_loop
+    async def before_poll_timer(self):
+        await self.bot.wait_until_ready()
+
+    async def _channel(self, channel_id):
+        channel = self.bot.get_channel(int(channel_id))
+        if channel is None:
+            try:
+                channel = await self.bot.fetch_channel(int(channel_id))
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                return None
+        return channel
+
+    async def _message(self, channel_id, message_id):
+        channel = await self._channel(channel_id)
+        if channel is None or not message_id:
+            return channel, None
+        try:
+            return channel, await channel.fetch_message(int(message_id))
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            return channel, None
+
+    async def end_poll(self, poll_id):
+        poll = self.service.get(poll_id)
+        if poll.status != "active":
+            return
+        channel, message = await self._message(poll.channel_id, poll.message_id)
+        counts = {emoji: 0 for emoji in poll.emojis}
+        if message is not None:
+            for reaction in message.reactions:
+                emoji = str(reaction.emoji)
+                if emoji in counts:
+                    counts[emoji] = max(0, reaction.count - (1 if reaction.me else 0))
+            try:
+                await message.delete()
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                pass
+        poll = self.service.end(poll.id, [counts[emoji] for emoji in poll.emojis])
+        if channel is not None:
+            await channel.send(f"Poll - {poll.title} - has ended.")
+        guild = self.bot.get_guild(int(poll.guild_id))
+        mod_channel = await self._channel(poll.mod_channel_id) if poll.mod_channel_id else None
+        if guild is not None and mod_channel is not None:
+            mod_message = await self.mod_channels.send(
+                guild, channel=mod_channel,
+                content=f"⏱️ Poll **{poll.title}** has ended.",
+                view=PollControlView(self, poll, "publish"), silent=True,
+            )
+            poll = self.service.update_delivery(poll.id, mod_message_id=mod_message.id)
+            self.bot.add_view(PollControlView(self, poll, "publish"), message_id=mod_message.id)
+
+    async def cancel_poll(self, interaction, poll_id):
+        try:
+            poll = self.service.cancel(poll_id)
+        except PollError as error:
+            return await interaction.followup.send(f"❌ {error}", ephemeral=True)
+        channel, message = await self._message(poll.channel_id, poll.message_id)
+        if message is not None:
+            try:
+                await message.delete()
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                pass
+        notice = f"Poll - {poll.title} - was canceled."
+        if channel is not None:
+            await channel.send(notice)
+        await interaction.channel.send(notice, allowed_mentions=discord.AllowedMentions.none())
+        if interaction.message:
+            await interaction.message.edit(view=PollControlView(self, poll, "cancel", disabled=True))
+        await interaction.followup.send("✅ Poll canceled.", ephemeral=True)
+
+    async def publish_poll(self, interaction, poll_id):
+        try:
+            poll = self.service.get(poll_id)
+            if poll.status != "ended":
+                raise PollError(f"Poll is already {poll.status}.")
+            channel = await self._channel(poll.channel_id)
+            if channel is None:
+                raise PollError("The original poll channel is unavailable.")
+            await channel.send(embed=results_embed(poll))
+            poll = self.service.publish(poll.id)
+        except PollError as error:
+            return await interaction.followup.send(f"❌ {error}", ephemeral=True)
+        await interaction.channel.send(
+            f"Poll - {poll.title} - has been published to {channel.mention}",
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+        if interaction.message:
+            await interaction.message.edit(view=PollControlView(self, poll, "publish", disabled=True))
+        await interaction.followup.send("✅ Poll results published.", ephemeral=True)
+
+
+async def setup(bot):
+    await bot.add_cog(PollCog(bot))

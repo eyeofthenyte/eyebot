@@ -14,7 +14,7 @@ class PortableCogHost:
         self.google_sheets = None
 
     def add_cog(self, cog):
-        self.cogs[type(cog).__name__] = cog
+        self.cogs[getattr(cog, "qualified_name", type(cog).__name__)] = cog
 
     def get_command(self, name):
         normalized = name.strip().casefold()
@@ -39,6 +39,7 @@ def build_portable_runtime(*, config, logger):
     from cogs.loot import Loot
     from cogs.namegen import NameGen
     from cogs.oracle import Oracle
+    from cogs.poll import PollCog
     from cogs.roller import Roll, load_config
     from cogs.trinket import Trinket
     from cogs.wildmagic import WildMagic
@@ -53,6 +54,7 @@ def build_portable_runtime(*, config, logger):
         Loot,
         NameGen,
         Oracle,
+        PollCog,
         Trinket,
         WildMagic,
     ):
@@ -66,4 +68,6 @@ def build_portable_runtime(*, config, logger):
     roller.config = load_config()
     host.add_cog(roller)
 
-    return host, build_portable_router(host.cogs, strict=True)
+    router = build_portable_router(host.cogs, strict=True)
+    router.poll_cog = host.cogs.get("Poll")
+    return host, router

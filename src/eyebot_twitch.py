@@ -123,6 +123,13 @@ class Bot(commands.Bot):
     async def event_message(self, message):
         if getattr(message, "echo", False):
             return
+        poll = self.command_host.cogs.get("Poll")
+        if poll is not None:
+            channel_id = getattr(message.channel, "id", None) or getattr(message.channel, "name", "")
+            actor_id = getattr(message.author, "id", None) or getattr(message.author, "name", "")
+            poll.bind_portable_destination("twitch", channel_id, message.channel.send)
+            if poll.record_portable_vote("twitch", channel_id, actor_id, message.content):
+                return
         if await self.command_transport.dispatch(message):
             return
         await self.handle_commands(message)

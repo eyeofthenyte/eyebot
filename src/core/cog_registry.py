@@ -35,6 +35,9 @@ PORTABLE_COMMANDS = (
     PortableCommandSpec("NameGen", "namegen", "namegen", (), "variadic"),
     PortableCommandSpec("Oracle", "oracle", "oracle", (), "joined", "question"),
     PortableCommandSpec(
+        "Poll", "poll_portable", "poll", (), "optional_joined", "specification",
+    ),
+    PortableCommandSpec(
         "Roll", "roll", "roll", ("r",), "optional_joined", "args", True,
     ),
     PortableCommandSpec(

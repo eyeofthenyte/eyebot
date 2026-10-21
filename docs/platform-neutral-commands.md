@@ -169,3 +169,21 @@ boundary, including configured DM channel and DM role destinations.
 Requests and responses support `to_dict()` and `from_dict()`. This allows them
 to cross process boundaries, enter a queue, or be logged without serializing
 platform SDK objects.
+
+# Polls
+
+Discord uses the `/poll` application command. Twitch and Kick chat use the
+configured command prefix and comma-separated fields:
+
+```text
+!poll 30 Who should roll?, Vote for who should roll, Fred, Judy, Bill, Bert, Anna
+```
+
+An unsigned duration is minutes. Add `h`/`H` for hours or `d`/`D` for days;
+polls may run for at most 30 days. Viewers vote by posting only the option
+number while the poll is active. When time expires, EyeBot posts every option
+tied for the highest vote count.
+
+YouTube, Facebook, and TikTok do not currently expose inbound livestream chat
+to EyeBot, so they cannot collect numbered votes until their inbound chat
+connectors are available.

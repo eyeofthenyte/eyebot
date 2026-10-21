@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from adapters.kick_adapter import request_from_kick_chat_event, send_kick_response
-from core.command_model import CommandParseError
+from core.command_model import CommandParseError, CommandResponse
 from services.tokenRefreshService import TokenRefreshService
 
 
@@ -63,6 +63,17 @@ class KickCommandService:
         guild_id = matches[0]
         guild = self.platforms.discord_guilds().get(guild_id, {})
         prefix = str(guild.get("prefix") or self.config.get("prefix") or "!")
+        poll = getattr(self.router, "poll_cog", None)
+        payload = event.payload
+        broadcaster = payload.get("broadcaster") if isinstance(payload, dict) else {}
+        sender = payload.get("sender") if isinstance(payload, dict) else {}
+        channel_id = str((broadcaster or {}).get("user_id") or "")
+        actor_id = str((sender or {}).get("user_id") or "")
+        content = str(payload.get("content") or "") if isinstance(payload, dict) else ""
+        if poll is not None and poll.record_portable_vote(
+            "kick", channel_id, actor_id, content
+        ):
+            return "processed_poll_vote"
         try:
             command_request = request_from_kick_chat_event(
                 event.payload,
@@ -76,6 +87,12 @@ class KickCommandService:
 
         await self.tokens.refresh_guild(guild_id, "kick", session)
         settings = self.platforms.effective_guild_platform(guild_id, "kick")
+        if poll is not None:
+            async def send_poll_result(text):
+                await send_kick_response(
+                    session, settings, command_request, CommandResponse.text(text)
+                )
+            poll.bind_portable_destination("kick", channel_id, send_poll_result)
         response = await self.router.dispatch(command_request)
         sent_ids = await send_kick_response(
             session, settings, command_request, response
