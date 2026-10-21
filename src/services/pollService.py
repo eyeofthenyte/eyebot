@@ -13,6 +13,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
 
+import emoji as unicode_emoji
+
 
 MAX_DURATION = timedelta(days=30)
 PORTABLE_DURATION_RE = re.compile(r"^(?P<amount>[0-9]+)(?P<unit>[mMhHdD]?)$")
@@ -20,6 +22,13 @@ PORTABLE_DURATION_RE = re.compile(r"^(?P<amount>[0-9]+)(?P<unit>[mMhHdD]?)$")
 
 class PollError(ValueError):
     """A poll validation or state-transition error safe to show to users."""
+
+
+def normalize_builtin_emoji(value: str) -> str | None:
+    """Return one Unicode emoji from a pasted glyph or recognized shortcode."""
+    selected = str(value or "").strip()
+    converted = unicode_emoji.emojize(selected, language="alias")
+    return converted if unicode_emoji.is_emoji(converted) else None
 
 
 def utc_now() -> datetime:

@@ -22,7 +22,7 @@ RUN apt-get update \
 COPY requirements.txt ./
 RUN python -m pip install --requirement requirements.txt
 RUN python -m pip check
-RUN python -c "import aiohttp, atproto, cryptography, discord, facebook, feedparser, googleapiclient, google_auth_oauthlib, gspread, instagrapi, kickapi, PIL, pymupdf, pypdf, requests, substack_api, TikTokApi, tweepy, twitchio, yaml"
+RUN python -c "import aiohttp, atproto, cryptography, discord, emoji, facebook, feedparser, googleapiclient, google_auth_oauthlib, gspread, instagrapi, kickapi, PIL, pymupdf, pypdf, requests, substack_api, TikTokApi, tweepy, twitchio, yaml"
 
 COPY . .
 

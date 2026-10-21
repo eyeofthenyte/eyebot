@@ -7,6 +7,7 @@ from services.pollService import (
     PollService,
     format_duration,
     format_portable_results,
+    normalize_builtin_emoji,
     parse_duration,
     parse_portable_duration,
     parse_portable_poll,
@@ -14,6 +15,17 @@ from services.pollService import (
 
 
 class PollParsingTests(unittest.TestCase):
+    def test_builtin_emoji_shortcodes_are_normalized(self):
+        self.assertEqual(normalize_builtin_emoji(":smile:"), "😄")
+        self.assertEqual(normalize_builtin_emoji(":thumbsup:"), "👍")
+        self.assertEqual(normalize_builtin_emoji(":thumbs_up:"), "👍")
+
+    def test_pasted_unicode_emoji_is_preserved(self):
+        self.assertEqual(normalize_builtin_emoji("🔥"), "🔥")
+
+    def test_non_emoji_text_is_rejected(self):
+        self.assertIsNone(normalize_builtin_emoji("not-an-emoji"))
+
     def test_plain_portable_duration_is_minutes(self):
         self.assertEqual(parse_portable_duration("30"), timedelta(minutes=30))
 

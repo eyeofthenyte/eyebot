@@ -17,6 +17,7 @@ from services.pollService import (
     PollService,
     format_duration,
     format_portable_results,
+    normalize_builtin_emoji,
     parse_portable_duration,
     parse_portable_poll,
 )
@@ -224,21 +225,24 @@ class PollCog(commands.Cog, name="Poll"):
                 guild.emojis,
             )
             usable = getattr(emoji, "is_usable", None) if emoji else None
+            if emoji is not None and (not callable(usable) or usable()):
+                return str(emoji)
+        partial = discord.PartialEmoji.from_str(selected)
+        if partial.id is not None:
+            emoji = guild.get_emoji(partial.id) if guild is not None else None
+            usable = getattr(emoji, "is_usable", None) if emoji else None
             if emoji is None or (callable(usable) and not usable()):
                 raise PollError(
-                    f"The custom emoji `{selected}` is not available to EyeBot in this server."
+                    "A selected custom emoji is not available to EyeBot in this server."
                 )
             return str(emoji)
-        partial = discord.PartialEmoji.from_str(selected)
-        if partial.id is None:
-            return selected
-        emoji = guild.get_emoji(partial.id) if guild is not None else None
-        usable = getattr(emoji, "is_usable", None) if emoji else None
-        if emoji is None or (callable(usable) and not usable()):
-            raise PollError(
-                "A selected custom emoji is not available to EyeBot in this server."
-            )
-        return str(emoji)
+        converted = normalize_builtin_emoji(selected)
+        if converted is not None:
+            return converted
+        raise PollError(
+            f"`{selected}` is not a recognized emoji. Paste the emoji itself or use "
+            "a built-in shortcode such as `:smile:` or `:thumbsup:`."
+        )
 
     @staticmethod
     def reaction_value(value):

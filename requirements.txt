@@ -5,6 +5,7 @@ PyMuPDF==1.28.2
 atproto==0.0.69
 cryptography==46.0.7
 discord.py==2.7.1
+emoji==2.14.1
 facebook-sdk==3.1.0
 feedparser==6.0.14
 google-api-python-client==2.198.0
