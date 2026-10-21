@@ -173,9 +173,11 @@ platform SDK objects.
 # Polls
 
 Discord uses the `/poll` application command, which opens a guided popup for
-the poll details, optional choices, and emoji selection. Voting uses a dropdown;
-each user's first selection is final. Twitch and Kick chat use the configured
-command prefix and comma-separated fields:
+the poll details, optional choices, and emoji selection. The emoji picker pages
+through every usable custom emoji in the server and also accepts pasted Unicode
+emoji. Voting uses reactions; each user's first listed reaction is final, and
+EyeBot removes later selections. Twitch and Kick chat use the configured command
+prefix and comma-separated fields:
 
 ```text
 !poll 30 Who should roll?, Vote for who should roll, Fred, Judy, Bill, Bert, Anna
