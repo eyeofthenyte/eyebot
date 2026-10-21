@@ -254,6 +254,23 @@ class PollService:
             self._write(store)
             return True
 
+    def remove_vote(self, poll_id, user_id, option_index: int) -> bool:
+        """Clear a vote only when the user removed their currently selected option."""
+        with self._lock:
+            store = self._read()
+            value = store["polls"].get(str(poll_id))
+            if not isinstance(value, dict):
+                raise PollError("Poll was not found.")
+            if value.get("status") != "active":
+                return False
+            votes = value.setdefault("votes", {})
+            voter = str(user_id)
+            if int(votes.get(voter, -1)) != int(option_index):
+                return False
+            del votes[voter]
+            self._write(store)
+            return True
+
     def update_delivery(self, poll_id, **fields) -> Poll:
         allowed = {"message_id", "mod_channel_id", "mod_message_id"}
         if set(fields) - allowed:

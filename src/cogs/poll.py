@@ -45,7 +45,9 @@ def poll_embed(poll) -> discord.Embed:
     for emoji, option, count in zip(poll.emojis, poll.options, counts):
         embed.add_field(name=f"{emoji} {count}", value=option, inline=False)
     embed.add_field(name="Poll ends", value=f"<t:{timestamp}:R> (<t:{timestamp}:F>)", inline=False)
-    embed.set_footer(text="React with one listed emoji. Your first vote is final.")
+    embed.set_footer(
+        text="One active vote per user. Remove your reaction before choosing another."
+    )
     return embed
 
 
@@ -250,6 +252,27 @@ class PollCog(commands.Cog, name="Poll"):
         partial = discord.PartialEmoji.from_str(str(value))
         return partial if partial.id is not None else str(value)
 
+    @staticmethod
+    def emoji_identity(value):
+        partial = (
+            value if isinstance(value, discord.PartialEmoji)
+            else discord.PartialEmoji.from_str(str(value))
+        )
+        if partial.id is not None:
+            return ("custom", int(partial.id))
+        # Discord may omit the optional presentation selector in reaction events.
+        return ("unicode", str(partial.name or value).replace("\ufe0f", ""))
+
+    def reaction_option_index(self, poll, emoji):
+        selected = self.emoji_identity(emoji)
+        return next(
+            (
+                index for index, configured in enumerate(poll.emojis)
+                if self.emoji_identity(configured) == selected
+            ),
+            None,
+        )
+
     async def cog_load(self):
         if hasattr(self.bot, "tree") and not self.poll_timer.is_running():
             self.poll_timer.start()
@@ -281,11 +304,11 @@ class PollCog(commands.Cog, name="Poll"):
         poll = self.service.find_active_by_message(payload.message_id)
         if poll is None:
             return
-        selected_emoji = str(payload.emoji)
-        if selected_emoji not in poll.emojis:
+        option_index = self.reaction_option_index(poll, payload.emoji)
+        if option_index is None:
             return
         accepted = self.service.record_vote(
-            poll.id, payload.user_id, poll.emojis.index(selected_emoji)
+            poll.id, payload.user_id, option_index
         )
         channel = await self._channel(poll.channel_id)
         if channel is None:
@@ -299,6 +322,27 @@ class PollCog(commands.Cog, name="Poll"):
             if member is None:
                 member = await self.bot.fetch_user(payload.user_id)
             await message.remove_reaction(payload.emoji, member)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            pass
+
+    @commands.Cog.listener()
+    async def on_raw_reaction_remove(self, payload: discord.RawReactionActionEvent):
+        if self.bot.user is None or payload.user_id == self.bot.user.id:
+            return
+        poll = self.service.find_active_by_message(payload.message_id)
+        if poll is None:
+            return
+        option_index = self.reaction_option_index(poll, payload.emoji)
+        if option_index is None:
+            return
+        if not self.service.remove_vote(poll.id, payload.user_id, option_index):
+            return
+        channel = await self._channel(poll.channel_id)
+        if channel is None:
+            return
+        try:
+            message = await channel.fetch_message(payload.message_id)
+            await message.edit(embed=poll_embed(self.service.get(poll.id)))
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             pass
 

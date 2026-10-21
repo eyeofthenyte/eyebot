@@ -98,6 +98,19 @@ class PollStorageTests(unittest.TestCase):
         self.assertFalse(self.service.record_vote(poll.id, "user-1", 1))
         self.assertEqual(self.service.get(poll.id).votes, {"user-1": 0})
 
+    def test_removing_current_vote_allows_another_selection(self):
+        poll = self.create_poll()
+        self.assertTrue(self.service.record_vote(poll.id, "user-1", 0))
+        self.assertTrue(self.service.remove_vote(poll.id, "user-1", 0))
+        self.assertTrue(self.service.record_vote(poll.id, "user-1", 1))
+        self.assertEqual(self.service.get(poll.id).votes, {"user-1": 1})
+
+    def test_removing_an_option_not_selected_does_not_clear_vote(self):
+        poll = self.create_poll()
+        self.service.record_vote(poll.id, "user-1", 0)
+        self.assertFalse(self.service.remove_vote(poll.id, "user-1", 1))
+        self.assertEqual(self.service.get(poll.id).votes, {"user-1": 0})
+
     def test_finds_active_poll_by_message(self):
         poll = self.create_poll()
         self.service.update_delivery(poll.id, message_id="123")
